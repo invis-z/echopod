@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 enum {
-    HAL_AUDIO_VOLUME_MAX = 50
+    HAL_AUDIO_VOLUME_MAX = 85
 };
 
 typedef enum HalAudioState {

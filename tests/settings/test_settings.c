@@ -47,10 +47,10 @@ static void defaults_are_comfortable(void)
     CHECK_EQUAL(START_MAIN_MENU, settings.start_screen);
     CHECK_EQUAL(SHUFFLE_OFF, settings.shuffle);
     CHECK_EQUAL(REPEAT_OFF, settings.repeat);
-    CHECK_EQUAL(12, settings.volume);
+    CHECK_EQUAL(40, settings.volume);
     CHECK_EQUAL(5u * 60000u, settings_auto_off_ms(&settings));
     CHECK_EQUAL(USB_MODE_STORAGE, settings.usb_mode);
-    CHECK_EQUAL(30, settings.dac_volume);
+    CHECK_EQUAL(60, settings.dac_volume);
 }
 
 static void auto_off_options_are_stocks(void)
