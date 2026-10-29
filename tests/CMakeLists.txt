@@ -437,3 +437,6 @@ if(EXISTS ${ECHO_TOOLS_PYTHON})
 else()
     message(STATUS "tools venv not found: run python3 -m venv .venv && .venv/bin/pip install -r tools/requirements.txt")
 endif()
+
+add_executable(library_size_probe library/library_size_probe.c)
+target_link_libraries(library_size_probe PRIVATE echo_library_scan echo_options)
