@@ -34,7 +34,7 @@ typedef enum DacCurve {
 enum {
     DAC_LEFT_ADDRESS = 0x60,
     DAC_RIGHT_ADDRESS = 0x66,
-    DAC_VOLUME_LEVELS = 50,
+    DAC_VOLUME_LEVELS = 85,
     DAC_BALANCE_CENTER = 12,
     DAC_VOLUME_MUTED = 0xFF
 };
