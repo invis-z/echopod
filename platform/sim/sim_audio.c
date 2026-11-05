@@ -344,11 +344,6 @@ void hal_audio_set_output(HalAudioOutput output)
     unlock();
 }
 
-void hal_audio_set_bluetooth_level(HalAudioBluetoothLevel level)
-{
-    (void)level;
-}
-
 void hal_audio_allow_slow_clock(bool allowed)
 {
     (void)allowed;

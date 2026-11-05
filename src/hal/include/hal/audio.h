@@ -6,7 +6,7 @@
 #include "dsp/equalizer.h"
 
 enum {
-    HAL_AUDIO_VOLUME_MAX = 50
+    HAL_AUDIO_VOLUME_MAX = 85
 };
 
 typedef enum HalAudioState {
@@ -25,11 +25,6 @@ typedef enum HalAudioOutput {
     HAL_AUDIO_OUTPUT_SINGLE_ENDED,
     HAL_AUDIO_OUTPUT_BALANCED
 } HalAudioOutput;
-
-typedef enum HalAudioBluetoothLevel {
-    HAL_AUDIO_BLUETOOTH_STANDARD,
-    HAL_AUDIO_BLUETOOTH_LOUDER
-} HalAudioBluetoothLevel;
 
 typedef enum HalAudioJack {
     HAL_AUDIO_JACK_NONE,
@@ -133,7 +128,6 @@ void hal_audio_set_gain(HalAudioGain gain);
 void hal_audio_set_filter(uint8_t filter);
 void hal_audio_set_balance(uint8_t balance);
 void hal_audio_set_output(HalAudioOutput output);
-void hal_audio_set_bluetooth_level(HalAudioBluetoothLevel level);
 void hal_audio_set_equalizer(const EqualizerCurve *curve);
 void hal_audio_allow_slow_clock(bool allowed);
 HalAudioStatus hal_audio_status(void);
