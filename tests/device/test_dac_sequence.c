@@ -346,28 +346,31 @@ static void the_gain_setting_writes_the_headphone_gain_register(void)
 static void volume_levels_map_onto_the_pcm_volume_scale(void)
 {
     CHECK_EQUAL(0xFF, dac_volume_value(0, DAC_CURVE_SINGLE_ENDED));
-    CHECK_EQUAL(0x5E, dac_volume_value(12, DAC_CURVE_SINGLE_ENDED));
-    CHECK_EQUAL(0x3E, dac_volume_value(25, DAC_CURVE_SINGLE_ENDED));
-    CHECK_EQUAL(0x02, dac_volume_value(50, DAC_CURVE_SINGLE_ENDED));
-    CHECK_EQUAL(0x02, dac_volume_value(80, DAC_CURVE_SINGLE_ENDED));
+    CHECK_EQUAL(0xAA, dac_volume_value(1, DAC_CURVE_SINGLE_ENDED));
+    CHECK_EQUAL(0xA8, dac_volume_value(2, DAC_CURVE_SINGLE_ENDED));
+    CHECK_EQUAL(0x5E, dac_volume_value(39, DAC_CURVE_SINGLE_ENDED));
+    CHECK_EQUAL(0x04, dac_volume_value(84, DAC_CURVE_SINGLE_ENDED));
+    CHECK_EQUAL(0x02, dac_volume_value(85, DAC_CURVE_SINGLE_ENDED));
+    CHECK_EQUAL(0x02, dac_volume_value(160, DAC_CURVE_SINGLE_ENDED));
 }
 
 static void the_balanced_curve_sits_three_units_lower(void)
 {
     CHECK_EQUAL(0xFF, dac_volume_value(0, DAC_CURVE_BALANCED));
-    CHECK_EQUAL(0x61, dac_volume_value(12, DAC_CURVE_BALANCED));
-    CHECK_EQUAL(0x05, dac_volume_value(50, DAC_CURVE_BALANCED));
+    CHECK_EQUAL(0xAD, dac_volume_value(1, DAC_CURVE_BALANCED));
+    CHECK_EQUAL(0x61, dac_volume_value(39, DAC_CURVE_BALANCED));
+    CHECK_EQUAL(0x05, dac_volume_value(85, DAC_CURVE_BALANCED));
 }
 
-static void the_quietest_steps_start_at_stock_s_floor_and_rise_smoothly(void)
+static void every_level_is_one_decibel_from_the_next(void)
 {
-    CHECK_EQUAL(0xB3, dac_volume_value(1, DAC_CURVE_SINGLE_ENDED));
-    CHECK_EQUAL(0xC8, dac_volume_value(1, DAC_CURVE_BALANCED));
-    for (uint8_t level = 1; level < 8; level++) {
-        CHECK(dac_volume_value(level + 1, DAC_CURVE_SINGLE_ENDED) <
-              dac_volume_value(level, DAC_CURVE_SINGLE_ENDED));
-        CHECK(dac_volume_value(level + 1, DAC_CURVE_BALANCED) <
-              dac_volume_value(level, DAC_CURVE_BALANCED));
+    for (uint8_t level = 1; level < 85; level++) {
+        CHECK_EQUAL(dac_volume_value(level, DAC_CURVE_SINGLE_ENDED) - 2,
+                    dac_volume_value(level + 1, DAC_CURVE_SINGLE_ENDED));
+        CHECK_EQUAL(dac_volume_value(level, DAC_CURVE_BALANCED) - 2,
+                    dac_volume_value(level + 1, DAC_CURVE_BALANCED));
+        CHECK_EQUAL(dac_volume_value(level, DAC_CURVE_BLUETOOTH) - 2,
+                    dac_volume_value(level + 1, DAC_CURVE_BLUETOOTH));
     }
 }
 
@@ -386,20 +389,20 @@ static void balance_attenuates_one_chip_only(void)
 static void the_bluetooth_curve_sits_thirteen_units_below_single_ended(void)
 {
     CHECK_EQUAL(0xFF, dac_volume_value(0, DAC_CURVE_BLUETOOTH));
-    CHECK_EQUAL(0x85, dac_volume_value(1, DAC_CURVE_BLUETOOTH));
-    CHECK_EQUAL(0x6B, dac_volume_value(12, DAC_CURVE_BLUETOOTH));
-    CHECK_EQUAL(0x0F, dac_volume_value(50, DAC_CURVE_BLUETOOTH));
+    CHECK_EQUAL(0xB7, dac_volume_value(1, DAC_CURVE_BLUETOOTH));
+    CHECK_EQUAL(0x6B, dac_volume_value(39, DAC_CURVE_BLUETOOTH));
+    CHECK_EQUAL(0x0F, dac_volume_value(85, DAC_CURVE_BLUETOOTH));
 }
 
 static void the_louder_bluetooth_curve_tops_out_where_the_wired_one_does(void)
 {
     CHECK_EQUAL(0xFF, dac_volume_value(0, DAC_CURVE_BLUETOOTH_LOUD));
-    CHECK_EQUAL(0x78, dac_volume_value(1, DAC_CURVE_BLUETOOTH_LOUD));
-    CHECK_EQUAL(0x5E, dac_volume_value(12, DAC_CURVE_BLUETOOTH_LOUD));
-    CHECK_EQUAL(dac_volume_value(50, DAC_CURVE_SINGLE_ENDED),
-                dac_volume_value(50, DAC_CURVE_BLUETOOTH_LOUD));
-    CHECK_EQUAL(dac_volume_value(50, DAC_CURVE_BLUETOOTH) - 13,
-                dac_volume_value(50, DAC_CURVE_BLUETOOTH_LOUD));
+    CHECK_EQUAL(0xAA, dac_volume_value(1, DAC_CURVE_BLUETOOTH_LOUD));
+    CHECK_EQUAL(0x94, dac_volume_value(12, DAC_CURVE_BLUETOOTH_LOUD));
+    CHECK_EQUAL(dac_volume_value(85, DAC_CURVE_SINGLE_ENDED),
+                dac_volume_value(85, DAC_CURVE_BLUETOOTH_LOUD));
+    CHECK_EQUAL(dac_volume_value(85, DAC_CURVE_BLUETOOTH) - 13,
+                dac_volume_value(85, DAC_CURVE_BLUETOOTH_LOUD));
 }
 
 static void a_volume_ramp_moves_six_units_a_step_and_lands_on_the_target(void)
@@ -438,7 +441,7 @@ int main(void)
         TEST_CASE(the_gain_setting_writes_the_headphone_gain_register),
         TEST_CASE(volume_levels_map_onto_the_pcm_volume_scale),
         TEST_CASE(the_balanced_curve_sits_three_units_lower),
-        TEST_CASE(the_quietest_steps_start_at_stock_s_floor_and_rise_smoothly),
+        TEST_CASE(every_level_is_one_decibel_from_the_next),
         TEST_CASE(the_bluetooth_curve_sits_thirteen_units_below_single_ended),
         TEST_CASE(balance_attenuates_one_chip_only),
         TEST_CASE(the_louder_bluetooth_curve_tops_out_where_the_wired_one_does),

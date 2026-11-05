@@ -25,19 +25,16 @@ typedef struct Write {
 #define HEADPHONE_GAIN 0x080000u
 
 enum {
-    TOP_VOLUME_VALUE = 0x7A,
-    BALANCED_TOP_VOLUME_VALUE = 0x7D,
-    BLUETOOTH_TOP_VOLUME_VALUE = 0x87,
-    SINGLE_ENDED_FLOOR_VOLUME_VALUE = 0xB3,
-    BALANCED_FLOOR_VOLUME_VALUE = 0xC8,
-    LOW_END_STEPS = 3,
+    TOP_VOLUME_VALUE = 0xAC,
+    BALANCED_TOP_VOLUME_VALUE = 0xAF,
+    BLUETOOTH_TOP_VOLUME_VALUE = 0xB9,
     FILTER_COUNT = 5,
     FILTER_MAP = 0x090000,
     BALANCE_UNITS_PER_STEP = 2,
     RAMP_STEP = 6,
     RAMP_FLOOR = 0xC0,
-    VOLUME_STEP_NUMERATOR = 12,
-    VOLUME_STEP_DENOMINATOR = 5,
+    VOLUME_STEP_NUMERATOR = 2,
+    VOLUME_STEP_DENOMINATOR = 1,
     GAIN_HIGH_VALUE = 0x31,
     GAIN_LOW_VALUE = 0x10
 };
@@ -276,20 +273,6 @@ static uint32_t curve_top(DacCurve curve)
     return TOP_VOLUME_VALUE;
 }
 
-static uint32_t curve_floor(DacCurve curve)
-{
-    switch (curve) {
-    case DAC_CURVE_BALANCED:
-        return BALANCED_FLOOR_VOLUME_VALUE;
-    case DAC_CURVE_SINGLE_ENDED:
-        return SINGLE_ENDED_FLOOR_VOLUME_VALUE;
-    case DAC_CURVE_BLUETOOTH:
-    case DAC_CURVE_BLUETOOTH_LOUD:
-        break;
-    }
-    return 0;
-}
-
 uint8_t dac_volume_value(uint8_t level, DacCurve curve)
 {
     if (level == 0) {
@@ -297,12 +280,6 @@ uint8_t dac_volume_value(uint8_t level, DacCurve curve)
     }
     uint32_t capped = level < DAC_VOLUME_LEVELS ? level : DAC_VOLUME_LEVELS;
     uint32_t top = curve_top(curve);
-    uint32_t floor = curve_floor(curve);
-    if (floor != 0 && capped <= LOW_END_STEPS) {
-        uint32_t target =
-            top - VOLUME_STEP_NUMERATOR * (LOW_END_STEPS + 1) / VOLUME_STEP_DENOMINATOR;
-        return (uint8_t)(floor - (floor - target) * (capped - 1) / LOW_END_STEPS);
-    }
     return (uint8_t)(top - VOLUME_STEP_NUMERATOR * capped / VOLUME_STEP_DENOMINATOR);
 }
 
