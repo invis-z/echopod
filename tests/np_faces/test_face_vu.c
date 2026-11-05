@@ -407,7 +407,8 @@ static void the_volume_bar_is_cream_and_proportional_to_the_volume(void)
         int y = landscape ? BAR_LANDSCAPE_Y : BAR_PORTRAIT_Y;
         int width = landscape ? BAR_LANDSCAPE_WIDTH : BAR_PORTRAIT_WIDTH;
         np_test_draw(&scene, pixels);
-        CHECK_EQUAL(32 * width / 50, fill_width(&scene, pixels, x, y, width, CREAM));
+        CHECK_EQUAL(32 * width / SETTINGS_VOLUME_MAX,
+                    fill_width(&scene, pixels, x, y, width, CREAM));
     }
 }
 

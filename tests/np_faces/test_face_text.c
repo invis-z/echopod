@@ -416,12 +416,12 @@ static void the_progress_width_is_proportional_and_clamped(void)
     CHECK_EQUAL(750, face_progress_width(3000000000u, 4000000000u, 1000));
 }
 
-static void the_volume_width_scales_to_fifty_and_clamps(void)
+static void the_volume_width_scales_to_eighty_five_and_clamps(void)
 {
     CHECK_EQUAL(0, face_volume_width(0, 150));
-    CHECK_EQUAL(96, face_volume_width(32, 150));
-    CHECK_EQUAL(75, face_volume_width(25, 150));
-    CHECK_EQUAL(150, face_volume_width(50, 150));
+    CHECK_EQUAL(56, face_volume_width(32, 150));
+    CHECK_EQUAL(30, face_volume_width(17, 150));
+    CHECK_EQUAL(150, face_volume_width(85, 150));
     CHECK_EQUAL(150, face_volume_width(200, 150));
 }
 
@@ -449,7 +449,7 @@ static void the_bar_shows_the_volume_in_the_hot_colour_even_while_scrubbing(void
     scene.frame.scrubbing = true;
     NowPlayingFrame frame = np_test_frame(&scene);
     FaceFill fill = face_bar_fill(&frame, 150);
-    CHECK_EQUAL(96, fill.width);
+    CHECK_EQUAL(56, fill.width);
     CHECK(fill.hot);
 }
 
@@ -654,7 +654,7 @@ int main(void)
         TEST_CASE(the_volume_feedback_replaces_the_lyric_as_a_static_label),
         TEST_CASE(scrubbing_replaces_everything_with_the_hint),
         TEST_CASE(the_progress_width_is_proportional_and_clamped),
-        TEST_CASE(the_volume_width_scales_to_fifty_and_clamps),
+        TEST_CASE(the_volume_width_scales_to_eighty_five_and_clamps),
         TEST_CASE(the_bar_shows_the_position_in_the_normal_colour),
         TEST_CASE(the_bar_follows_the_scrub_target_in_the_hot_colour),
         TEST_CASE(the_bar_shows_the_volume_in_the_hot_colour_even_while_scrubbing),

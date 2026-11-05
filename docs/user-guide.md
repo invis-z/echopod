@@ -81,7 +81,7 @@ During a long copy the screen goes dark after 30 seconds; any button lights it a
 1. On the player, Settings → System → USB mode → DAC.
 2. Plug in the USB cable. The player shows "USB DAC". No driver is needed on Windows 10 and later, macOS, Linux, Android or iOS (phones need a USB-C or Lightning adapter that passes data).
 3. On the computer, choose Rippl as the sound output (Windows: the speaker icon in the taskbar; macOS: System Settings → Sound → Output). The player shows the format, for example "Playing from computer · 48 kHz 24-bit".
-4. Use the computer's volume, the player's volume keys, or both. DAC mode has its own volume, separate from music: it starts at 30 of 50, the screen shows it ("48 kHz 24-bit · Volume 30"), and the player remembers it for next time. Start low. The volume buttons work as on Now Playing: a tap changes the volume, and right after a tap holding the rocker keeps changing it; your Swap volume buttons, Volume buttons and orientation settings apply.
+4. Use the computer's volume, the player's volume keys, or both. DAC mode has its own volume, separate from music: it starts at 60 of 85, the screen shows it ("48 kHz 24-bit · Volume 60"), and the player remembers it for next time. Start low. The volume buttons work as on Now Playing: a tap changes the volume, and right after a tap holding the rocker keeps changing it; your Swap volume buttons, Volume buttons and orientation settings apply.
 5. The player's buttons control the computer's player, like a headset: ▶ is play/pause, holding + or − for a second is next or previous (or a tap, with Volume buttons set to *Tap: skip, hold: volume*), and Menu is next when it's set to Next track. Whether the app reacts depends on it, as with a keyboard's media keys.
 6. Unplug when you're done, or hold Back for a second to go back to the player's own music (it keeps charging).
 
@@ -177,7 +177,7 @@ At the top of an artist's, album artist's or genre's album list, **Play all** pl
 
 Choose Settings on Home, or hold ≡ anywhere except on Now Playing. The top of the list holds the settings you change most: **Shuffle**, **Repeat**, **Bluetooth** (see Bluetooth headphones), **Equalizer** (see Equalizer) and **Sleep timer**. The rest are in five groups: ▶ opens a group, and Back goes back to Settings. Each row shows its current value, and a change applies as soon as you pick it.
 
-- **Sound:** **Gain** (Low or High), **Output** (Auto, 3.5 mm or 4.4 mm), **Filter**, **Balance**, and **Bluetooth level**, which makes Bluetooth headphones louder (see Bluetooth headphones).
+- **Sound:** **Gain** (Low or High), **Output** (Auto, 3.5 mm or 4.4 mm), **Filter**, **Balance**.
 - **Display:** **Theme** picks the look of menus, lists, headers and Now Playing:
   - **Dark:** the default, light text on near-black, with a blue bar.
   - **Light:** dark text on a light background.
@@ -265,7 +265,7 @@ Settings → Bluetooth shows whether Bluetooth is on and which headphones are co
 
 Music plays through the headphones whenever nothing is plugged into either jack. To switch to wired headphones, pause, plug them in and press play: while music is going to Bluetooth the player can't see the jack. After you unplug, the next play goes back to Bluetooth. Each play or resume waits a moment (about half a second) before the music starts, so the headphones don't miss the opening.
 
-**Too quiet?** Settings → Sound → **Bluetooth level** has *Standard* and *Louder*. Standard is the level earlier versions used; Louder raises the signal sent to the Bluetooth module by 6.5 dB, to the same top level as the 3.5 mm jack. If Louder distorts at full volume with your headphones, go back to Standard. The headphones' own volume control is separate from the player's.
+**Volume:** the player sends Bluetooth headphones the same level the 3.5 mm jack would get at that volume, so the volume buttons cover the whole range. The headphones' own volume control is separate from the player's.
 
 The headphones' controls work: pause, play and next/previous track, and taking them out of your ears pauses if they have in-ear detection. If they disconnect, playback pauses. With nothing connected for 5 minutes, Bluetooth switches itself off to save battery; it comes back when you open its screen, press play with nothing plugged in, or restart the player. A small Bluetooth mark next to the play icon at the top shows Bluetooth is on (dim) or connected (bright).
 

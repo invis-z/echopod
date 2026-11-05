@@ -679,18 +679,6 @@ int fake_hal_audio_output(void)
     return (int)fake.audio.output;
 }
 
-static HalAudioBluetoothLevel bluetooth_level;
-
-void hal_audio_set_bluetooth_level(HalAudioBluetoothLevel level)
-{
-    bluetooth_level = level;
-}
-
-int fake_hal_audio_bluetooth_level(void)
-{
-    return (int)bluetooth_level;
-}
-
 static bool slow_clock_allowed;
 
 void hal_audio_allow_slow_clock(bool allowed)

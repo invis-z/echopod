@@ -640,7 +640,7 @@ static void volume_and_scrubbing_drive_the_cells(void)
         NpTestScene scrub = scene_of(layout, NP_TEST_SCRUBBING);
         draw_into(&volume, pixels);
         draw_into(&scrub, other);
-        CHECK_EQUAL(volume.status.volume * cells / 50, lit_cells(pixels, layout));
+        CHECK_EQUAL(volume.status.volume * cells / SETTINGS_VOLUME_MAX, lit_cells(pixels, layout));
         CHECK_EQUAL(expected_cells(SCRUB_MS, scrub.status.duration_ms, cells),
                     lit_cells(other, layout));
     }
