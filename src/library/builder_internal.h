@@ -21,13 +21,14 @@ enum {
     BUILDER_ROW_SPOKEN_BIT = 1,
     BUILDER_ROW_GUESSED_BIT = 2,
     BUILDER_FOLDER_SIZE = 8,
+    BUILDER_FOLDER_HASH_SIZE = 14,
     BUILDER_MAX_DEPTH = 64,
     BUILDER_TEXT_CAPACITY = 1024,
     BUILDER_MAX_RECORD = 2 * BUILDER_TEXT_CAPACITY + 64,
     BUILDER_MAX_PLAYLISTS = 1024,
     BUILDER_ALIGNMENT = 8,
     BUILDER_ENTRY_HEADER = 6,
-    BUILDER_ENTRY_VALUES = 16,
+    BUILDER_ENTRY_VALUES = 32,
     BUILDER_PAIR_SIZE = BUILDER_ENTRY_HEADER + 2
 };
 
@@ -100,6 +101,7 @@ typedef struct FolderRow {
 } FolderRow;
 
 typedef struct ChainLevel {
+    uint64_t hash;
     uint16_t node;
     uint16_t start;
     uint16_t length;
@@ -109,6 +111,7 @@ typedef struct ScanTime {
     Out rows;
     Out folders;
     Out heap;
+    Out folder_hashes;
     char chain_text[BUILDER_TEXT_CAPACITY];
     ChainLevel chain[BUILDER_MAX_DEPTH];
     uint32_t chain_depth;
@@ -116,12 +119,7 @@ typedef struct ScanTime {
     char previous[BUILDER_FIELDS][BUILDER_TEXT_CAPACITY];
     uint32_t previous_text[BUILDER_FIELDS];
     uint16_t previous_length[BUILDER_FIELDS];
-    uint32_t *folder_first;
-    uint32_t *folder_second;
-    uint16_t *folder_parent;
-    uint16_t *folder_slots;
-    uint32_t folder_capacity;
-    uint32_t folder_mask;
+    uint32_t sibling_depth;
 } ScanTime;
 
 typedef struct GroupTable {
@@ -164,12 +162,10 @@ typedef struct Prepared {
     uint32_t folder_link_count;
     Region title_order;
     uint32_t index_mark;
-    uint16_t *positions;
-    uint16_t *exact;
-    uint32_t exact_mask;
-    uint16_t *by_name;
-    uint32_t by_name_mask;
-    uint16_t *next_same_name;
+    Region exact;
+    Region by_name;
+    Cache lookup;
+    Cache positions;
     void *resolve;
     Cache rows;
     Cache folders;
@@ -194,6 +190,8 @@ typedef struct BuilderState {
     uint32_t text_bytes;
     Region rows;
     Region folders;
+    Region folder_hashes;
+    bool folders_unsorted;
     ScanTime *scan;
     Prepared *prepared;
     bool prepare_done;
@@ -251,6 +249,7 @@ void builder_row_encode(const TrackRow *row, uint8_t *bytes);
 void builder_folder_decode(const uint8_t *bytes, FolderRow *row);
 void builder_folder_encode(const FolderRow *row, uint8_t *bytes);
 
+bool builder_merge_folders(BuilderState *state);
 bool builder_guess_album_artists(BuilderState *state, Prepared *prepared);
 bool builder_rank(BuilderState *state, Prepared *prepared);
 bool builder_model(BuilderState *state, Prepared *prepared);
@@ -260,10 +259,6 @@ uint32_t builder_resolve_entry(BuilderState *state, Prepared *prepared, const ch
 uint32_t builder_folded_path(BuilderState *state, Prepared *prepared, uint32_t position, char *out);
 BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink sink,
                              uint32_t capacity, uint32_t *length);
-bool builder_read_column(BuilderState *state, Region column, uint16_t *values, uint32_t count);
-bool builder_write_column(BuilderState *state, Region column, const uint16_t *values,
-                          uint32_t count);
 bool builder_read_text(Cache *heap, uint32_t offset, uint32_t length, char *text);
 bool builder_read_row(Cache *rows, const BuilderState *state, uint32_t track, TrackRow *row);
 bool builder_read_folder(Cache *folders, const BuilderState *state, uint32_t node, FolderRow *row);
-uint16_t *builder_load_column(BuilderState *state, Region column, uint32_t count);

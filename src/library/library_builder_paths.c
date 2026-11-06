@@ -7,7 +7,11 @@
 enum {
     PATH_CAPACITY = 1024,
     MAX_PARTS = 64,
-    EMPTY_SLOT = 0
+    STREAM_BUFFER = 4096,
+    PLACE_SIZE = 8,
+    INDEX_ENTRY = 8,
+    LOOKUP_BLOCK = 1024,
+    LOOKUP_BLOCKS = 4
 };
 
 typedef struct Span {
@@ -39,15 +43,6 @@ static ResolveScratch *scratch_of(const Prepared *prepared)
     return prepared->resolve;
 }
 
-static uint32_t slots_for(uint32_t count)
-{
-    uint32_t result = 16;
-    while (result < count + count / 4) {
-        result *= 2;
-    }
-    return result;
-}
-
 static uint32_t append_folded(char *out, uint32_t used, const char *text, uint32_t length)
 {
     if (used >= PATH_CAPACITY - 1) {
@@ -56,12 +51,24 @@ static uint32_t append_folded(char *out, uint32_t used, const char *text, uint32
     return used + (uint32_t)case_fold_make(text, length, out + used, PATH_CAPACITY - used);
 }
 
-uint32_t builder_folded_path(BuilderState *state, Prepared *prepared, uint32_t position, char *out)
+static bool track_at(Prepared *prepared, uint32_t position, uint32_t *track)
+{
+    uint8_t bytes[2];
+    if (!cache_read(&prepared->positions, prepared->final_tracks.offset + position * 2, bytes,
+                    sizeof bytes)) {
+        return false;
+    }
+    *track = builder_get16(bytes);
+    return true;
+}
+
+static uint32_t folded_track_path(BuilderState *state, Prepared *prepared, uint32_t track,
+                                  char *out)
 {
     char *name = scratch_of(prepared)->name;
     TrackRow row;
     out[0] = '\0';
-    if (!builder_read_row(&prepared->rows, state, prepared->positions[position], &row)) {
+    if (!builder_read_row(&prepared->rows, state, track, &row)) {
         return 0;
     }
     FolderRow chain[BUILDER_MAX_DEPTH];
@@ -90,12 +97,20 @@ uint32_t builder_folded_path(BuilderState *state, Prepared *prepared, uint32_t p
     return append_folded(out, used, name, length);
 }
 
-static uint32_t folded_name_hash(BuilderState *state, Prepared *prepared, uint32_t position,
+uint32_t builder_folded_path(BuilderState *state, Prepared *prepared, uint32_t position, char *out)
+{
+    uint32_t track = 0;
+    out[0] = '\0';
+    return track_at(prepared, position, &track) ? folded_track_path(state, prepared, track, out)
+                                                : 0;
+}
+
+static uint32_t folded_name_hash(BuilderState *state, Prepared *prepared, uint32_t track,
                                  char *folded)
 {
     char *name = scratch_of(prepared)->name;
     TrackRow row;
-    if (!builder_read_row(&prepared->rows, state, prepared->positions[position], &row) ||
+    if (!builder_read_row(&prepared->rows, state, track, &row) ||
         !builder_read_text(&prepared->heap, row.text[BUILDER_FILE], row.length[BUILDER_FILE],
                            name)) {
         return 0;
@@ -121,52 +136,126 @@ static bool same_folded_path(BuilderState *state, Prepared *prepared, uint32_t p
     return true;
 }
 
-static void index_exact(BuilderState *state, Prepared *prepared, uint32_t position)
+static int by_hash_then_position(const uint8_t *left, const uint8_t *right, const void *context)
 {
-    char *folded = scratch_of(prepared)->folded;
-    uint32_t length = builder_folded_path(state, prepared, position, folded);
-    uint32_t hash = hash_update(HASH_START, folded, length);
-    for (uint32_t probe = 0;; probe++) {
-        uint16_t *slot = &prepared->exact[(hash + probe) & prepared->exact_mask];
-        if (*slot == EMPTY_SLOT || same_folded_path(state, prepared, *slot - 1u, folded, length)) {
-            *slot = (uint16_t)(position + 1);
-            return;
-        }
+    (void)context;
+    uint32_t a = builder_get32(left + 2);
+    uint32_t b = builder_get32(right + 2);
+    if (a != b) {
+        return a < b ? -1 : 1;
     }
+    uint32_t c = builder_get16(left + 6);
+    uint32_t d = builder_get16(right + 6);
+    return c < d ? -1 : c > d ? 1 : 0;
 }
 
-static void index_name(BuilderState *state, Prepared *prepared, uint32_t position)
+static bool put_index_entry(Out *out, uint32_t hash, uint32_t position)
 {
-    uint32_t hash = folded_name_hash(state, prepared, position, scratch_of(prepared)->folded);
-    uint16_t *head = &prepared->by_name[hash & prepared->by_name_mask];
-    prepared->next_same_name[position] = *head;
-    *head = (uint16_t)(position + 1);
+    uint8_t entry[INDEX_ENTRY];
+    builder_put16(entry, INDEX_ENTRY);
+    builder_put32(entry + 2, hash);
+    builder_put16(entry + 6, position);
+    return out_put(out, entry, sizeof entry);
+}
+
+static bool emit_index_entries(BuilderState *state, Prepared *prepared, Out *exact, Out *names)
+{
+    ResolveScratch *scratch = scratch_of(prepared);
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (buffer == NULL) {
+        return false;
+    }
+    In places;
+    in_open(&places, &state->store, prepared->track_place.offset,
+            prepared->track_place.offset + state->track_count * PLACE_SIZE, buffer, STREAM_BUFFER);
+    for (uint32_t track = 0; track < state->track_count; track++) {
+        uint8_t place[PLACE_SIZE];
+        if (!in_get(&places, place, sizeof place)) {
+            return false;
+        }
+        uint32_t position = builder_get16(place);
+        uint32_t length = folded_track_path(state, prepared, track, scratch->folded);
+        uint32_t path_hash = hash_update(HASH_START, scratch->folded, length);
+        uint32_t name_hash = folded_name_hash(state, prepared, track, scratch->folded);
+        if (state->store.io_failed || !put_index_entry(exact, path_hash, position) ||
+            !put_index_entry(names, name_hash, position)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool sort_index(BuilderState *state, Region input, Region *sorted)
+{
+    SortJob job = {.store = &state->store,
+                   .arena = &state->arena,
+                   .input = input,
+                   .compare = by_hash_then_position,
+                   .context = NULL};
+    return sort_records(&job, sorted);
 }
 
 bool builder_index_paths(BuilderState *state, Prepared *prepared)
 {
     uint32_t count = state->track_count;
-    uint32_t slots = slots_for(count);
-    prepared->index_mark = state->arena.used;
-    prepared->positions = builder_load_column(state, prepared->final_tracks, count);
-    prepared->exact = arena_take(&state->arena, slots * 2);
-    prepared->by_name = arena_take(&state->arena, slots * 2);
-    prepared->next_same_name = arena_take(&state->arena, count * 2 + 2);
     prepared->resolve = arena_take(&state->arena, (uint32_t)sizeof(ResolveScratch));
-    if (state->arena.failed || prepared->positions == NULL) {
+    if (prepared->resolve == NULL ||
+        !cache_init(&prepared->lookup, &state->store, &state->arena, LOOKUP_BLOCK, LOOKUP_BLOCKS) ||
+        !cache_init(&prepared->positions, &state->store, &state->arena, LOOKUP_BLOCK,
+                    LOOKUP_BLOCKS)) {
         return false;
     }
-    prepared->exact_mask = slots - 1;
-    prepared->by_name_mask = slots - 1;
-    for (uint32_t slot = 0; slot < slots; slot++) {
-        prepared->exact[slot] = EMPTY_SLOT;
-        prepared->by_name[slot] = EMPTY_SLOT;
+    prepared->index_mark = state->arena.used;
+    Region exact_input = store_take(&state->store, count * INDEX_ENTRY);
+    Region name_input = store_take(&state->store, count * INDEX_ENTRY);
+    uint8_t *exact_buffer = arena_take(&state->arena, STREAM_BUFFER);
+    uint8_t *name_buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (state->store.failed || exact_buffer == NULL || name_buffer == NULL) {
+        return false;
     }
-    for (uint32_t position = 0; position < count; position++) {
-        index_exact(state, prepared, position);
-        index_name(state, prepared, position);
+    Out exact;
+    Out names;
+    out_open(&exact, &state->store, exact_input, exact_buffer, STREAM_BUFFER);
+    out_open(&names, &state->store, name_input, name_buffer, STREAM_BUFFER);
+    bool emitted = emit_index_entries(state, prepared, &exact, &names) && out_close(&exact) &&
+                   out_close(&names);
+    state->arena.used = prepared->index_mark;
+    bool sorted = emitted && sort_index(state, exact_input, &prepared->exact) &&
+                  sort_index(state, name_input, &prepared->by_name);
+    state->arena.used = prepared->index_mark;
+    return sorted && !state->store.io_failed;
+}
+
+static bool index_entry(Prepared *prepared, Region table, uint32_t index, uint32_t *hash,
+                        uint32_t *position)
+{
+    uint8_t entry[INDEX_ENTRY];
+    if (!cache_read(&prepared->lookup, table.offset + index * INDEX_ENTRY, entry, sizeof entry)) {
+        return false;
     }
-    return !state->store.io_failed;
+    *hash = builder_get32(entry + 2);
+    *position = builder_get16(entry + 6);
+    return true;
+}
+
+static uint32_t first_with_hash(Prepared *prepared, Region table, uint32_t hash)
+{
+    uint32_t low = 0;
+    uint32_t high = table.size / INDEX_ENTRY;
+    while (low < high) {
+        uint32_t middle = low + (high - low) / 2;
+        uint32_t found = 0;
+        uint32_t position = 0;
+        if (!index_entry(prepared, table, middle, &found, &position)) {
+            return high;
+        }
+        if (found < hash) {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+    return low;
 }
 
 static bool contains_url(const char *entry)
@@ -274,16 +363,20 @@ static uint32_t find_exact(BuilderState *state, Prepared *prepared, const char *
     uint32_t folded_length =
         (uint32_t)case_fold_make(scratch->normal, normal_length, folded, PATH_CAPACITY);
     uint32_t hash = hash_update(HASH_START, folded, folded_length);
-    for (uint32_t probe = 0; probe <= prepared->exact_mask; probe++) {
-        uint16_t slot = prepared->exact[(hash + probe) & prepared->exact_mask];
-        if (slot == EMPTY_SLOT) {
-            return BUILDER_UNSET;
+    uint32_t entries = prepared->exact.size / INDEX_ENTRY;
+    uint32_t result = BUILDER_UNSET;
+    for (uint32_t index = first_with_hash(prepared, prepared->exact, hash); index < entries;
+         index++) {
+        uint32_t found = 0;
+        uint32_t position = 0;
+        if (!index_entry(prepared, prepared->exact, index, &found, &position) || found != hash) {
+            break;
         }
-        if (same_folded_path(state, prepared, slot - 1u, folded, folded_length)) {
-            return slot - 1u;
+        if (same_folded_path(state, prepared, position, folded, folded_length)) {
+            result = position;
         }
     }
-    return BUILDER_UNSET;
+    return result;
 }
 
 static uint32_t join(const char *folder, const char *path, uint32_t length, char *out)
@@ -369,9 +462,14 @@ static uint32_t find_by_suffix(BuilderState *state, Prepared *prepared)
     Span last = wanted->spans[wanted->count - 1];
     uint32_t hash = hash_update(HASH_START, wanted->text + last.start, last.length);
     Best best = {.at_score = 0};
-    for (uint16_t link = prepared->by_name[hash & prepared->by_name_mask]; link != EMPTY_SLOT;
-         link = prepared->next_same_name[link - 1]) {
-        uint32_t position = link - 1u;
+    uint32_t entries = prepared->by_name.size / INDEX_ENTRY;
+    for (uint32_t index = first_with_hash(prepared, prepared->by_name, hash); index < entries;
+         index++) {
+        uint32_t found = 0;
+        uint32_t position = 0;
+        if (!index_entry(prepared, prepared->by_name, index, &found, &position) || found != hash) {
+            break;
+        }
         uint32_t length = builder_folded_path(state, prepared, position, scratch->track);
         fold_parts(&scratch->raw, scratch->track, length, &scratch->candidate);
         Parts *candidate = &scratch->candidate;

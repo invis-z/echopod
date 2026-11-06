@@ -19,7 +19,11 @@ enum {
     GROUP_ENTRY = 8,
     DISPLAY_SIZE = 8,
     FOLDER_FINAL = 16,
-    NAME_HEADER = 6
+    NAME_HEADER = 6,
+    PLACE_SIZE = 8,
+    PLACED_SIZE = 32,
+    COLUMN_BLOCK = 1024,
+    COLUMN_BLOCKS = 4
 };
 
 typedef enum Section {
@@ -55,12 +59,7 @@ typedef struct Encode {
     BuilderState *state;
     Prepared *prepared;
     Writer *writer;
-    uint16_t *final_tracks;
-    uint16_t *track_album;
-    uint16_t *artists;
-    uint16_t *genres;
-    uint16_t *folder_index;
-    uint16_t *folder_path;
+    Region placed;
     uint16_t *playlist_order;
     uint8_t *stream;
     char *text;
@@ -328,31 +327,218 @@ static void write_header(Writer *writer, const Layout *layout)
     pad_to(writer, HEADER_SIZE);
 }
 
+typedef struct Placed {
+    uint32_t title;
+    uint32_t title_length;
+    uint32_t file;
+    uint32_t file_length;
+    uint32_t folder;
+    uint32_t album;
+    uint32_t artist;
+    uint32_t genre;
+    uint32_t folder_index;
+    uint32_t path_length;
+    uint32_t duration_ms;
+    uint8_t disc;
+    uint8_t number;
+    uint8_t chapters;
+} Placed;
+
+static void placed_encode(const Placed *placed, uint8_t *bytes)
+{
+    builder_put32(bytes, placed->title);
+    builder_put16(bytes + 4, placed->title_length);
+    builder_put32(bytes + 6, placed->file);
+    builder_put16(bytes + 10, placed->file_length);
+    builder_put16(bytes + 12, placed->folder);
+    builder_put16(bytes + 14, placed->album);
+    builder_put16(bytes + 16, placed->artist);
+    builder_put16(bytes + 18, placed->genre);
+    builder_put16(bytes + 20, placed->folder_index);
+    builder_put16(bytes + 22, placed->path_length);
+    builder_put32(bytes + 24, placed->duration_ms);
+    bytes[28] = placed->disc;
+    bytes[29] = placed->number;
+    bytes[30] = placed->chapters;
+    bytes[31] = 0;
+}
+
+static void placed_decode(const uint8_t *bytes, Placed *placed)
+{
+    *placed = (Placed){.title = builder_get32(bytes),
+                       .title_length = builder_get16(bytes + 4),
+                       .file = builder_get32(bytes + 6),
+                       .file_length = builder_get16(bytes + 10),
+                       .folder = builder_get16(bytes + 12),
+                       .album = builder_get16(bytes + 14),
+                       .artist = builder_get16(bytes + 16),
+                       .genre = builder_get16(bytes + 18),
+                       .folder_index = builder_get16(bytes + 20),
+                       .path_length = builder_get16(bytes + 22),
+                       .duration_ms = builder_get32(bytes + 24),
+                       .disc = bytes[28],
+                       .number = bytes[29],
+                       .chapters = bytes[30]};
+}
+
+static bool open_in(BuilderState *state, In *in, Region region, uint32_t length)
+{
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (buffer == NULL) {
+        return false;
+    }
+    in_open(in, &state->store, region.offset, region.offset + length, buffer, STREAM_BUFFER);
+    return true;
+}
+
+static bool get_u16(In *in, uint32_t *value)
+{
+    uint8_t bytes[2];
+    if (!in_get(in, bytes, sizeof bytes)) {
+        return false;
+    }
+    *value = builder_get16(bytes);
+    return true;
+}
+
+static bool cached_u16(Cache *cache, Region column, uint32_t index, uint32_t *value)
+{
+    uint8_t bytes[2];
+    if (!cache_read(cache, column.offset + index * 2, bytes, sizeof bytes)) {
+        return false;
+    }
+    *value = builder_get16(bytes);
+    return true;
+}
+
+typedef struct PlaceInputs {
+    In rows;
+    In artists;
+    In genres;
+    In places;
+    Cache folder_index;
+    Cache folder_path;
+    Out pairs;
+} PlaceInputs;
+
+static bool open_place_inputs(Encode *encode, PlaceInputs *inputs, Region pairs)
+{
+    BuilderState *state = encode->state;
+    Prepared *prepared = encode->prepared;
+    uint32_t count = state->track_count;
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (buffer == NULL || !open_in(state, &inputs->rows, state->rows, count * BUILDER_ROW_SIZE) ||
+        !open_in(state, &inputs->artists, prepared->columns[BUILDER_ARTIST], count * 2) ||
+        !open_in(state, &inputs->genres, prepared->columns[BUILDER_GENRE], count * 2) ||
+        !open_in(state, &inputs->places, prepared->track_place, count * PLACE_SIZE) ||
+        !cache_init(&inputs->folder_index, &state->store, &state->arena, COLUMN_BLOCK,
+                    COLUMN_BLOCKS) ||
+        !cache_init(&inputs->folder_path, &state->store, &state->arena, COLUMN_BLOCK,
+                    COLUMN_BLOCKS)) {
+        return false;
+    }
+    out_open(&inputs->pairs, &state->store, pairs, buffer, STREAM_BUFFER);
+    return true;
+}
+
+static bool place_track(Encode *encode, PlaceInputs *inputs)
+{
+    Prepared *prepared = encode->prepared;
+    uint8_t bytes[BUILDER_ROW_SIZE];
+    uint8_t place[PLACE_SIZE];
+    TrackRow row;
+    Placed placed;
+    uint32_t folder_path = 0;
+    if (!in_get(&inputs->rows, bytes, sizeof bytes) || !get_u16(&inputs->artists, &placed.artist) ||
+        !get_u16(&inputs->genres, &placed.genre) || !in_get(&inputs->places, place, sizeof place)) {
+        return false;
+    }
+    builder_row_decode(bytes, &row);
+    if (!cached_u16(&inputs->folder_index, prepared->folder_new_index, row.folder,
+                    &placed.folder_index) ||
+        !cached_u16(&inputs->folder_path, prepared->folder_path_length, row.folder, &folder_path)) {
+        return false;
+    }
+    placed.title = row.text[BUILDER_TITLE];
+    placed.title_length = row.length[BUILDER_TITLE];
+    placed.file = row.text[BUILDER_FILE];
+    placed.file_length = row.length[BUILDER_FILE];
+    placed.folder = row.folder;
+    placed.album = builder_get16(place + 2);
+    placed.path_length = folder_path + row.length[BUILDER_FILE];
+    placed.duration_ms = row.duration_ms;
+    placed.disc = row.disc;
+    placed.number = row.number;
+    placed.chapters = row.chapters;
+    uint8_t value[PLACED_SIZE];
+    placed_encode(&placed, value);
+    return builder_put_entry(&inputs->pairs, builder_get16(place), value, sizeof value);
+}
+
+static bool place_rows(Encode *encode)
+{
+    BuilderState *state = encode->state;
+    uint32_t count = state->track_count;
+    uint32_t mark = state->arena.used;
+    encode->placed = store_take(&state->store, count * PLACED_SIZE + 4);
+    Region pairs = store_take(&state->store, count * (BUILDER_ENTRY_HEADER + PLACED_SIZE) + 4);
+    PlaceInputs inputs;
+    if (state->store.failed || !open_place_inputs(encode, &inputs, pairs)) {
+        return false;
+    }
+    for (uint32_t track = 0; track < count; track++) {
+        if (!place_track(encode, &inputs)) {
+            return false;
+        }
+    }
+    pairs.size = count * (BUILDER_ENTRY_HEADER + PLACED_SIZE);
+    bool closed = out_close(&inputs.pairs);
+    state->arena.used = mark;
+    bool placed =
+        closed && builder_scatter_values(state, pairs, encode->placed, count, PLACED_SIZE);
+    state->store.end = (encode->placed.offset + encode->placed.size + 3) & ~3u;
+    return placed;
+}
+
+static bool next_placed(In *in, Placed *placed)
+{
+    uint8_t bytes[PLACED_SIZE];
+    if (!in_get(in, bytes, sizeof bytes)) {
+        return false;
+    }
+    placed_decode(bytes, placed);
+    return true;
+}
+
 static bool write_tracks(Encode *encode)
 {
     BuilderState *state = encode->state;
+    uint32_t mark = state->arena.used;
+    In in;
+    if (!open_in(state, &in, encode->placed, state->track_count * PLACED_SIZE)) {
+        return false;
+    }
     for (uint32_t position = 0; position < state->track_count; position++) {
-        uint32_t track = encode->final_tracks[position];
-        TrackRow row;
-        if (!builder_read_row(&encode->prepared->rows, state, track, &row)) {
+        Placed placed;
+        if (!next_placed(&in, &placed)) {
             return false;
         }
-        uint32_t title = take_string(encode, row.length[BUILDER_TITLE]);
-        uint32_t path_length = encode->folder_path[row.folder] + row.length[BUILDER_FILE];
+        uint32_t title = take_string(encode, placed.title_length);
         uint32_t path = encode->strings;
-        encode->strings += path_length + 1;
+        encode->strings += placed.path_length + 1;
         Writer *writer = encode->writer;
         put_u32(writer, title);
         put_u32(writer, path);
-        put_u16(writer, encode->track_album[position]);
-        put_u16(writer, encode->artists[track]);
-        put_u16(writer, encode->genres[track]);
-        put_u16(writer, encode->folder_index[row.folder]);
-        put_u32(writer, row.duration_ms);
-        put_byte(writer, row.disc);
-        put_byte(writer, row.number);
-        put_u16(writer, row.chapters);
+        put_u16(writer, placed.album);
+        put_u16(writer, placed.artist);
+        put_u16(writer, placed.genre);
+        put_u16(writer, placed.folder_index);
+        put_u32(writer, placed.duration_ms);
+        put_byte(writer, placed.disc);
+        put_byte(writer, placed.number);
+        put_u16(writer, placed.chapters);
     }
+    state->arena.used = mark;
     return true;
 }
 
@@ -555,20 +741,24 @@ static bool emit_track_strings(Encode *encode)
 {
     BuilderState *state = encode->state;
     Prepared *prepared = encode->prepared;
+    uint32_t mark = state->arena.used;
+    In in;
+    if (!open_in(state, &in, encode->placed, state->track_count * PLACED_SIZE)) {
+        return false;
+    }
     for (uint32_t position = 0; position < state->track_count; position++) {
-        TrackRow row;
-        if (!builder_read_row(&prepared->rows, state, encode->final_tracks[position], &row) ||
-            !emit_text(encode, &prepared->heap, row.text[BUILDER_TITLE],
-                       row.length[BUILDER_TITLE]) ||
-            !folder_text_for(encode, row.folder) ||
-            !builder_read_text(&prepared->heap, row.text[BUILDER_FILE], row.length[BUILDER_FILE],
-                               encode->text)) {
+        Placed placed;
+        if (!next_placed(&in, &placed) ||
+            !emit_text(encode, &prepared->heap, placed.title, placed.title_length) ||
+            !folder_text_for(encode, placed.folder) ||
+            !builder_read_text(&prepared->heap, placed.file, placed.file_length, encode->text)) {
             return false;
         }
         put_bytes(encode->writer, encode->folder_text, encode->folder_text_length);
-        put_bytes(encode->writer, encode->text, row.length[BUILDER_FILE]);
+        put_bytes(encode->writer, encode->text, placed.file_length);
         put_byte(encode->writer, 0);
     }
+    state->arena.used = mark;
     return true;
 }
 
@@ -619,24 +809,15 @@ static bool emit_names(Encode *encode)
 static bool load_columns(Encode *encode)
 {
     BuilderState *state = encode->state;
-    Prepared *prepared = encode->prepared;
-    uint32_t count = state->track_count;
-    encode->final_tracks = builder_load_column(state, prepared->final_tracks, count);
-    encode->track_album = builder_load_column(state, prepared->track_album, count);
-    encode->artists = builder_load_column(state, prepared->columns[BUILDER_ARTIST], count);
-    encode->genres = builder_load_column(state, prepared->columns[BUILDER_GENRE], count);
-    encode->folder_index =
-        builder_load_column(state, prepared->folder_new_index, state->folder_count);
-    encode->folder_path =
-        builder_load_column(state, prepared->folder_path_length, state->folder_count);
+    if (!place_rows(encode)) {
+        return false;
+    }
     encode->stream = arena_take(&state->arena, STREAM_BUFFER);
     encode->text = arena_take(&state->arena, BUILDER_TEXT_CAPACITY);
     encode->folder_text = arena_take(&state->arena, BUILDER_TEXT_CAPACITY);
     encode->folder_text_node = BUILDER_UNSET;
     encode->folder_text_length = 0;
-    return !state->arena.failed && encode->final_tracks != NULL && encode->track_album != NULL &&
-           encode->artists != NULL && encode->genres != NULL && encode->folder_index != NULL &&
-           encode->folder_path != NULL;
+    return !state->arena.failed;
 }
 
 BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink sink,
@@ -648,7 +829,9 @@ BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink s
     encode.text = arena_take(&state->arena, BUILDER_TEXT_CAPACITY);
     if (writer == NULL || encode.text == NULL || !order_playlists(&encode) ||
         !load_columns(&encode)) {
-        return BUILDER_OUT_OF_MEMORY;
+        return state->store.io_failed ? BUILDER_WRITE_FAILED
+               : state->store.failed  ? BUILDER_NO_ROOM
+                                      : BUILDER_OUT_OF_MEMORY;
     }
     uint32_t strings = string_total(&encode);
     if (strings == 0) {

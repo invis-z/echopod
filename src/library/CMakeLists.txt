@@ -27,6 +27,7 @@ add_library(rippl_library_scan STATIC
     library_builder.c
     library_builder_albums.c
     library_builder_encode.c
+    library_builder_folders.c
     library_builder_model.c
     library_builder_paths.c
     library_builder_rank.c
