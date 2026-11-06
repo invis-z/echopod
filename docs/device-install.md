@@ -40,6 +40,8 @@ If FiiO's updater won't take the file, maskrom can write the image straight into
 3. Eject both drives. The player shows "Checking HIFIEC90.IMG", then "Installing update" with a percentage, then "Update installed".
 4. Unplug, hold Power to switch off, then switch on. The new build starts.
 
+**8 MiB images (prototype).** The build also writes `flasher/HIFIEC90.IMG`, a 5 MiB image of the same firmware without the extended CJK glyphs. A player running an Rippl build that only accepts 5 MiB images refuses the 8 MiB `HIFIEC90.IMG` as an invalid image with error `E1` (the size), for example `(E1/34)`. Install `flasher/HIFIEC90.IMG` first as above, restart, then install `HIFIEC90.IMG`. Once a build that accepts both is installed, the flasher isn't needed. An 8 MiB image hasn't been started on a player yet: have maskrom recovery (`docs/device-recovery.md`) ready.
+
 The updater takes the highest-numbered `HIFIECnn.IMG`. It checks the image's shape, rows, entry vector, header copy and CRC before writing, skips an image that is already installed, and writes slot 2 first, then slot 1, reading back every chunk. It also accepts FiiO's own 8 GB image (see "Going back to FiiO's firmware" in the user guide) and refuses the 512 MB model's.
 
 ## What to check after an install

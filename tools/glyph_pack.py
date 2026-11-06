@@ -67,8 +67,19 @@ def in_ranges(codepoint, ranges):
     return any(first <= codepoint <= last for first, last in ranges)
 
 
+def encodes(codec, codepoint):
+    try:
+        chr(codepoint).encode(codec)
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 def set_characters(spec):
     ranges = spec["ranges"]
+    if "encodes" in spec:
+        return {codepoint for first, last in ranges for codepoint in range(first, last + 1)
+                if not 0xD800 <= codepoint <= 0xDFFF and encodes(spec["encodes"], codepoint)}
     if "codec" in spec:
         trails = spec.get("trails", [[0xA1, 0xFE]])
         return {codepoint for codepoint in codec_characters(spec["codec"], spec["leads"], trails)
@@ -81,6 +92,9 @@ def face_characters(config, face):
     wanted = set_characters({"ranges": face.get("ranges", [])})
     for name in face.get("character_sets", []):
         wanted |= set_characters(config["character_sets"][name])
+    faces = {other["name"]: other for other in config["faces"]}
+    for name in face.get("exclude_faces", []):
+        wanted -= face_characters(config, faces[name])
     return wanted
 
 

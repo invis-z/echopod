@@ -19,7 +19,7 @@ A short map of the hardware Rippl drives, for reading the code in `platform/devi
 ## Storage
 
 - 8 GB eMMC on the DW-MMC controller. From the start: the ID block, firmware slot 1, firmware slot 2, a SAVE block, then the FAT32 user volume that appears as "ECHO MINI" over USB. Rippl never writes the ID block, the SAVE block or the gap between them.
-- Each firmware slot holds the first 5 MiB of a firmware image. On the unit tested, slot 1 is at rockusb sector 0 and slot 2 at rockusb sector 69632.
+- Each firmware slot is half of the firmware area (34 MiB on the unit tested, room for FiiO's 32 MiB images); Rippl's images use its first 5 or 8 MiB. On the unit tested, slot 1 is at rockusb sector 0 and slot 2 at rockusb sector 69632.
 - A microSD slot on the same kind of controller, with card detect. Rippl reads and writes FAT16, FAT32 and exFAT.
 
 ## Audio
@@ -47,5 +47,5 @@ A short map of the hardware Rippl drives, for reading the code in `platform/devi
 
 ## Firmware image
 
-- `HIFIEC90.IMG` is a 5 MiB `RKnanoFW` container: an outer header, a table of load rows, the code and data, a copy of the first 512 bytes at `0x44C000` and a CRC-32 trailer at `0x500000`. `tools/make_image.py` builds it.
+- `HIFIEC90.IMG` is a 5 or 8 MiB `RKnanoFW` container: an outer header, a table of load rows, the code and data, a copy of the first 512 bytes at the fw size (`0x44C000` or `0x74C000`) and a CRC-32 trailer at the next MiB (`0x500000` or `0x800000`). `tools/make_image.py` builds it.
 - FiiO's firmware installs the highest-numbered `HIFIECnn.IMG` it finds at the top level of internal storage. FiiO's own images are 32 MiB.
