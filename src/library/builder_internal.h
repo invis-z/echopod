@@ -26,7 +26,9 @@ enum {
     BUILDER_MAX_RECORD = 2 * BUILDER_TEXT_CAPACITY + 64,
     BUILDER_MAX_PLAYLISTS = 1024,
     BUILDER_ALIGNMENT = 8,
-    BUILDER_PAIR_SIZE = 8
+    BUILDER_ENTRY_HEADER = 6,
+    BUILDER_ENTRY_VALUES = 16,
+    BUILDER_PAIR_SIZE = BUILDER_ENTRY_HEADER + 2
 };
 
 typedef struct Arena {
@@ -150,6 +152,7 @@ typedef struct Prepared {
     Region folder_order;
     Region final_tracks;
     Region track_album;
+    Region track_place;
     Region albums;
     GroupTable artists;
     GroupTable album_artists;
@@ -238,7 +241,10 @@ bool cache_read(Cache *cache, uint32_t offset, void *bytes, uint32_t length);
 
 bool sort_records(const SortJob *job, Region *output);
 bool builder_put_pair(Out *out, uint32_t index, uint32_t value);
+bool builder_put_entry(Out *out, uint32_t index, const uint8_t *values, uint32_t size);
 bool builder_scatter(BuilderState *state, Region pairs, Region column, uint32_t count);
+bool builder_scatter_values(BuilderState *state, Region pairs, Region column, uint32_t count,
+                            uint32_t size);
 
 void builder_row_decode(const uint8_t *bytes, TrackRow *row);
 void builder_row_encode(const TrackRow *row, uint8_t *bytes);
