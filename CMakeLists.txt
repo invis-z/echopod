@@ -17,7 +17,7 @@ option(RIPPL_BUILD_SIM "Build the SDL2 simulator" ON)
 option(RIPPL_BUILD_TESTS "Build the host tests" ON)
 option(RIPPL_BUILD_DEVICE "Build the device firmware with cmake/arm-none-eabi.cmake" OFF)
 option(RIPPL_RELEASE "Leave the developer-only Diagnostics rows out of the build" OFF)
-set(RIPPL_APP_RAM_BUDGET_BYTES 131072 CACHE STRING "Static RAM budget for src/ on the device")
+set(RIPPL_APP_RAM_BUDGET_BYTES 132096 CACHE STRING "Static RAM budget for src/ on the device")
 
 include(cmake/project_options.cmake)
 

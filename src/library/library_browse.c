@@ -13,7 +13,7 @@ enum {
 
 static BrowseItem make_item(BrowseItemKind kind, LibrarySection group, uint32_t index)
 {
-    return (BrowseItem){.kind = kind, .group = group, .index = (uint16_t)index};
+    return (BrowseItem){.kind = kind, .group = group, .index = index};
 }
 
 static LibrarySection group_section_of(BrowseKind kind)
@@ -82,7 +82,7 @@ typedef struct TrackWalk {
 
 static TrackWalk walk;
 
-static BrowseQuery album_query(BrowseQuery group, uint16_t album)
+static BrowseQuery album_query(BrowseQuery group, uint32_t album)
 {
     return (BrowseQuery){.kind = BROWSE_ALBUM_TRACKS,
                          .group = LIBRARY_ARTISTS,
@@ -91,7 +91,7 @@ static BrowseQuery album_query(BrowseQuery group, uint16_t album)
 }
 
 static bool linked_album(const Library *library, const LibraryGroup *group, uint32_t link,
-                         uint16_t *album)
+                         uint32_t *album)
 {
     return link < group->link_count &&
            library_read_index(library, LIBRARY_LINKS, group->first_link + link, album);
@@ -100,7 +100,7 @@ static bool linked_album(const Library *library, const LibraryGroup *group, uint
 static uint32_t group_track_count(const Library *library, BrowseQuery query)
 {
     LibraryGroup group;
-    uint16_t album = 0;
+    uint32_t album = 0;
     uint32_t count = 0;
     walk.library = NULL;
     if (!library_read_group(library, query.group, query.subject, &group)) {
@@ -124,7 +124,7 @@ static bool group_track_item(const Library *library, BrowseQuery query, uint32_t
                              BrowseItem *item)
 {
     LibraryGroup group;
-    uint16_t album = 0;
+    uint32_t album = 0;
     if (!library_read_group(library, query.group, query.subject, &group)) {
         return false;
     }
@@ -202,7 +202,7 @@ static bool table_item(const Library *library, LibrarySection section, uint32_t 
 static bool linked_item(const Library *library, uint32_t link, BrowseItemKind kind,
                         BrowseItem *item)
 {
-    uint16_t value = 0;
+    uint32_t value = 0;
     if (!library_read_index(library, LIBRARY_LINKS, link, &value)) {
         return false;
     }
@@ -212,7 +212,7 @@ static bool linked_item(const Library *library, uint32_t link, BrowseItemKind ki
 
 static bool title_order_item(const Library *library, uint32_t position, BrowseItem *item)
 {
-    uint16_t track = 0;
+    uint32_t track = 0;
     if (!library_read_index(library, LIBRARY_TITLE_ORDER, position, &track)) {
         return false;
     }
@@ -289,14 +289,14 @@ bool browse_item(const Library *library, BrowseQuery query, uint32_t position, B
     return false;
 }
 
-static uint16_t artist_filter(BrowseQuery parent)
+static uint32_t artist_filter(BrowseQuery parent)
 {
     bool from_artist = parent.kind == BROWSE_GROUP_ALBUMS && parent.group == LIBRARY_ARTISTS;
     return from_artist ? parent.subject : LIBRARY_NONE;
 }
 
-static BrowseQuery query_of(BrowseKind kind, LibrarySection group, uint16_t subject,
-                            uint16_t artist)
+static BrowseQuery query_of(BrowseKind kind, LibrarySection group, uint32_t subject,
+                            uint32_t artist)
 {
     return (BrowseQuery){.kind = kind, .group = group, .subject = subject, .artist = artist};
 }

@@ -23,7 +23,7 @@ typedef struct HomeArt {
     const char *notice;
     bool cycling;
     bool has_album;
-    uint16_t album;
+    uint32_t album;
     uint32_t next_change_ms;
 } HomeArt;
 

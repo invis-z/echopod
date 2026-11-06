@@ -103,19 +103,19 @@ CoverFlowOrder cover_flow_order_make(const Library *library)
 }
 
 bool cover_flow_order_album(const Library *library, CoverFlowOrder order, uint32_t position,
-                            uint16_t *album)
+                            uint32_t *album)
 {
     if (position >= order.count) {
         return false;
     }
     if (!order.linked) {
-        *album = (uint16_t)position;
+        *album = (uint32_t)position;
         return true;
     }
     return library_read_index(library, LIBRARY_LINKS, order.first_link + position, album);
 }
 
-bool cover_flow_order_find(const Library *library, CoverFlowOrder order, uint16_t album,
+bool cover_flow_order_find(const Library *library, CoverFlowOrder order, uint32_t album,
                            uint32_t *position)
 {
     LibraryAlbum record;
@@ -135,7 +135,7 @@ bool cover_flow_order_find(const Library *library, CoverFlowOrder order, uint16_
         end = group.first_link + group.link_count;
     }
     for (uint32_t link = first; link < end; link++) {
-        uint16_t value = 0;
+        uint32_t value = 0;
         if (library_read_index(library, LIBRARY_LINKS, link, &value) && value == album) {
             *position = link - order.first_link;
             return true;
@@ -149,7 +149,7 @@ static bool is_random(const CoverFlowScreen *flow, int position)
     return flow->first > 0 && position == RANDOM_POSITION;
 }
 
-static uint16_t album_of(const CoverFlowScreen *flow, int position)
+static uint32_t album_of(const CoverFlowScreen *flow, int position)
 {
     if (position < flow->first) {
         return LIBRARY_NONE;
@@ -158,9 +158,9 @@ static uint16_t album_of(const CoverFlowScreen *flow, int position)
     return tile->position == position ? tile->album : LIBRARY_NONE;
 }
 
-static uint16_t link_album(const Library *library, uint32_t link)
+static uint32_t link_album(const Library *library, uint32_t link)
 {
-    uint16_t track_index = 0;
+    uint32_t track_index = 0;
     LibraryTrack track;
     if (!library_read_index(library, LIBRARY_LINKS, link, &track_index) ||
         !library_read_track(library, track_index, &track)) {
@@ -169,7 +169,7 @@ static uint16_t link_album(const Library *library, uint32_t link)
     return track.album;
 }
 
-static uint16_t folder_album(const Library *library, uint16_t folder)
+static uint32_t folder_album(const Library *library, uint32_t folder)
 {
     uint32_t count = library_count(library, LIBRARY_FOLDERS);
     LibraryFolder record;
@@ -190,7 +190,7 @@ static bool step_run(const CoverFlowScreen *flow, CoverFlowTile *tile, int direc
     const Library *library = flow->config.library;
     uint32_t first = flow->order.first_link;
     uint32_t link = tile->link;
-    uint16_t album = tile->album;
+    uint32_t album = tile->album;
     if (direction > 0) {
         while (album == tile->album) {
             if (++link >= first + flow->order.links) {
@@ -213,7 +213,7 @@ static bool step_run(const CoverFlowScreen *flow, CoverFlowTile *tile, int direc
 
 static CoverFlowTile first_run(const CoverFlowScreen *flow)
 {
-    uint16_t album = link_album(flow->config.library, flow->order.first_link);
+    uint32_t album = link_album(flow->config.library, flow->order.first_link);
     return (CoverFlowTile){flow->first, album, album, flow->order.first_link};
 }
 
@@ -420,7 +420,7 @@ static void load_covers(CoverFlowScreen *flow)
     }
 }
 
-static int playlist_find(CoverFlowScreen *flow, uint16_t album)
+static int playlist_find(CoverFlowScreen *flow, uint32_t album)
 {
     CoverFlowTile tile = first_run(flow);
     while (tile.album != album) {
@@ -432,11 +432,11 @@ static int playlist_find(CoverFlowScreen *flow, uint16_t album)
     return tile.position;
 }
 
-static bool child_index(const Library *library, CoverFlowOrder order, uint16_t folder,
+static bool child_index(const Library *library, CoverFlowOrder order, uint32_t folder,
                         uint32_t *index)
 {
     for (uint32_t link = 0; link < order.count; link++) {
-        uint16_t value = LIBRARY_NONE;
+        uint32_t value = LIBRARY_NONE;
         if (library_read_index(library, LIBRARY_LINKS, order.first_link + link, &value) &&
             value == folder) {
             *index = link;
@@ -446,7 +446,7 @@ static bool child_index(const Library *library, CoverFlowOrder order, uint16_t f
     return false;
 }
 
-static int folder_find(const CoverFlowScreen *flow, uint16_t folder)
+static int folder_find(const CoverFlowScreen *flow, uint32_t folder)
 {
     LibraryFolder record;
     uint32_t index = 0;
@@ -514,7 +514,7 @@ static ScreenAction play_random(CoverFlowScreen *flow)
     return screen_action_push(flow->config.browse->config.now_playing);
 }
 
-static void use_order(CoverFlowScreen *flow, CoverFlowOrder order, int32_t key, BrowseQuery parent,
+static void use_order(CoverFlowScreen *flow, CoverFlowOrder order, int64_t key, BrowseQuery parent,
                       int album_level)
 {
     if (key != flow->order_key) {
@@ -532,12 +532,12 @@ static void use_order(CoverFlowScreen *flow, CoverFlowOrder order, int32_t key, 
     }
 }
 
-static int32_t folder_key(uint16_t folder)
+static int64_t folder_key(uint32_t folder)
 {
-    return (int32_t)LIBRARY_FOLDERS << 16 | folder;
+    return (int64_t)LIBRARY_FOLDERS << 32 | folder;
 }
 
-static bool folder_order(const Library *library, uint16_t folder, CoverFlowOrder *order)
+static bool folder_order(const Library *library, uint32_t folder, CoverFlowOrder *order)
 {
     LibraryFolder record;
     if (!library_read_folder(library, folder, &record) || record.subfolder_count == 0 ||
@@ -553,7 +553,7 @@ static bool folder_order(const Library *library, uint16_t folder, CoverFlowOrder
     return true;
 }
 
-static bool enter_folder(CoverFlowScreen *flow, uint16_t folder, uint16_t child)
+static bool enter_folder(CoverFlowScreen *flow, uint32_t folder, uint32_t child)
 {
     CoverFlowOrder order;
     uint32_t index = 0;
@@ -682,7 +682,7 @@ static bool cover_image(const CoverFlowScreen *flow, int position, Image *image)
         *image = shuffle_image();
         return true;
     }
-    uint16_t album = album_of(flow, position);
+    uint32_t album = album_of(flow, position);
     return cover_cache_full(flow->config.covers, album, image) == COVER_LOADED ||
            cover_cache_half(flow->config.covers, position, album, image) == COVER_LOADED;
 }
@@ -814,16 +814,16 @@ Screen *cover_flow_screen_open_all(CoverFlowScreen *flow)
 static uint32_t playlist_runs(const Library *library, CoverFlowOrder order)
 {
     uint32_t runs = 0;
-    uint16_t previous = LIBRARY_NONE;
+    uint32_t previous = LIBRARY_NONE;
     for (uint32_t link = order.first_link; link < order.first_link + order.links; link++) {
-        uint16_t album = link_album(library, link);
+        uint32_t album = link_album(library, link);
         runs += link == order.first_link || album != previous ? 1u : 0u;
         previous = album;
     }
     return runs;
 }
 
-static Screen *open_folder(CoverFlowScreen *flow, uint16_t folder, int album_level)
+static Screen *open_folder(CoverFlowScreen *flow, uint32_t folder, int album_level)
 {
     CoverFlowOrder order;
     if (!folder_order(flow->config.library, folder, &order)) {
@@ -834,7 +834,7 @@ static Screen *open_folder(CoverFlowScreen *flow, uint16_t folder, int album_lev
     return &flow->screen;
 }
 
-Screen *cover_flow_screen_open_group(CoverFlowScreen *flow, LibrarySection group, uint16_t subject,
+Screen *cover_flow_screen_open_group(CoverFlowScreen *flow, LibrarySection group, uint32_t subject,
                                      int album_level)
 {
     LibraryGroup record;
@@ -858,7 +858,7 @@ Screen *cover_flow_screen_open_group(CoverFlowScreen *flow, LibrarySection group
         order.count = playlist_runs(flow->config.library, order);
         parent.kind = BROWSE_PLAYLIST_TRACKS;
     }
-    use_order(flow, order, (int32_t)group << 16 | subject, parent, album_level);
+    use_order(flow, order, (int64_t)group << 32 | subject, parent, album_level);
     return &flow->screen;
 }
 

@@ -309,7 +309,7 @@ static void audiobooks_and_podcasts_are_left_out(void)
     player_init(&player, library);
     BrowseQuery folder = browse_root_query(BROWSE_FOLDER);
     LibraryTrack record;
-    uint16_t chapter = spoken_library_track(library, SPOKEN_CHAPTER_ONE_PATH);
+    uint32_t chapter = spoken_library_track(library, SPOKEN_CHAPTER_ONE_PATH);
     CHECK(library_read_track(library, chapter, &record));
     CHECK(browse_child(folder, (BrowseItem){.kind = BROWSE_ITEM_FOLDER, .index = record.folder},
                        &folder));

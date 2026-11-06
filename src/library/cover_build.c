@@ -65,7 +65,7 @@ typedef struct CoverState {
     CoverMatch matches[STEM_COUNT];
     uint16_t full[COVER_FULL_PIXELS];
     uint16_t half[COVER_HALF_PIXELS];
-    uint16_t folders[MAX_FOLDERS];
+    uint32_t folders[MAX_FOLDERS];
     uint32_t folder_count;
     CoverLayout layout;
     CoverEntry *index;
@@ -491,7 +491,7 @@ static bool open_art_file(CoverState *state, const CoverJob *job, CoverMatch mat
     return true;
 }
 
-static bool folder_tried(CoverState *state, uint16_t folder)
+static bool folder_tried(CoverState *state, uint32_t folder)
 {
     for (uint32_t index = 0; index < state->folder_count; index++) {
         if (state->folders[index] == folder) {

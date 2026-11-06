@@ -22,7 +22,7 @@ static void save_later(Player *player)
     player->save_pending = true;
 }
 
-static bool track_path(const Player *player, uint16_t track, char *buffer, size_t capacity)
+static bool track_path(const Player *player, uint32_t track, char *buffer, size_t capacity)
 {
     LibraryTrack record;
     char relative[PLAYER_PATH_CAPACITY];
@@ -56,7 +56,7 @@ static void save_up_next(const Player *player)
     (void)hal_file_write(PLAYER_UP_NEXT_PATH, bytes, sizeof bytes);
 }
 
-static bool current_track(const Player *player, uint16_t *track)
+static bool current_track(const Player *player, uint32_t *track)
 {
     if (player->from_up_next) {
         *track = player->track;
@@ -65,7 +65,7 @@ static bool current_track(const Player *player, uint16_t *track)
     return play_queue_current(&player->queue, track);
 }
 
-static bool upcoming_track(Player *player, PlayQueueCursor *cursor, uint16_t *track)
+static bool upcoming_track(Player *player, PlayQueueCursor *cursor, uint32_t *track)
 {
     if (player->repeat == REPEAT_ONE && player->from_up_next) {
         player->next_source = PLAYER_NEXT_SAME_SONG;
@@ -85,7 +85,7 @@ static void queue_upcoming(Player *player)
 {
     char path[PLAYER_PATH_CAPACITY];
     PlayQueueCursor upcoming = player->queue.cursor;
-    uint16_t track = 0;
+    uint32_t track = 0;
     player->has_next =
         upcoming_track(player, &upcoming, &track) && track_path(player, track, path, sizeof path);
     if (!player->has_next) {
@@ -97,14 +97,14 @@ static void queue_upcoming(Player *player)
     hal_audio_queue_next(path, player->next_token);
 }
 
-static void note_spoken(Player *player, uint16_t track)
+static void note_spoken(Player *player, uint32_t track)
 {
     char path[PLAYER_PATH_CAPACITY];
     player->spoken =
         track_path(player, track, path, sizeof path) && spoken_kind_of(path) != SPOKEN_NONE;
 }
 
-static uint32_t resume_point(const Player *player, uint16_t track, uint32_t start_ms)
+static uint32_t resume_point(const Player *player, uint32_t track, uint32_t start_ms)
 {
     if (start_ms != 0 || !player->spoken || player->resume.position_for == NULL) {
         return start_ms;
@@ -115,7 +115,7 @@ static uint32_t resume_point(const Player *player, uint16_t track, uint32_t star
 static bool start_current(Player *player, uint32_t start_ms)
 {
     char path[PLAYER_PATH_CAPACITY];
-    uint16_t track = 0;
+    uint32_t track = 0;
     if (!current_track(player, &track) || !track_path(player, track, path, sizeof path)) {
         become_idle(player);
         return false;
@@ -151,7 +151,7 @@ static bool start_playable(Player *player, uint32_t start_ms, int direction, boo
     if (start_current(player, start_ms)) {
         return true;
     }
-    for (uint16_t tries = 1; tries < player->queue.count; tries++) {
+    for (uint32_t tries = 1; tries < player->queue.count; tries++) {
         PlayQueueCursor target;
         if (!play_queue_neighbor(&player->queue, direction, wrap, &target)) {
             break;
@@ -167,7 +167,7 @@ static bool start_playable(Player *player, uint32_t start_ms, int direction, boo
 
 static bool start_up_next(Player *player)
 {
-    uint16_t track = 0;
+    uint32_t track = 0;
     bool started = false;
     while (!started && up_next_first(&player->up_next, &track)) {
         up_next_drop(&player->up_next, 1);
@@ -423,7 +423,7 @@ static void finish_track(Player *player, bool failed)
     save_later(player);
 }
 
-static PlayerUpNextResult enqueue(Player *player, uint16_t track, bool next)
+static PlayerUpNextResult enqueue(Player *player, uint32_t track, bool next)
 {
     if (!player->has_track) {
         player->from_up_next = true;
@@ -442,17 +442,17 @@ static PlayerUpNextResult enqueue(Player *player, uint16_t track, bool next)
     return PLAYER_UP_NEXT_ADDED;
 }
 
-PlayerUpNextResult player_play_next(Player *player, uint16_t track)
+PlayerUpNextResult player_play_next(Player *player, uint32_t track)
 {
     return enqueue(player, track, true);
 }
 
-PlayerUpNextResult player_add_to_up_next(Player *player, uint16_t track)
+PlayerUpNextResult player_add_to_up_next(Player *player, uint32_t track)
 {
     return enqueue(player, track, false);
 }
 
-bool player_jump_to_up_next(Player *player, uint16_t index)
+bool player_jump_to_up_next(Player *player, uint32_t index)
 {
     if (index >= player->up_next.count) {
         return false;
@@ -564,7 +564,7 @@ static bool read_resume_state(ResumeState *state)
 
 static bool rebuild_queue(Player *player, const ResumeState *state)
 {
-    uint16_t track = 0;
+    uint32_t track = 0;
     if (!play_queue_build(&player->queue, player->library, state->plan)) {
         return false;
     }

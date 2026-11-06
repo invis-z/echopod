@@ -45,7 +45,7 @@ typedef struct ListenHistory {
     bool open;
     bool playing;
     bool located;
-    uint16_t track;
+    uint32_t track;
     uint32_t position_ms;
     uint32_t last_ms;
     uint32_t sequence;

@@ -53,7 +53,7 @@ static CoverState state_of(CoverState state, Image *image, Image loaded)
     return state;
 }
 
-CoverState cover_cache_half(const CoverCache *cache, int position, uint16_t album, Image *image)
+CoverState cover_cache_half(const CoverCache *cache, int position, uint32_t album, Image *image)
 {
     const CoverSlot *slot = &cache->halves[slot_of(position)];
     if (slot->position != position || slot->album != album) {
@@ -63,7 +63,7 @@ CoverState cover_cache_half(const CoverCache *cache, int position, uint16_t albu
     return state_of(slot->state, image, loaded);
 }
 
-CoverState cover_cache_full(const CoverCache *cache, uint16_t album, Image *image)
+CoverState cover_cache_full(const CoverCache *cache, uint32_t album, Image *image)
 {
     if (cache->full_state == COVER_EMPTY || cache->full_album != album) {
         return COVER_EMPTY;
@@ -72,7 +72,7 @@ CoverState cover_cache_full(const CoverCache *cache, uint16_t album, Image *imag
     return state_of(cache->full_state, image, loaded);
 }
 
-static CoverState read_cover(CoverCache *cache, uint16_t album, CoverSize size, Color *pixels)
+static CoverState read_cover(CoverCache *cache, uint32_t album, CoverSize size, Color *pixels)
 {
     uint32_t record = 0;
     uint32_t key = library_album_key(cache->library, album);
@@ -81,7 +81,7 @@ static CoverState read_cover(CoverCache *cache, uint16_t album, CoverSize size, 
     return found ? COVER_LOADED : COVER_MISSING;
 }
 
-bool cover_cache_load_half(CoverCache *cache, int position, uint16_t album)
+bool cover_cache_load_half(CoverCache *cache, int position, uint32_t album)
 {
     Image ignored;
     if (cover_cache_half(cache, position, album, &ignored) != COVER_EMPTY) {
@@ -94,7 +94,7 @@ bool cover_cache_load_half(CoverCache *cache, int position, uint16_t album)
     return true;
 }
 
-bool cover_cache_load_full(CoverCache *cache, uint16_t album)
+bool cover_cache_load_full(CoverCache *cache, uint32_t album)
 {
     Image ignored;
     if (cover_cache_full(cache, album, &ignored) != COVER_EMPTY) {

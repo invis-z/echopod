@@ -23,7 +23,7 @@ static uint32_t album_count(const HomeArt *art)
     return art->store->available ? library_music_count(&art->store->library, LIBRARY_ALBUMS) : 0;
 }
 
-static bool playing_album(const HomeArt *art, uint16_t *album)
+static bool playing_album(const HomeArt *art, uint32_t *album)
 {
     PlayerStatus status = player_status(art->player);
     LibraryTrack track;
@@ -34,7 +34,7 @@ static bool playing_album(const HomeArt *art, uint16_t *album)
     return true;
 }
 
-static bool cover_missing(const HomeArt *art, uint16_t album)
+static bool cover_missing(const HomeArt *art, uint32_t album)
 {
     Image ignored;
     cover_cache_load_full(art->covers, album);
@@ -44,7 +44,7 @@ static bool cover_missing(const HomeArt *art, uint16_t album)
 static void show_next_with_a_cover(HomeArt *art, uint32_t count)
 {
     for (uint32_t tried = 0; tried < count; tried++) {
-        art->album = (uint16_t)((art->album + 1) % count);
+        art->album = (uint32_t)((art->album + 1) % count);
         if (!cover_missing(art, art->album)) {
             return;
         }
@@ -55,7 +55,7 @@ static void cycle(HomeArt *art, uint32_t count, uint32_t now_ms)
 {
     if (!art->cycling) {
         art->cycling = true;
-        art->album = (uint16_t)(count - 1);
+        art->album = (uint32_t)(count - 1);
         show_next_with_a_cover(art, count);
         art->next_change_ms = now_ms + HOME_ART_CYCLE_MS;
         return;
@@ -74,7 +74,7 @@ void home_art_update(void *context, uint32_t now_ms)
     if (!art->has_album) {
         return;
     }
-    uint16_t album;
+    uint32_t album;
     if (playing_album(art, &album)) {
         art->cycling = false;
         art->album = album;

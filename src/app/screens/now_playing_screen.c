@@ -430,7 +430,7 @@ static void load_lyrics(NowPlayingScreen *now_playing, const LibraryTrack *track
     }
 }
 
-static void load_texts(NowPlayingScreen *now_playing, uint16_t track_index)
+static void load_texts(NowPlayingScreen *now_playing, uint32_t track_index)
 {
     const Library *library = now_playing->config.library;
     LibraryTrack track;

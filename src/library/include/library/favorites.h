@@ -12,7 +12,7 @@ enum {
 };
 
 typedef struct FavoritesCollector {
-    uint16_t *albums;
+    uint32_t *albums;
     uint16_t capacity;
     void (*between_albums)(void *context);
     void *context;
@@ -29,6 +29,6 @@ bool favorites_toggle(Favorites *favorites, uint32_t key);
 uint32_t favorites_encode(const Favorites *favorites, uint8_t *bytes);
 bool favorites_decode(const uint8_t *bytes, uint32_t length, Favorites *favorites);
 uint16_t favorites_collect_albums(const Favorites *favorites, const Library *library,
-                                  uint16_t *albums, uint16_t capacity);
+                                  uint32_t *albums, uint16_t capacity);
 uint16_t favorites_collect(const Favorites *favorites, const Library *library,
                            FavoritesCollector collector);
