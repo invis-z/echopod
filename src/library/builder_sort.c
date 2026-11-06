@@ -247,3 +247,57 @@ bool sort_records(const SortJob *job, Region *output)
     arena->used = mark;
     return true;
 }
+
+static int by_scatter_index(const uint8_t *left, const uint8_t *right, const void *context)
+{
+    (void)context;
+    uint32_t a = builder_get32(left + 2);
+    uint32_t b = builder_get32(right + 2);
+    return a < b ? -1 : a > b ? 1 : 0;
+}
+
+bool builder_put_pair(Out *out, uint32_t index, uint32_t value)
+{
+    uint8_t pair[BUILDER_PAIR_SIZE];
+    builder_put16(pair, BUILDER_PAIR_SIZE);
+    builder_put32(pair + 2, index);
+    builder_put16(pair + 6, value);
+    return out_put(out, pair, sizeof pair);
+}
+
+bool builder_scatter(BuilderState *state, Region pairs, Region column, uint32_t count)
+{
+    uint32_t arena_mark = state->arena.used;
+    uint32_t store_mark = state->store.end;
+    SortJob job = {.store = &state->store,
+                   .arena = &state->arena,
+                   .input = pairs,
+                   .compare = by_scatter_index,
+                   .context = NULL};
+    Region sorted;
+    if (!sort_records(&job, &sorted)) {
+        return false;
+    }
+    uint8_t *in_buffer = arena_take(&state->arena, STREAM_BUFFER);
+    uint8_t *out_buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (in_buffer == NULL || out_buffer == NULL) {
+        return false;
+    }
+    In in;
+    in_open(&in, &state->store, sorted.offset, sorted.offset + sorted.size, in_buffer,
+            STREAM_BUFFER);
+    Out out;
+    out_open(&out, &state->store, column, out_buffer, STREAM_BUFFER);
+    for (uint32_t index = 0; index < count; index++) {
+        uint8_t pair[BUILDER_PAIR_SIZE];
+        if (in_done(&in) || !in_get(&in, pair, sizeof pair) || builder_get32(pair + 2) != index ||
+            !out_put(&out, pair + 6, 2)) {
+            state->arena.failed = !state->store.io_failed && !state->store.failed;
+            return false;
+        }
+    }
+    bool closed = in_done(&in) && out_close(&out);
+    state->arena.used = arena_mark;
+    state->store.end = store_mark;
+    return closed;
+}
