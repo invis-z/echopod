@@ -5,8 +5,8 @@
 
 enum {
     STREAM_BUFFER = 4096,
-    RECORD_HEADER = 12,
-    FOLDER_HEADER = 6,
+    RECORD_HEADER = 14,
+    FOLDER_HEADER = 8,
     DISPLAY_SIZE = 8
 };
 
@@ -52,7 +52,7 @@ static int compare_bytes(const uint8_t *left, uint32_t left_length, const uint8_
 
 static uint32_t key_length_of(const uint8_t *record)
 {
-    return builder_get16(record + 10);
+    return builder_get16(record + 12);
 }
 
 static int compare_keys_only(const uint8_t *left, const uint8_t *right)
@@ -90,10 +90,10 @@ static bool emit_run(Prepared *prepared, Tail *tail, uint32_t run, const TrackRo
     uint32_t key_length = 1u + (uint32_t)sort_key_make(text, key + 1, SORT_KEY_CAPACITY - 1);
     uint8_t header[RECORD_HEADER];
     builder_put16(header, RECORD_HEADER + key_length + length);
-    builder_put16(header + 2, run);
-    builder_put32(header + 4, row->text[field]);
-    builder_put16(header + 8, length);
-    builder_put16(header + 10, key_length);
+    builder_put32(header + 2, run);
+    builder_put32(header + 6, row->text[field]);
+    builder_put16(header + 10, length);
+    builder_put16(header + 12, key_length);
     return out_put(&tail->out, header, sizeof header) && out_put(&tail->out, key, key_length) &&
            out_put(&tail->out, text, length);
 }
@@ -201,7 +201,7 @@ static bool assign_ranks(BuilderState *state, Region sorted, RankTarget *target)
         if (!in_record(&in, record)) {
             return false;
         }
-        uint32_t run = builder_get16(record + 2);
+        uint32_t run = builder_get32(record + 2);
         bool new_key = !have_previous || compare_keys_only(previous, record) != 0;
         bool new_spelling = new_key || compare_raw_only(previous, record) != 0;
         if (new_key) {
@@ -211,12 +211,12 @@ static bool assign_ranks(BuilderState *state, Region sorted, RankTarget *target)
             ranks++;
             target->music_ranks += record[RECORD_HEADER] == 0 ? 1u : 0u;
             best_run = run;
-            best_text = builder_get32(record + 4);
-            best_length = builder_get16(record + 8);
+            best_text = builder_get32(record + 6);
+            best_length = builder_get16(record + 10);
         } else if (run < best_run) {
             best_run = run;
-            best_text = builder_get32(record + 4);
-            best_length = builder_get16(record + 8);
+            best_text = builder_get32(record + 6);
+            best_length = builder_get16(record + 10);
         }
         if (new_spelling) {
             spellings++;
@@ -253,11 +253,11 @@ static bool write_rank_column(BuilderState *state, int field, Region rank_of_run
     RunReader reader;
     open_rows(state, &reader, buffer);
     In run_ranks;
-    in_open(&run_ranks, &state->store, rank_of_run.offset, rank_of_run.offset + runs * 2,
+    in_open(&run_ranks, &state->store, rank_of_run.offset, rank_of_run.offset + runs * 4,
             run_buffer, STREAM_BUFFER);
     Out out;
     out_open(&out, &state->store, column, out_buffer, STREAM_BUFFER);
-    uint8_t rank[2] = {0, 0};
+    uint8_t rank[4] = {0, 0, 0, 0};
     for (uint32_t track = 0; track < state->track_count; track++) {
         TrackRow row;
         bool new_run = false;
@@ -285,7 +285,7 @@ static bool open_pairs(BuilderState *state, Out *out, Region *pairs, uint32_t co
 
 static bool run_column(BuilderState *state, Region pairs, uint32_t runs, Region *column)
 {
-    *column = store_take(&state->store, runs * 2 + 2);
+    *column = store_take(&state->store, runs * 4 + 4);
     pairs.size = runs * BUILDER_PAIR_SIZE;
     return !state->store.failed && builder_scatter(state, pairs, *column, runs);
 }
@@ -308,14 +308,14 @@ static bool rank_field(BuilderState *state, Prepared *prepared, int field)
 {
     uint32_t count = state->track_count;
     GroupTable *group = group_of_field(prepared, field);
-    prepared->columns[field] = store_take(&state->store, count * 2 + 2);
+    prepared->columns[field] = store_take(&state->store, count * 4 + 4);
     RankTarget target = {.display = {.offset = 0, .size = 0}, .music_ranks = 0};
     if (group != NULL) {
         target.display = store_take(&state->store, count * DISPLAY_SIZE + DISPLAY_SIZE);
         group->display = target.display;
     }
     if (field == BUILDER_GENRE) {
-        prepared->genre_spelling = store_take(&state->store, count * 2 + 2);
+        prepared->genre_spelling = store_take(&state->store, count * 4 + 4);
     }
     if (state->store.failed) {
         return false;
@@ -368,8 +368,8 @@ static bool rank_field(BuilderState *state, Prepared *prepared, int field)
 static int compare_folder_names(const uint8_t *left, const uint8_t *right, const void *context)
 {
     (void)context;
-    uint32_t left_key = builder_get16(left + 4);
-    uint32_t right_key = builder_get16(right + 4);
+    uint32_t left_key = builder_get16(left + 6);
+    uint32_t right_key = builder_get16(right + 6);
     int key = compare_bytes(left + FOLDER_HEADER, left_key, right + FOLDER_HEADER, right_key);
     if (key != 0) {
         return key;
@@ -412,8 +412,8 @@ static bool collect_folders(BuilderState *state, Prepared *prepared, Region *inp
         uint32_t key_length = (uint32_t)sort_key_make(text, key, SORT_KEY_CAPACITY);
         uint8_t header[FOLDER_HEADER];
         builder_put16(header, FOLDER_HEADER + key_length + row.length);
-        builder_put16(header + 2, node);
-        builder_put16(header + 4, key_length);
+        builder_put32(header + 2, node);
+        builder_put16(header + 6, key_length);
         if (!out_put(&tail.out, header, sizeof header) || !out_put(&tail.out, key, key_length) ||
             !out_put(&tail.out, text, row.length)) {
             return false;
@@ -425,7 +425,7 @@ static bool collect_folders(BuilderState *state, Prepared *prepared, Region *inp
 static bool rank_folders(BuilderState *state, Prepared *prepared)
 {
     uint32_t count = state->folder_count;
-    prepared->folder_order = store_take(&state->store, count * 2 + 2);
+    prepared->folder_order = store_take(&state->store, count * 4 + 4);
     if (state->store.failed) {
         return false;
     }
@@ -469,7 +469,7 @@ static bool rank_folders(BuilderState *state, Prepared *prepared)
             }
             have_previous = true;
         }
-        if (!builder_put_pair(&order, builder_get16(record + 2), ranks)) {
+        if (!builder_put_pair(&order, builder_get32(record + 2), ranks)) {
             return false;
         }
     }

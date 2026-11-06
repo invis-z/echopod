@@ -447,20 +447,20 @@ static void too_little_memory_says_so(void)
     CHECK_EQUAL(BUILDER_OUT_OF_MEMORY, result);
 }
 
-static void the_65536th_track_is_too_many(void)
+static void a_16_bit_library_refuses_the_65536th_track(void)
 {
     LibraryBuilder builder;
     start(&builder);
     char path[64];
-    BuilderResult result = BUILDER_OK;
-    uint32_t added = 0;
-    for (; added < 65536 && result == BUILDER_OK; added++) {
+    for (uint32_t added = 0; added < 65536; added++) {
         snprintf(path, sizeof path, "A/%05u.flac", added);
         BuilderTrack next = track(path, "T", "A", "A", "B", "G", 2000, 1);
-        result = library_builder_add_track(&builder, &next);
+        CHECK_EQUAL(BUILDER_OK, library_builder_add_track(&builder, &next));
     }
-    CHECK_EQUAL(BUILDER_TOO_MANY, result);
-    CHECK_EQUAL(65536u, added);
+    Built built;
+    finish(&builder, &built);
+    CHECK_EQUAL(BUILDER_TOO_MANY, built.result);
+    free(built.output.bytes);
 }
 
 static void a_library_bigger_than_its_room_writes_nothing(void)
@@ -586,7 +586,7 @@ int main(void)
         TEST_CASE(the_builder_stays_inside_its_memory),
         TEST_CASE(a_scratch_file_too_small_says_there_is_no_room),
         TEST_CASE(too_little_memory_says_so),
-        TEST_CASE(the_65536th_track_is_too_many),
+        TEST_CASE(a_16_bit_library_refuses_the_65536th_track),
         TEST_CASE(a_library_bigger_than_its_room_writes_nothing),
         TEST_CASE(an_empty_library_still_writes_a_valid_header),
         TEST_CASE(a_featured_artist_stays_with_the_album),
