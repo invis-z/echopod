@@ -6,7 +6,7 @@
 #include "playback/play_queue.h"
 
 enum {
-    RESUME_STATE_SIZE = 44
+    RESUME_STATE_SIZE = 56
 };
 
 typedef struct ResumeState {
@@ -15,7 +15,7 @@ typedef struct ResumeState {
     RepeatMode repeat;
     uint8_t volume;
     PlayQueueCursor cursor;
-    uint16_t track;
+    uint32_t track;
     uint32_t position_ms;
     bool from_up_next;
 } ResumeState;

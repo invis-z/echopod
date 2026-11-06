@@ -77,8 +77,8 @@ typedef struct NowPlayingScreen {
     bool scrubbing;
     uint32_t scrub_position_ms;
     bool has_text;
-    uint16_t text_track;
-    uint16_t album_index;
+    uint32_t text_track;
+    uint32_t album_index;
     uint32_t text_changed_ms;
     uint32_t now_ms;
     NowPlayingFeedback feedback;

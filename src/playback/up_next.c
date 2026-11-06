@@ -3,7 +3,7 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 1,
+    VERSION = 2,
     MAGIC_FIELD = 0,
     VERSION_FIELD = 4,
     COUNT_FIELD = 6,
@@ -48,7 +48,7 @@ void up_next_clear(UpNext *up_next)
     up_next->count = 0;
 }
 
-bool up_next_add(UpNext *up_next, uint16_t track)
+bool up_next_add(UpNext *up_next, uint32_t track)
 {
     if (up_next->count == UP_NEXT_CAPACITY) {
         return false;
@@ -57,12 +57,12 @@ bool up_next_add(UpNext *up_next, uint16_t track)
     return true;
 }
 
-bool up_next_play_next(UpNext *up_next, uint16_t track)
+bool up_next_play_next(UpNext *up_next, uint32_t track)
 {
     if (up_next->count == UP_NEXT_CAPACITY) {
         return false;
     }
-    for (uint16_t index = up_next->count; index > 0; index--) {
+    for (uint32_t index = up_next->count; index > 0; index--) {
         up_next->tracks[index] = up_next->tracks[index - 1];
     }
     up_next->tracks[0] = track;
@@ -70,7 +70,7 @@ bool up_next_play_next(UpNext *up_next, uint16_t track)
     return true;
 }
 
-bool up_next_first(const UpNext *up_next, uint16_t *track)
+bool up_next_first(const UpNext *up_next, uint32_t *track)
 {
     if (up_next->count == 0) {
         return false;
@@ -79,16 +79,16 @@ bool up_next_first(const UpNext *up_next, uint16_t *track)
     return true;
 }
 
-void up_next_drop(UpNext *up_next, uint16_t count)
+void up_next_drop(UpNext *up_next, uint32_t count)
 {
     if (count >= up_next->count) {
         up_next->count = 0;
         return;
     }
-    for (uint16_t index = count; index < up_next->count; index++) {
+    for (uint32_t index = count; index < up_next->count; index++) {
         up_next->tracks[index - count] = up_next->tracks[index];
     }
-    up_next->count = (uint16_t)(up_next->count - count);
+    up_next->count = up_next->count - count;
 }
 
 void up_next_encode(const UpNext *up_next, uint32_t fingerprint, uint8_t *bytes)
@@ -99,8 +99,8 @@ void up_next_encode(const UpNext *up_next, uint32_t fingerprint, uint8_t *bytes)
     put_u16(bytes, VERSION_FIELD, VERSION);
     put_u16(bytes, COUNT_FIELD, up_next->count);
     put_u32(bytes, FINGERPRINT_FIELD, fingerprint);
-    for (uint16_t index = 0; index < up_next->count; index++) {
-        put_u16(bytes, TRACKS_FIELD + 2 * index, up_next->tracks[index]);
+    for (uint32_t index = 0; index < up_next->count; index++) {
+        put_u32(bytes, TRACKS_FIELD + 4 * (int)index, up_next->tracks[index]);
     }
     put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes));
 }
@@ -124,8 +124,8 @@ bool up_next_decode(const uint8_t *bytes, uint32_t length, uint32_t fingerprint,
         return false;
     }
     up_next->count = get_u16(bytes, COUNT_FIELD);
-    for (uint16_t index = 0; index < up_next->count; index++) {
-        up_next->tracks[index] = get_u16(bytes, TRACKS_FIELD + 2 * index);
+    for (uint32_t index = 0; index < up_next->count; index++) {
+        up_next->tracks[index] = get_u32(bytes, TRACKS_FIELD + 4 * (int)index);
     }
     return true;
 }

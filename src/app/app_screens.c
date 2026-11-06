@@ -113,7 +113,7 @@ static MenuItem music_item(AppScreens *screens, const LibraryStore *store, int i
                       .opens = true};
 }
 
-static Screen *open_group_flow(void *context, LibrarySection group, uint16_t subject, int level)
+static Screen *open_group_flow(void *context, LibrarySection group, uint32_t subject, int level)
 {
     return cover_flow_screen_open_group(context, group, subject, level);
 }
@@ -174,7 +174,7 @@ static bool shelf_present(const void *context)
 
 static MenuItem shelf_item(AppScreens *screens, AppScreensContext context, SpokenKind shelf)
 {
-    uint16_t folder = 0;
+    uint32_t folder = 0;
     BrowseEntry *entry = &screens->shelf_entries[shelf == SPOKEN_PODCAST ? 1 : 0];
     *entry = (BrowseEntry){
         .pool = &screens->browse,

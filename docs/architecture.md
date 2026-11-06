@@ -136,7 +136,7 @@ The CMake targets enforce these rules. Each module exposes only its own `include
 
 - `hal/audio.h` is high level: `play(path, start, token)`, `queue_next(path, token)`, pause, resume, seek, volume and status. The backend decodes; on the device that's `board/audio.c` (see Device playback).
 - Gapless: when a track starts, the player queues the next one with a new token. The backend switches without a gap and reports the new token, and `player_update` then moves the queue on and queues the following track.
-- Shuffle is seeded (`core/random`). The resume file (`/.echo/resume.bin`, `playback/resume_state`) stores the queue plan (source list, anchor track, shuffle mode, seed), the cursor, the track and the position, so the exact same queue is rebuilt after power-off. A library fingerprint rejects resume files from an older index.
+- Shuffle is seeded (`core/random`). The resume file (`/.echo/resume.bin`, `playback/resume_state`) stores the queue plan (source list, anchor track, shuffle mode, seed), the cursor, the track and the position, so the exact same queue is rebuilt after power-off. A library fingerprint rejects resume files from an older index. Version 2 stores the subject, artist, anchor, cursor and track as 32-bit numbers (56 bytes); Up Next (`/.echo/upnext.bin`) version 2 stores its tracks as 32-bit numbers. Files of version 1 are ignored, so the first start after updating resumes nothing.
 - The player saves on start, on track change, on pause, every 15 s while playing, and in `app_stop()`.
 
 ## Cover Flow

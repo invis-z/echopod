@@ -39,7 +39,7 @@ typedef struct CoverFlowScreen {
     CoverFlowOrder order;
     CoverFlowOrder artist_order;
     BrowseQuery parent;
-    int32_t order_key;
+    int64_t order_key;
     int album_level;
     int held_repeats;
     int count;
@@ -56,10 +56,10 @@ typedef struct CoverFlowScreen {
 
 Screen *cover_flow_screen_init(CoverFlowScreen *flow, CoverFlowConfig config);
 Screen *cover_flow_screen_open_all(CoverFlowScreen *flow);
-Screen *cover_flow_screen_open_group(CoverFlowScreen *flow, LibrarySection group, uint16_t subject,
+Screen *cover_flow_screen_open_group(CoverFlowScreen *flow, LibrarySection group, uint32_t subject,
                                      int album_level);
 CoverFlowOrder cover_flow_order_make(const Library *library);
 bool cover_flow_order_album(const Library *library, CoverFlowOrder order, uint32_t position,
-                            uint16_t *album);
-bool cover_flow_order_find(const Library *library, CoverFlowOrder order, uint16_t album,
+                            uint32_t *album);
+bool cover_flow_order_find(const Library *library, CoverFlowOrder order, uint32_t album,
                            uint32_t *position);

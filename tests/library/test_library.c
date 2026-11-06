@@ -118,8 +118,8 @@ static void groups_link_to_their_albums(void)
 {
     Library *library = fixture_library_open(&fixture);
     LibraryGroup bjork;
-    uint16_t first = 0;
-    uint16_t second = 0;
+    uint32_t first = 0;
+    uint32_t second = 0;
     CHECK(library_read_group(library, LIBRARY_ARTISTS, BJORK_ARTIST, &bjork));
     CHECK(string_is(library, bjork.name, "Björk"));
     CHECK_EQUAL(2, bjork.link_count);
@@ -134,7 +134,7 @@ static void folders_list_subfolders_then_tracks(void)
     Library *library = fixture_library_open(&fixture);
     LibraryFolder root;
     LibraryFolder homogenic;
-    uint16_t first_track = 0;
+    uint32_t first_track = 0;
     CHECK(library_read_folder(library, 0, &root));
     CHECK(string_is(library, root.name, ""));
     CHECK_EQUAL(LIBRARY_NONE, root.parent);
@@ -150,7 +150,7 @@ static void folders_list_subfolders_then_tracks(void)
 static void the_title_order_starts_with_the_first_title(void)
 {
     Library *library = fixture_library_open(&fixture);
-    uint16_t first = 0;
+    uint32_t first = 0;
     LibraryTrack track;
     CHECK(library_read_index(library, LIBRARY_TITLE_ORDER, 0, &first));
     CHECK(library_read_track(library, first, &track));
@@ -172,7 +172,7 @@ static void indices_out_of_range_are_refused(void)
     Library *library = fixture_library_open(&fixture);
     LibraryTrack track;
     LibraryAlbum album;
-    uint16_t value;
+    uint32_t value;
     CHECK(!library_read_track(library, FIXTURE_TRACKS, &track));
     CHECK(!library_read_album(library, FIXTURE_ALBUMS, &album));
     CHECK(!library_read_index(library, LIBRARY_TITLE_ORDER, FIXTURE_TRACKS, &value));
@@ -205,7 +205,7 @@ static void playlists_link_to_their_tracks_in_order(void)
 {
     Library *library = fixture_library_open(&fixture);
     LibraryGroup road_trip;
-    uint16_t tracks[3] = {0};
+    uint32_t tracks[3] = {0};
     CHECK(library_read_group(library, LIBRARY_PLAYLISTS, 0, &road_trip));
     CHECK(string_is(library, road_trip.name, "Road Trip"));
     CHECK_EQUAL(3, road_trip.link_count);

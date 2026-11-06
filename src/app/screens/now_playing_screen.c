@@ -362,7 +362,7 @@ static ScreenAction run_command(NowPlayingScreen *now_playing, NowPlayingCommand
     return screen_action_none();
 }
 
-static void load_texts(NowPlayingScreen *now_playing, uint16_t track_index)
+static void load_texts(NowPlayingScreen *now_playing, uint32_t track_index)
 {
     const Library *library = now_playing->config.library;
     LibraryTrack track;

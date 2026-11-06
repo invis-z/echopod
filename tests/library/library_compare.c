@@ -64,8 +64,8 @@ static void same_links(Pair *pair, const char *what, uint32_t index, uint32_t ex
                        uint32_t actual_first, uint32_t count)
 {
     for (uint32_t link = 0; link < count; link++) {
-        uint16_t left = 0;
-        uint16_t right = 0;
+        uint32_t left = 0;
+        uint32_t right = 0;
         if (!library_read_index(&pair->expected, LIBRARY_LINKS, expected_first + link, &left) ||
             !library_read_index(&pair->actual, LIBRARY_LINKS, actual_first + link, &right) ||
             left != right) {
@@ -157,8 +157,8 @@ static void compare_folders(Pair *pair)
 static void compare_title_order(Pair *pair)
 {
     for (uint32_t index = 0; index < library_count(&pair->expected, LIBRARY_TITLE_ORDER); index++) {
-        uint16_t left = 0;
-        uint16_t right = 0;
+        uint32_t left = 0;
+        uint32_t right = 0;
         if (!library_read_index(&pair->expected, LIBRARY_TITLE_ORDER, index, &left) ||
             !library_read_index(&pair->actual, LIBRARY_TITLE_ORDER, index, &right) ||
             left != right) {
