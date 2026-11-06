@@ -28,6 +28,7 @@ add_library(echo_library_scan STATIC
     library_builder_rank.c
     library_scan.c
     library_scan_entry.c
+    segment_scratch.c
     playlist_reader.c
     sort_fold_table.c
     sort_key.c
