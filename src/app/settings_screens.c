@@ -38,7 +38,8 @@ static const char *const BRIGHTNESS_OPTIONS[BRIGHTNESS_LEVEL_COUNT] = {"1", "2",
 static const StringId ORIENTATION_OPTIONS[ORIENTATION_COUNT] = {
     STR_SETTINGS_LANDSCAPE, STR_SETTINGS_PORTRAIT, STR_SETTINGS_PORTRAIT_FLIPPED};
 static const StringId GAIN_OPTIONS[GAIN_LEVEL_COUNT] = {STR_SETTINGS_LOW, STR_SETTINGS_HIGH};
-static const char *const FILTER_OPTIONS[DAC_FILTER_COUNT] = {"1", "2", "3", "4", "5"};
+static const char *const FILTER_OPTIONS[DAC_FILTER_COUNT] = {
+    "Fast, low latency", "Fast, linear phase", "Slow, low latency", "Slow, linear phase", "NOS"};
 static const char *const BALANCE_OPTIONS[SETTINGS_BALANCE_STEPS] = {
     "L12", "L11", "L10", "L9", "L8", "L7", "L6", "L5", "L4", "L3",  "L2",  "L1", "0",
     "R1",  "R2",  "R3",  "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12"};
