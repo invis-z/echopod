@@ -23,6 +23,7 @@ enum {
 
 static const char UPDATE_TEMPLATE[] = "/HIFIEC00.IMG";
 static const char MODEL_UPDATE[] = "/ECHOMINI.IMG";
+static const char RIPPL_UPDATE[] = "/RIPPL.IMG";
 static char update_path[sizeof UPDATE_TEMPLATE];
 static const char *install_title;
 
@@ -65,13 +66,20 @@ static void report(void *context, uint32_t done, uint32_t total)
     }
 }
 
+static bool open_named(const char *name, size_t size)
+{
+    for (size_t index = 0; index < size; index++) {
+        update_path[index] = name[index];
+    }
+    return fat_open(&volume, update_path, &file);
+}
+
 static bool open_highest_numbered(void)
 {
     _Static_assert(sizeof MODEL_UPDATE == sizeof UPDATE_TEMPLATE, "same length");
-    for (size_t index = 0; index < sizeof MODEL_UPDATE; index++) {
-        update_path[index] = MODEL_UPDATE[index];
-    }
-    if (fat_open(&volume, update_path, &file)) {
+    _Static_assert(sizeof RIPPL_UPDATE <= sizeof UPDATE_TEMPLATE, "fits the path");
+    if (open_named(RIPPL_UPDATE, sizeof RIPPL_UPDATE) ||
+        open_named(MODEL_UPDATE, sizeof MODEL_UPDATE)) {
         return true;
     }
     for (size_t index = 0; index < sizeof UPDATE_TEMPLATE; index++) {

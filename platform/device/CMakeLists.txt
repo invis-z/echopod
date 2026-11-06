@@ -193,7 +193,7 @@ target_link_options(echo_rescan_overlay PRIVATE
 
 set(ECHO_FIRMWARE_VERSION "0.10.1" CACHE STRING "major.minor.patch written to the image header")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-set(ECHO_DEVICE_IMAGE ${CMAKE_BINARY_DIR}/HIFIEC90.IMG)
+set(ECHO_DEVICE_IMAGE ${CMAKE_BINARY_DIR}/RIPPL.IMG)
 set(ECHO_FLASHER_IMAGE ${CMAKE_BINARY_DIR}/flasher/HIFIEC90.IMG)
 set(ECHO_GLYPH_FACE_ARGUMENTS "")
 set(ECHO_FLASHER_FACE_ARGUMENTS "")
