@@ -7,7 +7,8 @@ enum {
     COLUMN_BUFFER = 1024,
     ALBUM_TUPLE = 18,
     ALBUM_PRE = 16,
-    ORDER_TUPLE = 10,
+    ORDER_TUPLE = 10 + 16,
+    PLACE_SIZE = 8,
     ALBUM_FINAL = 20,
     GROUP_TUPLE = 10,
     GROUP_ENTRY = 8,
@@ -15,7 +16,8 @@ enum {
     FOLDER_FINAL = 16,
     TITLE_TUPLE = 8,
     KIND_CHILD = 0,
-    KIND_TRACK = 1
+    KIND_TRACK = 1,
+    FOLDER_CACHE_BLOCKS = 4
 };
 
 typedef struct Tail {
@@ -203,15 +205,18 @@ static bool pull(Stream *stream)
     return stream->live;
 }
 
-static bool album_genres(BuilderState *state, Region sorted, uint16_t *genre_of_album,
-                         uint32_t *albums)
+static bool album_genres(BuilderState *state, Region sorted, Region genres, uint32_t *albums)
 {
     uint32_t mark = state->arena.used;
     Stream stream;
     uint8_t *previous = arena_take(&state->arena, ALBUM_TUPLE);
-    if (previous == NULL || !open_stream(state, &stream, sorted) || !pull(&stream)) {
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (previous == NULL || buffer == NULL || !open_stream(state, &stream, sorted) ||
+        !pull(&stream)) {
         return false;
     }
+    Out out;
+    out_open(&out, &state->store, genres, buffer, STREAM_BUFFER);
     uint32_t album = 0;
     while (stream.live) {
         for (uint32_t index = 0; index < ALBUM_TUPLE; index++) {
@@ -238,53 +243,66 @@ static bool album_genres(BuilderState *state, Region sorted, uint16_t *genre_of_
                 best_genre = genre_key;
             }
         }
-        genre_of_album[album++] = (uint16_t)best_genre;
+        uint8_t value[2];
+        builder_put16(value, best_genre);
+        if (!out_put(&out, value, sizeof value)) {
+            return false;
+        }
+        album++;
     }
     *albums = album;
+    bool closed = out_close(&out);
     state->arena.used = mark;
-    return !state->store.io_failed;
+    return closed && !state->store.io_failed;
 }
 
-static bool write_album_rows(BuilderState *state, Region sorted, const uint16_t *genre_of_album,
+static bool write_album_rows(BuilderState *state, Region sorted, Region genres, uint32_t count,
                              Region albums)
 {
     uint32_t mark = state->arena.used;
     Stream stream;
     uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    uint8_t *genre_buffer = arena_take(&state->arena, STREAM_BUFFER);
     uint8_t *previous = arena_take(&state->arena, ALBUM_TUPLE);
-    if (buffer == NULL || previous == NULL || !open_stream(state, &stream, sorted) ||
-        !pull(&stream)) {
+    if (buffer == NULL || genre_buffer == NULL || previous == NULL ||
+        !open_stream(state, &stream, sorted) || !pull(&stream)) {
         return false;
     }
     Out out;
     out_open(&out, &state->store, albums, buffer, STREAM_BUFFER);
-    uint32_t album = 0;
+    In genre_of_album;
+    in_open(&genre_of_album, &state->store, genres.offset, genres.offset + count * 2, genre_buffer,
+            STREAM_BUFFER);
     uint32_t member_start = 0;
     while (stream.live) {
         for (uint32_t index = 0; index < ALBUM_TUPLE; index++) {
             previous[index] = stream.record[index];
         }
-        uint32_t count = 0;
+        uint32_t members = 0;
         uint32_t year = 0;
         while (stream.live && by_album_key(previous, stream.record, NULL) == 0) {
             uint32_t candidate = builder_get16(stream.record + 10);
             if (candidate != 0 && (year == 0 || candidate < year)) {
                 year = candidate;
             }
-            count++;
+            members++;
             if (!pull(&stream)) {
                 return false;
             }
+        }
+        uint8_t genre[2];
+        if (!in_get(&genre_of_album, genre, sizeof genre)) {
+            return false;
         }
         uint8_t row[ALBUM_PRE];
         builder_put16(row, builder_get16(previous + 6));
         builder_put16(row + 2, builder_get16(previous + 2));
         builder_put16(row + 4, builder_get16(previous + 4));
         builder_put16(row + 6, year);
-        builder_put16(row + 8, count);
-        builder_put16(row + 10, genre_of_album[album++]);
+        builder_put16(row + 8, members);
+        builder_put16(row + 10, builder_get16(genre));
         builder_put32(row + 12, member_start);
-        member_start += count;
+        member_start += members;
         if (!out_put(&out, row, sizeof row)) {
             return false;
         }
@@ -330,19 +348,17 @@ static bool group_albums(BuilderState *state, Prepared *prepared, AlbumPhase *al
     }
     uint32_t arena_mark = state->arena.used;
     uint32_t store_mark = state->store.end;
+    Region genres = store_take(&state->store, count * 2 + 2);
     Region input;
     Region sorted;
-    if (!emit_album_tuples(state, prepared, &input) ||
-        !sort_with(state, input, by_album_genre, &sorted)) {
-        return false;
-    }
-    uint16_t *genre_of_album = arena_take(&state->arena, count * 2 + 2);
-    if (genre_of_album == NULL || !album_genres(state, sorted, genre_of_album, &albums->count)) {
+    if (state->store.failed || !emit_album_tuples(state, prepared, &input) ||
+        !sort_with(state, input, by_album_genre, &sorted) ||
+        !album_genres(state, sorted, genres, &albums->count)) {
         return false;
     }
     state->store.end = (input.offset + input.size + 3) & ~3u;
     if (!sort_with(state, input, by_album_key, &sorted) ||
-        !write_album_rows(state, sorted, genre_of_album, albums->pre)) {
+        !write_album_rows(state, sorted, genres, albums->count, albums->pre)) {
         return false;
     }
     state->store.end = (input.offset + input.size + 3) & ~3u;
@@ -366,16 +382,9 @@ static int by_album_order(const uint8_t *left, const uint8_t *right, const void 
     return artist != 0 ? artist : compare_u16(left, right, 6);
 }
 
-static bool read_album_pre(BuilderState *state, const AlbumPhase *albums, uint32_t album,
-                           uint8_t *row)
-{
-    return store_read(&state->store, albums->pre.offset + album * ALBUM_PRE, row, ALBUM_PRE);
-}
-
-static bool order_albums(BuilderState *state, const AlbumPhase *albums, uint16_t *album_at)
+static bool order_albums(BuilderState *state, const AlbumPhase *albums, Region *sorted)
 {
     uint32_t arena_mark = state->arena.used;
-    uint32_t store_mark = state->store.end;
     uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
     uint8_t *pre_buffer = arena_take(&state->arena, STREAM_BUFFER);
     Tail tail;
@@ -386,108 +395,145 @@ static bool order_albums(BuilderState *state, const AlbumPhase *albums, uint16_t
     in_open(&pre, &state->store, albums->pre.offset, albums->pre.offset + albums->count * ALBUM_PRE,
             pre_buffer, STREAM_BUFFER);
     for (uint32_t album = 0; album < albums->count; album++) {
-        uint8_t row[ALBUM_PRE];
-        if (!in_get(&pre, row, sizeof row)) {
+        uint8_t tuple[ORDER_TUPLE];
+        if (!in_get(&pre, tuple + 10, ALBUM_PRE)) {
             return false;
         }
-        uint8_t tuple[ORDER_TUPLE];
         builder_put16(tuple, ORDER_TUPLE);
-        builder_put16(tuple + 2, builder_get16(row + 4));
-        builder_put16(tuple + 4, builder_get16(row + 2));
-        builder_put16(tuple + 6, builder_get16(row));
+        builder_put16(tuple + 2, builder_get16(tuple + 14));
+        builder_put16(tuple + 4, builder_get16(tuple + 12));
+        builder_put16(tuple + 6, builder_get16(tuple + 10));
         builder_put16(tuple + 8, album);
         if (!out_put(&tail.out, tuple, sizeof tuple)) {
             return false;
         }
     }
     Region input;
-    Region sorted;
     if (!close_tail(state, &tail, &input)) {
         return false;
     }
     state->arena.used = arena_mark;
-    Stream stream;
-    if (!sort_with(state, input, by_album_order, &sorted) || !open_stream(state, &stream, sorted) ||
-        !pull(&stream)) {
+    return sort_with(state, input, by_album_order, sorted);
+}
+
+typedef struct Placing {
+    Out albums;
+    Out final_tracks;
+    Out track_album;
+    Out places;
+    Region place_pairs;
+} Placing;
+
+static bool open_placing(BuilderState *state, Prepared *prepared, Placing *placing)
+{
+    uint32_t count = state->track_count;
+    placing->place_pairs =
+        store_take(&state->store, count * (BUILDER_ENTRY_HEADER + PLACE_SIZE) + 4);
+    uint8_t *buffers[4];
+    for (int index = 0; index < 4; index++) {
+        buffers[index] = arena_take(&state->arena, STREAM_BUFFER);
+    }
+    if (state->store.failed || state->arena.failed) {
         return false;
     }
-    uint32_t position = 0;
-    while (stream.live) {
-        album_at[position++] = builder_get16(stream.record + 8);
-        if (!pull(&stream)) {
-            return false;
-        }
-    }
-    state->arena.used = arena_mark;
-    state->store.end = store_mark;
+    out_open(&placing->albums, &state->store, prepared->albums, buffers[0], STREAM_BUFFER);
+    out_open(&placing->final_tracks, &state->store, prepared->final_tracks, buffers[1],
+             STREAM_BUFFER);
+    out_open(&placing->track_album, &state->store, prepared->track_album, buffers[2],
+             STREAM_BUFFER);
+    out_open(&placing->places, &state->store, placing->place_pairs, buffers[3], STREAM_BUFFER);
     return true;
 }
 
-static bool place_tracks(BuilderState *state, Prepared *prepared, const AlbumPhase *albums,
-                         const uint16_t *album_at)
+static bool place_member(Placing *placing, uint32_t track, uint32_t position, uint32_t album,
+                         const uint8_t *pre)
 {
-    uint32_t count = state->track_count;
-    uint32_t mark = state->arena.used;
-    uint16_t *final_tracks = arena_take(&state->arena, count * 2 + 2);
-    uint16_t *track_album = arena_take(&state->arena, count * 2 + 2);
-    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
-    uint8_t *members = arena_take(&state->arena, STREAM_BUFFER);
-    if (state->arena.failed) {
+    uint8_t value[2];
+    uint8_t place[PLACE_SIZE];
+    builder_put16(place, position);
+    builder_put16(place + 2, album);
+    builder_put16(place + 4, builder_get16(pre + 6));
+    builder_put16(place + 6, builder_get16(pre + 4));
+    builder_put16(value, track);
+    if (!out_put(&placing->final_tracks, value, sizeof value)) {
         return false;
     }
-    Out out;
-    out_open(&out, &state->store, prepared->albums, buffer, STREAM_BUFFER);
+    builder_put16(value, album);
+    return out_put(&placing->track_album, value, sizeof value) &&
+           builder_put_entry(&placing->places, track, place, sizeof place);
+}
+
+static bool place_album(BuilderState *state, Prepared *prepared, const AlbumPhase *albums,
+                        Placing *placing, uint32_t final, const uint8_t *pre, uint32_t *position,
+                        uint8_t *members)
+{
+    uint32_t first_seen = builder_get16(pre);
+    uint32_t member_count = builder_get16(pre + 8);
+    uint32_t member_start = builder_get32(pre + 12);
+    uint32_t first_track = *position;
+    for (uint32_t done = 0; done < member_count;) {
+        uint32_t step =
+            member_count - done < STREAM_BUFFER / 2 ? member_count - done : STREAM_BUFFER / 2;
+        if (!store_read(&state->store, albums->members.offset + (member_start + done) * 2, members,
+                        step * 2)) {
+            return false;
+        }
+        for (uint32_t index = 0; index < step; index++) {
+            if (!place_member(placing, builder_get16(members + 2 * index), (*position)++, final,
+                              pre)) {
+                return false;
+            }
+        }
+        done += step;
+    }
+    if (builder_get16(pre + 4) < prepared->music_ranks[BUILDER_ALBUM]) {
+        prepared->music_albums = final + 1;
+        prepared->music_tracks = *position;
+    }
+    TrackRow row;
+    if (!builder_read_row(&prepared->rows, state, first_seen, &row)) {
+        return false;
+    }
+    uint8_t record[ALBUM_FINAL];
+    builder_put32(record, row.text[BUILDER_ALBUM]);
+    builder_put16(record + 4, row.length[BUILDER_ALBUM]);
+    builder_put16(record + 6, builder_get16(pre + 2));
+    builder_put16(record + 8, builder_get16(pre + 10));
+    builder_put16(record + 10, builder_get16(pre + 6));
+    builder_put16(record + 12, first_track);
+    builder_put16(record + 14, member_count);
+    builder_put16(record + 16, builder_get16(pre + 4));
+    builder_put16(record + 18, 0);
+    return out_put(&placing->albums, record, sizeof record);
+}
+
+static bool place_tracks(BuilderState *state, Prepared *prepared, const AlbumPhase *albums,
+                         Region order)
+{
+    uint32_t mark = state->arena.used;
+    Placing placing;
+    Stream stream;
+    uint8_t *members = arena_take(&state->arena, STREAM_BUFFER);
+    if (members == NULL || !open_placing(state, prepared, &placing) ||
+        !open_stream(state, &stream, order) || !pull(&stream)) {
+        return false;
+    }
     uint32_t position = 0;
     prepared->music_albums = 0;
     prepared->music_tracks = 0;
-    for (uint32_t final = 0; final < albums->count; final++) {
-        uint8_t pre[ALBUM_PRE];
-        if (!read_album_pre(state, albums, album_at[final], pre)) {
-            return false;
-        }
-        uint32_t first_seen = builder_get16(pre);
-        uint32_t member_count = builder_get16(pre + 8);
-        uint32_t member_start = builder_get32(pre + 12);
-        uint32_t first_track = position;
-        for (uint32_t done = 0; done < member_count;) {
-            uint32_t step =
-                member_count - done < STREAM_BUFFER / 2 ? member_count - done : STREAM_BUFFER / 2;
-            if (!store_read(&state->store, albums->members.offset + (member_start + done) * 2,
-                            members, step * 2)) {
-                return false;
-            }
-            for (uint32_t index = 0; index < step; index++) {
-                final_tracks[position] = builder_get16(members + 2 * index);
-                track_album[position++] = (uint16_t) final;
-            }
-            done += step;
-        }
-        if (builder_get16(pre + 4) < prepared->music_ranks[BUILDER_ALBUM]) {
-            prepared->music_albums = final + 1;
-            prepared->music_tracks = position;
-        }
-        TrackRow row;
-        if (!builder_read_row(&prepared->rows, state, first_seen, &row)) {
-            return false;
-        }
-        uint8_t record[ALBUM_FINAL];
-        builder_put32(record, row.text[BUILDER_ALBUM]);
-        builder_put16(record + 4, row.length[BUILDER_ALBUM]);
-        builder_put16(record + 6, builder_get16(pre + 2));
-        builder_put16(record + 8, builder_get16(pre + 10));
-        builder_put16(record + 10, builder_get16(pre + 6));
-        builder_put16(record + 12, first_track);
-        builder_put16(record + 14, member_count);
-        builder_put16(record + 16, builder_get16(pre + 4));
-        builder_put16(record + 18, 0);
-        if (!out_put(&out, record, sizeof record)) {
+    for (uint32_t final = 0; stream.live; final++) {
+        if (!place_album(state, prepared, albums, &placing, final, stream.record + 10, &position,
+                         members) ||
+            !pull(&stream)) {
             return false;
         }
     }
-    bool done = out_close(&out) &&
-                builder_write_column(state, prepared->final_tracks, final_tracks, count) &&
-                builder_write_column(state, prepared->track_album, track_album, count);
+    bool done = out_close(&placing.albums) && out_close(&placing.final_tracks) &&
+                out_close(&placing.track_album) && out_close(&placing.places);
+    placing.place_pairs.size = state->track_count * (BUILDER_ENTRY_HEADER + PLACE_SIZE);
     state->arena.used = mark;
+    done = done && builder_scatter_values(state, placing.place_pairs, prepared->track_place,
+                                          state->track_count, PLACE_SIZE);
     return done;
 }
 
@@ -496,6 +542,7 @@ static bool build_albums(BuilderState *state, Prepared *prepared)
     uint32_t count = state->track_count;
     prepared->final_tracks = store_take(&state->store, count * 2 + 2);
     prepared->track_album = store_take(&state->store, count * 2 + 2);
+    prepared->track_place = store_take(&state->store, count * PLACE_SIZE + PLACE_SIZE);
     prepared->albums = store_take(&state->store, count * ALBUM_FINAL + ALBUM_FINAL);
     if (state->store.failed) {
         return false;
@@ -503,12 +550,9 @@ static bool build_albums(BuilderState *state, Prepared *prepared)
     uint32_t arena_mark = state->arena.used;
     uint32_t store_mark = state->store.end;
     AlbumPhase albums = {.count = 0};
-    if (!group_albums(state, prepared, &albums)) {
-        return false;
-    }
-    uint16_t *album_at = arena_take(&state->arena, albums.count * 2 + 2);
-    if (album_at == NULL || !order_albums(state, &albums, album_at) ||
-        !place_tracks(state, prepared, &albums, album_at)) {
+    Region order;
+    if (!group_albums(state, prepared, &albums) || !order_albums(state, &albums, &order) ||
+        !place_tracks(state, prepared, &albums, order)) {
         return false;
     }
     prepared->album_count = albums.count;
@@ -517,34 +561,35 @@ static bool build_albums(BuilderState *state, Prepared *prepared)
     return true;
 }
 
-typedef struct Shared {
-    uint16_t *final_tracks;
-    uint16_t *track_album;
-    uint16_t *album_year;
-    uint16_t *album_title;
-} Shared;
+typedef struct TrackPlaces {
+    In in;
+    uint32_t position;
+    uint32_t album;
+    uint32_t year;
+    uint32_t title;
+} TrackPlaces;
 
-static bool load_shared(BuilderState *state, Prepared *prepared, Shared *shared)
+static bool open_places(BuilderState *state, Prepared *prepared, TrackPlaces *places)
 {
-    uint32_t count = state->track_count;
-    uint32_t albums = prepared->album_count;
-    shared->final_tracks = builder_load_column(state, prepared->final_tracks, count);
-    shared->track_album = builder_load_column(state, prepared->track_album, count);
-    shared->album_year = arena_take(&state->arena, albums * 2 + 2);
-    shared->album_title = arena_take(&state->arena, albums * 2 + 2);
-    if (shared->final_tracks == NULL || shared->track_album == NULL || shared->album_year == NULL ||
-        shared->album_title == NULL) {
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (buffer == NULL) {
         return false;
     }
-    for (uint32_t album = 0; album < albums; album++) {
-        uint8_t record[ALBUM_FINAL];
-        if (!store_read(&state->store, prepared->albums.offset + album * ALBUM_FINAL, record,
-                        sizeof record)) {
-            return false;
-        }
-        shared->album_year[album] = builder_get16(record + 10);
-        shared->album_title[album] = builder_get16(record + 16);
+    in_open(&places->in, &state->store, prepared->track_place.offset,
+            prepared->track_place.offset + state->track_count * PLACE_SIZE, buffer, STREAM_BUFFER);
+    return true;
+}
+
+static bool next_place(TrackPlaces *places)
+{
+    uint8_t place[PLACE_SIZE];
+    if (!in_get(&places->in, place, sizeof place)) {
+        return false;
     }
+    places->position = builder_get16(place);
+    places->album = builder_get16(place + 2);
+    places->year = builder_get16(place + 4);
+    places->title = builder_get16(place + 6);
     return true;
 }
 
@@ -571,22 +616,28 @@ static int by_group_title(const uint8_t *left, const uint8_t *right, const void 
     return title != 0 ? title : compare_u16(left, right, 8);
 }
 
-static bool emit_group_tuples(BuilderState *state, const Shared *shared, const uint16_t *groups,
-                              Region *input)
+static bool emit_group_tuples(BuilderState *state, Prepared *prepared, int field, Region *input)
 {
     uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    Column groups;
+    TrackPlaces places;
     Tail tail;
-    if (buffer == NULL || !open_tail(state, &tail, buffer)) {
+    if (buffer == NULL ||
+        !open_column(state, &groups, prepared->columns[field], state->track_count) ||
+        !open_places(state, prepared, &places) || !open_tail(state, &tail, buffer)) {
         return false;
     }
-    for (uint32_t position = 0; position < state->track_count; position++) {
-        uint32_t album = shared->track_album[position];
+    for (uint32_t track = 0; track < state->track_count; track++) {
+        uint16_t group = 0;
+        if (!next_value(&groups, &group) || !next_place(&places)) {
+            return false;
+        }
         uint8_t tuple[GROUP_TUPLE];
         builder_put16(tuple, GROUP_TUPLE);
-        builder_put16(tuple + 2, groups[shared->final_tracks[position]]);
-        builder_put16(tuple + 4, shared->album_year[album]);
-        builder_put16(tuple + 6, shared->album_title[album]);
-        builder_put16(tuple + 8, album);
+        builder_put16(tuple + 2, group);
+        builder_put16(tuple + 4, places.year);
+        builder_put16(tuple + 6, places.title);
+        builder_put16(tuple + 8, places.album);
         if (!out_put(&tail.out, tuple, sizeof tuple)) {
             return false;
         }
@@ -638,8 +689,8 @@ static bool write_group_links(BuilderState *state, Region sorted, GroupTable *ta
     return out_close(&links) && out_close(&groups);
 }
 
-static bool build_group(BuilderState *state, Prepared *prepared, const Shared *shared, int field,
-                        GroupTable *table, SortCompare order)
+static bool build_group(BuilderState *state, Prepared *prepared, int field, GroupTable *table,
+                        SortCompare order)
 {
     table->groups = store_take(&state->store, table->count * GROUP_ENTRY + GROUP_ENTRY);
     table->links = store_take(&state->store, state->track_count * 2 + 2);
@@ -648,12 +699,12 @@ static bool build_group(BuilderState *state, Prepared *prepared, const Shared *s
     }
     uint32_t arena_mark = state->arena.used;
     uint32_t store_mark = state->store.end;
-    uint16_t *groups = builder_load_column(state, prepared->columns[field], state->track_count);
     Region input;
     Region sorted;
-    if (groups == NULL || !emit_group_tuples(state, shared, groups, &input)) {
+    if (!emit_group_tuples(state, prepared, field, &input)) {
         return false;
     }
+    state->arena.used = arena_mark;
     if (!sort_with(state, input, order, &sorted) || !write_group_links(state, sorted, table)) {
         return false;
     }
@@ -677,23 +728,36 @@ static int by_rank_path(const uint8_t *left, const uint8_t *right, const void *c
     return left_depth < right_depth ? -1 : left_depth > right_depth ? 1 : 0;
 }
 
-static bool emit_folder_paths(BuilderState *state, Prepared *prepared, const uint16_t *order,
-                              Region *input)
+static bool column_at(Cache *cache, Region column, uint32_t index, uint32_t *value)
+{
+    uint8_t bytes[2];
+    if (!cache_read(cache, column.offset + index * 2, bytes, sizeof bytes)) {
+        return false;
+    }
+    *value = builder_get16(bytes);
+    return true;
+}
+
+static bool emit_folder_paths(BuilderState *state, Prepared *prepared, Region *input)
 {
     uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    Cache order;
     Tail tail;
-    if (buffer == NULL || !open_tail(state, &tail, buffer)) {
+    if (buffer == NULL ||
+        !cache_init(&order, &state->store, &state->arena, COLUMN_BUFFER, FOLDER_CACHE_BLOCKS) ||
+        !open_tail(state, &tail, buffer)) {
         return false;
     }
     for (uint32_t node = 0; node < state->folder_count; node++) {
-        uint16_t chain[BUILDER_MAX_DEPTH];
+        uint32_t chain[BUILDER_MAX_DEPTH];
         uint32_t depth = 0;
         for (uint32_t walk = node; walk != 0 && depth < BUILDER_MAX_DEPTH;) {
             FolderRow row;
-            if (!builder_read_folder(&prepared->folders, state, walk, &row)) {
+            if (!builder_read_folder(&prepared->folders, state, walk, &row) ||
+                !column_at(&order, prepared->folder_order, walk, &chain[depth])) {
                 return false;
             }
-            chain[depth++] = order[walk];
+            depth++;
             walk = row.parent;
         }
         uint8_t record[4 + 2 * BUILDER_MAX_DEPTH];
@@ -709,61 +773,77 @@ static bool emit_folder_paths(BuilderState *state, Prepared *prepared, const uin
     return close_tail(state, &tail, input);
 }
 
-typedef struct FolderPhase {
-    uint16_t *new_index;
-    uint16_t *node_at;
-    uint16_t *subfolders;
-    uint16_t *path_length;
-} FolderPhase;
-
-static bool number_folders(BuilderState *state, Prepared *prepared, FolderPhase *phase)
+static bool number_folders(BuilderState *state, Prepared *prepared, Region node_at)
 {
     uint32_t count = state->folder_count;
     uint32_t arena_mark = state->arena.used;
     uint32_t store_mark = state->store.end;
-    uint16_t *order = builder_load_column(state, prepared->folder_order, count);
     Region input;
     Region sorted;
-    if (order == NULL || !emit_folder_paths(state, prepared, order, &input)) {
+    if (!emit_folder_paths(state, prepared, &input)) {
         return false;
     }
     state->arena.used = arena_mark;
     Stream stream;
-    if (!sort_with(state, input, by_rank_path, &sorted) || !open_stream(state, &stream, sorted) ||
+    Out nodes;
+    Out pairs;
+    Region new_index_pairs = store_take(&state->store, count * BUILDER_PAIR_SIZE);
+    uint8_t *node_buffer = arena_take(&state->arena, STREAM_BUFFER);
+    uint8_t *pair_buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (state->store.failed || node_buffer == NULL || pair_buffer == NULL ||
+        !sort_with(state, input, by_rank_path, &sorted) || !open_stream(state, &stream, sorted) ||
         !pull(&stream)) {
         return false;
     }
+    out_open(&nodes, &state->store, node_at, node_buffer, STREAM_BUFFER);
+    out_open(&pairs, &state->store, new_index_pairs, pair_buffer, STREAM_BUFFER);
     uint32_t position = 0;
     while (stream.live) {
         uint32_t node = builder_get16(stream.record + 2);
-        phase->new_index[node] = (uint16_t)position;
-        phase->node_at[position++] = (uint16_t)node;
-        if (!pull(&stream)) {
+        uint8_t value[2];
+        builder_put16(value, node);
+        if (!out_put(&nodes, value, sizeof value) || !builder_put_pair(&pairs, node, position) ||
+            !pull(&stream)) {
             return false;
         }
+        position++;
     }
+    bool closed = position == count && out_close(&nodes) && out_close(&pairs);
     state->arena.used = arena_mark;
+    bool numbered =
+        closed && builder_scatter(state, new_index_pairs, prepared->folder_new_index, count);
     state->store.end = store_mark;
-    return position == count;
+    return numbered;
 }
 
-static bool measure_folders(BuilderState *state, Prepared *prepared, FolderPhase *phase)
+static bool measure_folders(BuilderState *state, Prepared *prepared)
 {
-    uint32_t count = state->folder_count;
-    for (uint32_t index = 0; index < count; index++) {
-        phase->subfolders[index] = 0;
+    uint32_t mark = state->arena.used;
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (buffer == NULL) {
+        return false;
     }
-    phase->path_length[0] = 0;
-    for (uint32_t position = 1; position < count; position++) {
-        uint32_t node = phase->node_at[position];
-        FolderRow row;
-        if (!builder_read_folder(&prepared->folders, state, node, &row)) {
+    Out out;
+    out_open(&out, &state->store, prepared->folder_path_length, buffer, STREAM_BUFFER);
+    for (uint32_t node = 0; node < state->folder_count; node++) {
+        uint32_t length = 0;
+        for (uint32_t walk = node; walk != 0;) {
+            FolderRow row;
+            if (!builder_read_folder(&prepared->folders, state, walk, &row)) {
+                return false;
+            }
+            length += row.length + 1u;
+            walk = row.parent;
+        }
+        uint8_t value[2];
+        builder_put16(value, length);
+        if (!out_put(&out, value, sizeof value)) {
             return false;
         }
-        phase->subfolders[phase->new_index[row.parent]]++;
-        phase->path_length[node] = (uint16_t)(phase->path_length[row.parent] + row.length + 1);
     }
-    return true;
+    bool closed = out_close(&out);
+    state->arena.used = mark;
+    return closed;
 }
 
 static int by_folder_link(const uint8_t *left, const uint8_t *right, const void *context)
@@ -798,73 +878,120 @@ static bool put_link_tuple(Tail *tail, uint32_t folder, uint32_t kind, uint32_t 
     return out_put(&tail->out, tuple, sizeof tuple);
 }
 
-static bool emit_folder_links(BuilderState *state, Prepared *prepared, const uint16_t *final_tracks,
-                              const FolderPhase *phase, Region *input)
+static bool emit_child_links(BuilderState *state, Prepared *prepared, Cache *new_index, Tail *tail)
 {
-    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
-    uint16_t *files =
-        builder_load_column(state, prepared->columns[BUILDER_FILE], state->track_count);
-    Tail tail;
-    if (buffer == NULL || files == NULL || !open_tail(state, &tail, buffer)) {
-        return false;
-    }
     for (uint32_t node = 1; node < state->folder_count; node++) {
         FolderRow row;
-        uint32_t child = phase->new_index[node];
+        uint32_t child = 0;
+        uint32_t parent = 0;
         if (!builder_read_folder(&prepared->folders, state, node, &row) ||
-            !put_link_tuple(&tail, phase->new_index[row.parent], KIND_CHILD, 0, 0, child, child)) {
+            !column_at(new_index, prepared->folder_new_index, node, &child) ||
+            !column_at(new_index, prepared->folder_new_index, row.parent, &parent) ||
+            !put_link_tuple(tail, parent, KIND_CHILD, 0, 0, child, child)) {
             return false;
         }
     }
-    for (uint32_t position = 0; position < state->track_count; position++) {
-        uint32_t track = final_tracks[position];
+    return true;
+}
+
+static bool emit_track_links(BuilderState *state, Prepared *prepared, Cache *new_index, Tail *tail)
+{
+    uint8_t *row_buffer = arena_take(&state->arena, STREAM_BUFFER);
+    Column files;
+    TrackPlaces places;
+    if (row_buffer == NULL ||
+        !open_column(state, &files, prepared->columns[BUILDER_FILE], state->track_count) ||
+        !open_places(state, prepared, &places)) {
+        return false;
+    }
+    In rows;
+    in_open(&rows, &state->store, state->rows.offset,
+            state->rows.offset + state->track_count * BUILDER_ROW_SIZE, row_buffer, STREAM_BUFFER);
+    for (uint32_t track = 0; track < state->track_count; track++) {
+        uint8_t bytes[BUILDER_ROW_SIZE];
         TrackRow row;
-        if (!builder_read_row(&prepared->rows, state, track, &row) ||
-            !put_link_tuple(&tail, phase->new_index[row.folder], KIND_TRACK, row.disc, row.number,
-                            files[track], position)) {
+        uint16_t file = 0;
+        uint32_t folder = 0;
+        if (!in_get(&rows, bytes, sizeof bytes) || !next_value(&files, &file) ||
+            !next_place(&places)) {
             return false;
         }
+        builder_row_decode(bytes, &row);
+        if (!column_at(new_index, prepared->folder_new_index, row.folder, &folder) ||
+            !put_link_tuple(tail, folder, KIND_TRACK, row.disc, row.number, file,
+                            places.position)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool emit_folder_links(BuilderState *state, Prepared *prepared, Region *input)
+{
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    Cache new_index;
+    Tail tail;
+    if (buffer == NULL ||
+        !cache_init(&new_index, &state->store, &state->arena, COLUMN_BUFFER, FOLDER_CACHE_BLOCKS) ||
+        !open_tail(state, &tail, buffer) || !emit_child_links(state, prepared, &new_index, &tail) ||
+        !emit_track_links(state, prepared, &new_index, &tail)) {
+        return false;
     }
     return close_tail(state, &tail, input);
 }
 
-static bool write_folder_rows(BuilderState *state, Prepared *prepared, const FolderPhase *phase,
+static bool write_folder_rows(BuilderState *state, Prepared *prepared, Region node_at,
                               Region sorted)
 {
     Stream stream;
+    Cache new_index;
     uint8_t *link_buffer = arena_take(&state->arena, STREAM_BUFFER);
     uint8_t *row_buffer = arena_take(&state->arena, STREAM_BUFFER);
-    if (link_buffer == NULL || row_buffer == NULL || !open_stream(state, &stream, sorted) ||
-        !pull(&stream)) {
+    uint8_t *node_buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (link_buffer == NULL || row_buffer == NULL || node_buffer == NULL ||
+        !cache_init(&new_index, &state->store, &state->arena, COLUMN_BUFFER, FOLDER_CACHE_BLOCKS) ||
+        !open_stream(state, &stream, sorted) || !pull(&stream)) {
         return false;
     }
     Out links;
     Out rows;
+    In nodes;
     out_open(&links, &state->store, prepared->folder_links, link_buffer, STREAM_BUFFER);
     out_open(&rows, &state->store, prepared->folders_final, row_buffer, STREAM_BUFFER);
+    in_open(&nodes, &state->store, node_at.offset, node_at.offset + state->folder_count * 2,
+            node_buffer, STREAM_BUFFER);
     uint32_t total = 0;
     for (uint32_t position = 0; position < state->folder_count; position++) {
         uint32_t first = total;
         uint32_t tracks = 0;
+        uint32_t children = 0;
         while (stream.live && builder_get16(stream.record + 2) == position) {
             uint8_t value[2];
             builder_put16(value, builder_get16(stream.record + 10));
             tracks += stream.record[4] == KIND_TRACK;
+            children += stream.record[4] == KIND_CHILD;
             total++;
             if (!out_put(&links, value, sizeof value) || !pull(&stream)) {
                 return false;
             }
         }
-        uint32_t node = phase->node_at[position];
+        uint8_t node_bytes[2];
         FolderRow row;
-        if (!builder_read_folder(&prepared->folders, state, node, &row)) {
+        uint32_t parent = BUILDER_NONE;
+        if (!in_get(&nodes, node_bytes, sizeof node_bytes)) {
+            return false;
+        }
+        uint32_t node = builder_get16(node_bytes);
+        if (!builder_read_folder(&prepared->folders, state, node, &row) ||
+            (node != 0 &&
+             !column_at(&new_index, prepared->folder_new_index, row.parent, &parent))) {
             return false;
         }
         uint8_t record[FOLDER_FINAL];
         builder_put32(record, row.name);
         builder_put16(record + 4, row.length);
-        builder_put16(record + 6, node == 0 ? BUILDER_NONE : phase->new_index[row.parent]);
-        builder_put16(record + 8, phase->subfolders[position]);
+        builder_put16(record + 6, parent);
+        builder_put16(record + 8, children);
         builder_put16(record + 10, tracks);
         builder_put32(record + 12, first);
         if (!out_put(&rows, record, sizeof record)) {
@@ -875,7 +1002,7 @@ static bool write_folder_rows(BuilderState *state, Prepared *prepared, const Fol
     return out_close(&links) && out_close(&rows);
 }
 
-static bool build_folders(BuilderState *state, Prepared *prepared, const uint16_t *final_tracks)
+static bool build_folders(BuilderState *state, Prepared *prepared)
 {
     uint32_t count = state->folder_count;
     prepared->folder_new_index = store_take(&state->store, count * 2 + 2);
@@ -887,27 +1014,19 @@ static bool build_folders(BuilderState *state, Prepared *prepared, const uint16_
     }
     uint32_t arena_mark = state->arena.used;
     uint32_t store_mark = state->store.end;
-    FolderPhase phase = {.new_index = arena_take(&state->arena, count * 2 + 2),
-                         .node_at = arena_take(&state->arena, count * 2 + 2),
-                         .subfolders = arena_take(&state->arena, count * 2 + 2),
-                         .path_length = arena_take(&state->arena, count * 2 + 2)};
-    if (state->arena.failed || !number_folders(state, prepared, &phase) ||
-        !measure_folders(state, prepared, &phase) ||
-        !builder_write_column(state, prepared->folder_path_length, phase.path_length, count)) {
+    Region node_at = store_take(&state->store, count * 2 + 2);
+    if (state->store.failed || !number_folders(state, prepared, node_at) ||
+        !measure_folders(state, prepared)) {
         return false;
     }
-    state->arena.used = (uint32_t)((uint8_t *)phase.path_length - state->arena.base);
-    phase.path_length = NULL;
-    uint32_t links_mark = state->arena.used;
     Region input;
     Region sorted;
-    if (!emit_folder_links(state, prepared, final_tracks, &phase, &input)) {
+    if (!emit_folder_links(state, prepared, &input)) {
         return false;
     }
-    state->arena.used = links_mark;
+    state->arena.used = arena_mark;
     if (!sort_with(state, input, by_folder_link, &sorted) ||
-        !write_folder_rows(state, prepared, &phase, sorted) ||
-        !builder_write_column(state, prepared->folder_new_index, phase.new_index, count)) {
+        !write_folder_rows(state, prepared, node_at, sorted)) {
         return false;
     }
     state->arena.used = arena_mark;
@@ -922,7 +1041,45 @@ static int by_title_then_artist(const uint8_t *left, const uint8_t *right, const
     return title != 0 ? title : compare_u16(left, right, 4);
 }
 
-static bool build_title_order(BuilderState *state, Prepared *prepared, const uint16_t *final_tracks)
+static bool emit_title_tuples(BuilderState *state, Prepared *prepared, Region *input)
+{
+    uint32_t count = state->track_count;
+    Column titles;
+    Column artists;
+    TrackPlaces places;
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    Tail tail;
+    if (buffer == NULL || !open_column(state, &titles, prepared->columns[BUILDER_TITLE], count) ||
+        !open_column(state, &artists, prepared->columns[BUILDER_ARTIST], count) ||
+        !open_places(state, prepared, &places) || !open_tail(state, &tail, buffer)) {
+        return false;
+    }
+    for (uint32_t track = 0; track < count; track++) {
+        uint16_t title = 0;
+        uint16_t artist = 0;
+        if (!next_value(&titles, &title) || !next_value(&artists, &artist) ||
+            !next_place(&places)) {
+            return false;
+        }
+        uint8_t tuple[TITLE_TUPLE];
+        builder_put16(tuple, TITLE_TUPLE);
+        builder_put16(tuple + 2, title);
+        builder_put16(tuple + 4, artist);
+        builder_put16(tuple + 6, places.position);
+        if (!out_put(&tail.out, tuple, sizeof tuple)) {
+            return false;
+        }
+    }
+    return close_tail(state, &tail, input);
+}
+
+static int by_title_order(const uint8_t *left, const uint8_t *right, const void *context)
+{
+    int order = by_title_then_artist(left, right, context);
+    return order != 0 ? order : compare_u16(left, right, 6);
+}
+
+static bool build_title_order(BuilderState *state, Prepared *prepared)
 {
     uint32_t count = state->track_count;
     prepared->title_order = store_take(&state->store, count * 2 + 2);
@@ -931,34 +1088,15 @@ static bool build_title_order(BuilderState *state, Prepared *prepared, const uin
     }
     uint32_t arena_mark = state->arena.used;
     uint32_t store_mark = state->store.end;
-    uint16_t *titles = builder_load_column(state, prepared->columns[BUILDER_TITLE], count);
-    uint16_t *artists = builder_load_column(state, prepared->columns[BUILDER_ARTIST], count);
-    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
-    Tail tail;
-    if (titles == NULL || artists == NULL || buffer == NULL || !open_tail(state, &tail, buffer)) {
-        return false;
-    }
-    for (uint32_t position = 0; position < count; position++) {
-        uint32_t track = final_tracks[position];
-        uint8_t tuple[TITLE_TUPLE];
-        builder_put16(tuple, TITLE_TUPLE);
-        builder_put16(tuple + 2, titles[track]);
-        builder_put16(tuple + 4, artists[track]);
-        builder_put16(tuple + 6, position);
-        if (!out_put(&tail.out, tuple, sizeof tuple)) {
-            return false;
-        }
-    }
     Region input;
     Region sorted;
-    if (!close_tail(state, &tail, &input)) {
+    if (!emit_title_tuples(state, prepared, &input)) {
         return false;
     }
-    uint32_t sort_mark = state->arena.used;
-    if (!sort_with(state, input, by_title_then_artist, &sorted)) {
+    state->arena.used = arena_mark;
+    if (!sort_with(state, input, by_title_order, &sorted)) {
         return false;
     }
-    state->arena.used = sort_mark;
     Stream stream;
     uint8_t *out_buffer = arena_take(&state->arena, STREAM_BUFFER);
     if (out_buffer == NULL || !open_stream(state, &stream, sorted) || !pull(&stream)) {
@@ -979,25 +1117,10 @@ static bool build_title_order(BuilderState *state, Prepared *prepared, const uin
 
 bool builder_model(BuilderState *state, Prepared *prepared)
 {
-    if (!build_albums(state, prepared)) {
-        return false;
-    }
-    uint32_t arena_mark = state->arena.used;
-    Shared shared;
-    bool built =
-        load_shared(state, prepared, &shared) &&
-        build_group(state, prepared, &shared, BUILDER_ARTIST, &prepared->artists,
-                    by_group_chronology) &&
-        build_group(state, prepared, &shared, BUILDER_ALBUM_ARTIST, &prepared->album_artists,
-                    by_group_chronology) &&
-        build_group(state, prepared, &shared, BUILDER_GENRE, &prepared->genres, by_group_title);
-    state->arena.used = arena_mark;
-    if (!built) {
-        return false;
-    }
-    uint16_t *final_tracks = builder_load_column(state, prepared->final_tracks, state->track_count);
-    built = final_tracks != NULL && build_folders(state, prepared, final_tracks) &&
-            build_title_order(state, prepared, final_tracks);
-    state->arena.used = arena_mark;
-    return built;
+    return build_albums(state, prepared) &&
+           build_group(state, prepared, BUILDER_ARTIST, &prepared->artists, by_group_chronology) &&
+           build_group(state, prepared, BUILDER_ALBUM_ARTIST, &prepared->album_artists,
+                       by_group_chronology) &&
+           build_group(state, prepared, BUILDER_GENRE, &prepared->genres, by_group_title) &&
+           build_folders(state, prepared) && build_title_order(state, prepared);
 }

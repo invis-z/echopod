@@ -256,16 +256,31 @@ static int by_scatter_index(const uint8_t *left, const uint8_t *right, const voi
     return a < b ? -1 : a > b ? 1 : 0;
 }
 
+bool builder_put_entry(Out *out, uint32_t index, const uint8_t *values, uint32_t size)
+{
+    uint8_t entry[BUILDER_ENTRY_HEADER + BUILDER_ENTRY_VALUES];
+    builder_put16(entry, BUILDER_ENTRY_HEADER + size);
+    builder_put32(entry + 2, index);
+    for (uint32_t byte = 0; byte < size; byte++) {
+        entry[BUILDER_ENTRY_HEADER + byte] = values[byte];
+    }
+    return size <= BUILDER_ENTRY_VALUES && out_put(out, entry, BUILDER_ENTRY_HEADER + size);
+}
+
 bool builder_put_pair(Out *out, uint32_t index, uint32_t value)
 {
-    uint8_t pair[BUILDER_PAIR_SIZE];
-    builder_put16(pair, BUILDER_PAIR_SIZE);
-    builder_put32(pair + 2, index);
-    builder_put16(pair + 6, value);
-    return out_put(out, pair, sizeof pair);
+    uint8_t bytes[2];
+    builder_put16(bytes, value);
+    return builder_put_entry(out, index, bytes, sizeof bytes);
 }
 
 bool builder_scatter(BuilderState *state, Region pairs, Region column, uint32_t count)
+{
+    return builder_scatter_values(state, pairs, column, count, 2);
+}
+
+bool builder_scatter_values(BuilderState *state, Region pairs, Region column, uint32_t count,
+                            uint32_t size)
 {
     uint32_t arena_mark = state->arena.used;
     uint32_t store_mark = state->store.end;
@@ -289,9 +304,10 @@ bool builder_scatter(BuilderState *state, Region pairs, Region column, uint32_t 
     Out out;
     out_open(&out, &state->store, column, out_buffer, STREAM_BUFFER);
     for (uint32_t index = 0; index < count; index++) {
-        uint8_t pair[BUILDER_PAIR_SIZE];
-        if (in_done(&in) || !in_get(&in, pair, sizeof pair) || builder_get32(pair + 2) != index ||
-            !out_put(&out, pair + 6, 2)) {
+        uint8_t entry[BUILDER_ENTRY_HEADER + BUILDER_ENTRY_VALUES];
+        if (in_done(&in) || !in_get(&in, entry, BUILDER_ENTRY_HEADER + size) ||
+            builder_get32(entry + 2) != index ||
+            !out_put(&out, entry + BUILDER_ENTRY_HEADER, size)) {
             state->arena.failed = !state->store.io_failed && !state->store.failed;
             return false;
         }
