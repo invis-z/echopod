@@ -40,6 +40,8 @@ static uint32_t port_shadow;
 static PanelRotation rotation;
 static uint8_t brightness;
 static bool backlight_on;
+static bool panel_asleep;
+static uint32_t panel_woke_ms;
 static bool pwm_running;
 static uint32_t pwm_period;
 static bool ramping;
@@ -210,6 +212,22 @@ static void apply_backlight(void)
     }
 }
 
+static void set_panel_asleep(bool asleep)
+{
+    if (asleep == panel_asleep) {
+        return;
+    }
+    uint32_t awake_ms = hal_clock_milliseconds() - panel_woke_ms;
+    if (asleep && awake_ms < PANEL_AWAKE_BEFORE_SLEEP_MS) {
+        board_delay_ms(PANEL_AWAKE_BEFORE_SLEEP_MS - awake_ms);
+    }
+    panel_set_asleep(&BUS, asleep);
+    panel_asleep = asleep;
+    if (!asleep) {
+        panel_woke_ms = hal_clock_milliseconds();
+    }
+}
+
 bool board_display_lit(void)
 {
     return backlight_on;
@@ -217,6 +235,7 @@ bool board_display_lit(void)
 
 void board_backlight_full(void)
 {
+    set_panel_asleep(false);
     ramping = false;
     backlight_on = true;
     drive_backlight(true);
@@ -270,6 +289,8 @@ void board_display_start(void)
     pulse_reset(RESET_READY_MS);
     panel_id = read_panel_id();
     panel_send_init(&BUS, panel_variant_of_id(panel_id));
+    panel_asleep = false;
+    panel_woke_ms = hal_clock_milliseconds();
     board_display_clear();
 }
 
@@ -300,10 +321,16 @@ void hal_display_set_power(bool on)
     bool was_on = backlight_on;
     backlight_on = on;
     ramping = false;
+    if (on) {
+        set_panel_asleep(false);
+    }
     if (on && !was_on) {
         start_fade_in();
     } else {
         apply_backlight();
+    }
+    if (!on) {
+        set_panel_asleep(true);
     }
     board_start_record_step_done();
 }

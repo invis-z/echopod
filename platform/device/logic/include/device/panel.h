@@ -11,7 +11,8 @@ enum {
     PANEL_BUS_READ_STROBE = 1u << 12,
     PANEL_READ_ID_COMMAND = 0x04,
     PANEL_ID_VARIANT_MASK = 0xFF0000,
-    PANEL_ID_VARIANT_A = 0xE80000
+    PANEL_ID_VARIANT_A = 0xE80000,
+    PANEL_AWAKE_BEFORE_SLEEP_MS = 120
 };
 
 typedef enum PanelVariant {
@@ -45,5 +46,6 @@ typedef struct PanelWindow {
 void panel_send_init(const PanelBus *bus, PanelVariant variant);
 void panel_set_rotation(const PanelBus *bus, PanelRotation rotation);
 void panel_begin_write(const PanelBus *bus, PanelWindow window);
+void panel_set_asleep(const PanelBus *bus, bool asleep);
 uint32_t panel_bus_word(uint32_t shadow, uint8_t value, bool data);
 PanelVariant panel_variant_of_id(uint32_t id);
