@@ -540,7 +540,7 @@ static void the_buds_skip_tracks(void)
     connect_to(&BUDS);
     play();
     step(START_MS + 100);
-    uint16_t first = player.track;
+    uint32_t first = player.track;
     fake_hal_bluetooth()->remote.nexts++;
     step(START_MS + 200);
     CHECK(player.track != first);
@@ -556,7 +556,7 @@ static void presses_from_before_the_connection_are_ignored(void)
     start();
     play();
     fake_hal_bluetooth()->remote.nexts = 3;
-    uint16_t first = player.track;
+    uint32_t first = player.track;
     connect_to(&BUDS);
     step(START_MS + 100);
     CHECK_EQUAL(first, player.track);

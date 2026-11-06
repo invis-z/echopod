@@ -30,7 +30,7 @@ static BigLibrary big;
 static FixtureLibrary fixture;
 static PlayQueue queue;
 
-static BrowseQuery album_tracks(uint16_t album)
+static BrowseQuery album_tracks(uint32_t album)
 {
     return (BrowseQuery){.kind = BROWSE_ALBUM_TRACKS,
                          .group = LIBRARY_ARTISTS,
@@ -38,7 +38,7 @@ static BrowseQuery album_tracks(uint16_t album)
                          .artist = LIBRARY_NONE};
 }
 
-static PlayQueue *built(BrowseQuery source, uint16_t anchor, ShuffleMode shuffle, uint32_t seed)
+static PlayQueue *built(BrowseQuery source, uint32_t anchor, ShuffleMode shuffle, uint32_t seed)
 {
     Library *library = fixture_library_open(&fixture);
     PlayQueuePlan plan = {
@@ -49,19 +49,19 @@ static PlayQueue *built(BrowseQuery source, uint16_t anchor, ShuffleMode shuffle
 
 static int current_track(const PlayQueue *built_queue)
 {
-    uint16_t track = 0;
-    return play_queue_current(built_queue, &track) ? track : -1;
+    uint32_t track = 0;
+    return play_queue_current(built_queue, &track) ? (int)track : -1;
 }
 
 static int track_after(const PlayQueue *built_queue, RepeatMode repeat)
 {
     PlayQueueCursor next;
-    uint16_t track = 0;
+    uint32_t track = 0;
     if (!play_queue_upcoming(built_queue, repeat, &next) ||
         !play_queue_track_at(built_queue, next, &track)) {
         return -1;
     }
-    return track;
+    return (int)track;
 }
 
 static void advance(PlayQueue *built_queue)
@@ -71,17 +71,17 @@ static void advance(PlayQueue *built_queue)
     play_queue_move_to(built_queue, next);
 }
 
-static int value_at(const PlayQueue *built_queue, uint16_t position)
+static int value_at(const PlayQueue *built_queue, uint32_t position)
 {
-    uint16_t track = 0;
+    uint32_t track = 0;
     if (!play_queue_track_at(built_queue, (PlayQueueCursor){position, 0}, &track)) {
         return -1;
     }
     if (built_queue->plan.shuffle != SHUFFLE_ALBUMS) {
-        return track;
+        return (int)track;
     }
     LibraryTrack details;
-    return library_read_track(built_queue->library, track, &details) ? details.album : -1;
+    return library_read_track(built_queue->library, track, &details) ? (int)details.album : -1;
 }
 
 static bool holds_each_value_once(const PlayQueue *built_queue, int values)
@@ -89,14 +89,14 @@ static bool holds_each_value_once(const PlayQueue *built_queue, int values)
     for (int value = 0; value < values; value++) {
         seen[value] = 0;
     }
-    for (int position = 0; position < built_queue->count; position++) {
-        int value = value_at(built_queue, (uint16_t)position);
+    for (int position = 0; position < (int)built_queue->count; position++) {
+        int value = value_at(built_queue, (uint32_t)position);
         if (value < 0 || value >= values || seen[value] != 0) {
             return false;
         }
         seen[value] = 1;
     }
-    return built_queue->count == values;
+    return (int)built_queue->count == values;
 }
 
 static int tracks_played_through(PlayQueue *built_queue)
@@ -160,7 +160,7 @@ static void previous_wraps_only_when_asked(void)
 {
     PlayQueue *list = built(album_tracks(BACK_IN_BLACK), HELLS_BELLS, SHUFFLE_OFF, 1);
     PlayQueueCursor previous;
-    uint16_t track = 0;
+    uint32_t track = 0;
     CHECK(!play_queue_neighbor(list, -1, false, &previous));
     CHECK(play_queue_neighbor(list, -1, true, &previous));
     CHECK(play_queue_track_at(list, previous, &track));
@@ -180,11 +180,11 @@ static void the_same_seed_rebuilds_the_same_order(void)
     int first[FIXTURE_TRACKS];
     PlayQueue *songs = built(browse_root_query(BROWSE_ALL_SONGS), HUNTER, SHUFFLE_SONGS, 11);
     for (int index = 0; index < FIXTURE_TRACKS; index++) {
-        first[index] = value_at(songs, (uint16_t)index);
+        first[index] = value_at(songs, (uint32_t)index);
     }
     songs = built(browse_root_query(BROWSE_ALL_SONGS), HUNTER, SHUFFLE_SONGS, 11);
     for (int index = 0; index < FIXTURE_TRACKS; index++) {
-        CHECK_EQUAL(first[index], value_at(songs, (uint16_t)index));
+        CHECK_EQUAL(first[index], value_at(songs, (uint32_t)index));
     }
 }
 
@@ -193,12 +193,12 @@ static void different_seeds_shuffle_differently(void)
     int first[FIXTURE_TRACKS];
     PlayQueue *songs = built(browse_root_query(BROWSE_ALL_SONGS), HUNTER, SHUFFLE_SONGS, 11);
     for (int index = 0; index < FIXTURE_TRACKS; index++) {
-        first[index] = value_at(songs, (uint16_t)index);
+        first[index] = value_at(songs, (uint32_t)index);
     }
     songs = built(browse_root_query(BROWSE_ALL_SONGS), HUNTER, SHUFFLE_SONGS, 12345);
     int differences = 0;
     for (int index = 0; index < FIXTURE_TRACKS; index++) {
-        differences += first[index] != value_at(songs, (uint16_t)index) ? 1 : 0;
+        differences += first[index] != value_at(songs, (uint32_t)index) ? 1 : 0;
     }
     CHECK(differences > 0);
 }
@@ -245,7 +245,7 @@ static void album_shuffle_previous_returns_to_the_last_track_of_the_album_before
     advance(albums);
     advance(albums);
     PlayQueueCursor previous;
-    uint16_t track = 0;
+    uint32_t track = 0;
     CHECK(play_queue_neighbor(albums, -1, false, &previous));
     CHECK(play_queue_track_at(albums, previous, &track));
     CHECK_EQUAL(JOGA, track);
@@ -256,7 +256,7 @@ static void stepping_works_from_any_place_without_moving_the_queue(void)
     PlayQueue *albums = built(album_tracks(BACK_IN_BLACK), HUNTER, SHUFFLE_ALBUMS, 3);
     PlayQueueCursor joga;
     PlayQueueCursor after_joga;
-    uint16_t track = 0;
+    uint32_t track = 0;
     CHECK(play_queue_step(albums, albums->cursor, 1, false, &joga));
     CHECK(play_queue_step(albums, joga, 1, false, &after_joga));
     CHECK(play_queue_track_at(albums, after_joga, &track));
@@ -278,7 +278,7 @@ static void playlists_play_in_their_own_order(void)
     CHECK_EQUAL(JOGA, track_after(playlist, REPEAT_OFF));
 }
 
-static PlayQueue *built_big(BrowseQuery source, uint16_t anchor, ShuffleMode shuffle)
+static PlayQueue *built_big(BrowseQuery source, uint32_t anchor, ShuffleMode shuffle)
 {
     PlayQueuePlan plan = {.source = source, .anchor_track = anchor, .shuffle = shuffle, .seed = 7};
     CHECK(play_queue_build(&queue, &big.library, plan));
@@ -287,15 +287,16 @@ static PlayQueue *built_big(BrowseQuery source, uint16_t anchor, ShuffleMode shu
 
 static int title_order_track(uint32_t position)
 {
-    uint16_t track = 0;
-    return library_read_index(&big.library, LIBRARY_TITLE_ORDER, position, &track) ? track : -1;
+    uint32_t track = 0;
+    return library_read_index(&big.library, LIBRARY_TITLE_ORDER, position, &track) ? (int)track
+                                                                                   : -1;
 }
 
 static void a_long_list_plays_through_to_its_last_track(void)
 {
     big_library_open(&big, BIG_LIST, BIG_LIST);
     BrowseQuery songs = browse_root_query(BROWSE_ALL_SONGS);
-    PlayQueue *list = built_big(songs, (uint16_t)title_order_track(0), SHUFFLE_OFF);
+    PlayQueue *list = built_big(songs, (uint32_t)title_order_track(0), SHUFFLE_OFF);
     CHECK_EQUAL(BIG_LIST, list->count);
     CHECK_EQUAL(BIG_LIST, tracks_played_through(list));
     CHECK_EQUAL(title_order_track(BIG_LIST - 1), current_track(list));
@@ -309,7 +310,7 @@ static void a_long_list_starts_at_an_anchor_near_its_end(void)
 {
     big_library_open(&big, BIG_LIST, BIG_LIST);
     BrowseQuery songs = browse_root_query(BROWSE_ALL_SONGS);
-    PlayQueue *list = built_big(songs, (uint16_t)title_order_track(BIG_LIST - 2), SHUFFLE_OFF);
+    PlayQueue *list = built_big(songs, (uint32_t)title_order_track(BIG_LIST - 2), SHUFFLE_OFF);
     CHECK_EQUAL(title_order_track(BIG_LIST - 2), current_track(list));
     CHECK_EQUAL(BIG_LIST - 1, play_queue_place(list).number);
     CHECK_EQUAL(title_order_track(BIG_LIST - 1), track_after(list, REPEAT_OFF));

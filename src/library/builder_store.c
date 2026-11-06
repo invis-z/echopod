@@ -282,13 +282,14 @@ void builder_row_encode(const TrackRow *row, uint8_t *bytes)
         builder_put32(bytes + 4 * field, row->text[field]);
         builder_put16(bytes + 24 + 2 * field, row->length[field]);
     }
-    builder_put16(bytes + 36, row->folder);
-    builder_put16(bytes + 38, row->year);
-    bytes[40] = row->disc;
-    bytes[41] = row->number;
-    bytes[42] = row->spoken;
-    bytes[43] = row->guessed;
-    builder_put32(bytes + 44, row->duration_ms);
+    builder_put32(bytes + 36, row->folder);
+    builder_put16(bytes + 40, row->year);
+    bytes[42] = row->disc;
+    bytes[43] = row->number;
+    bytes[44] = row->spoken;
+    bytes[45] = row->guessed;
+    builder_put16(bytes + 46, 0);
+    builder_put32(bytes + 48, row->duration_ms);
 }
 
 void builder_row_decode(const uint8_t *bytes, TrackRow *row)
@@ -297,27 +298,28 @@ void builder_row_decode(const uint8_t *bytes, TrackRow *row)
         row->text[field] = builder_get32(bytes + 4 * field);
         row->length[field] = builder_get16(bytes + 24 + 2 * field);
     }
-    row->folder = builder_get16(bytes + 36);
-    row->year = builder_get16(bytes + 38);
-    row->disc = bytes[40];
-    row->number = bytes[41];
-    row->spoken = bytes[42];
-    row->guessed = bytes[43];
-    row->duration_ms = builder_get32(bytes + 44);
+    row->folder = builder_get32(bytes + 36);
+    row->year = builder_get16(bytes + 40);
+    row->disc = bytes[42];
+    row->number = bytes[43];
+    row->spoken = bytes[44];
+    row->guessed = bytes[45];
+    row->duration_ms = builder_get32(bytes + 48);
 }
 
 void builder_folder_encode(const FolderRow *row, uint8_t *bytes)
 {
     builder_put32(bytes, row->name);
     builder_put16(bytes + 4, row->length);
-    builder_put16(bytes + 6, row->parent);
+    builder_put16(bytes + 6, 0);
+    builder_put32(bytes + 8, row->parent);
 }
 
 void builder_folder_decode(const uint8_t *bytes, FolderRow *row)
 {
     row->name = builder_get32(bytes);
     row->length = builder_get16(bytes + 4);
-    row->parent = builder_get16(bytes + 6);
+    row->parent = builder_get32(bytes + 8);
 }
 
 bool builder_read_row(Cache *rows, const BuilderState *state, uint32_t track, TrackRow *row)

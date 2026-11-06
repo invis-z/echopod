@@ -5,10 +5,10 @@
 
 enum {
     STREAM_BUFFER = 4096,
-    GUESS_HEADER = 18,
+    GUESS_HEADER = 20,
     DECISION_SIZE = 6,
     ASSIGNMENT_SIZE = 12,
-    ROW_FLAGS = 43,
+    ROW_FLAGS = 45,
     ROW_ALBUM_ARTIST_TEXT = 4 * BUILDER_ALBUM_ARTIST,
     ROW_ALBUM_ARTIST_LENGTH = 24 + 2 * BUILDER_ALBUM_ARTIST
 };
@@ -89,19 +89,19 @@ static int compare_bytes(const uint8_t *left, uint32_t left_length, const uint8_
 
 static const uint8_t *album_key(const uint8_t *record, uint32_t *length)
 {
-    *length = builder_get16(record + 14);
+    *length = builder_get16(record + 16);
     return record + GUESS_HEADER;
 }
 
 static const uint8_t *artist_key(const uint8_t *record, uint32_t *length)
 {
-    *length = builder_get16(record + 16);
-    return record + GUESS_HEADER + builder_get16(record + 14);
+    *length = builder_get16(record + 18);
+    return record + GUESS_HEADER + builder_get16(record + 16);
 }
 
 static int same_album(const uint8_t *left, const uint8_t *right)
 {
-    int folder = compare_numbers(builder_get16(left + 2), builder_get16(right + 2));
+    int folder = compare_numbers(builder_get32(left + 2), builder_get32(right + 2));
     if (folder != 0) {
         return folder;
     }
@@ -130,7 +130,7 @@ static int by_album_artist_track(const uint8_t *left, const uint8_t *right, cons
     }
     int artist = same_artist(left, right);
     return artist != 0 ? artist
-                       : compare_numbers(builder_get32(left + 4), builder_get32(right + 4));
+                       : compare_numbers(builder_get32(left + 6), builder_get32(right + 6));
 }
 
 static int by_track(const uint8_t *left, const uint8_t *right, const void *context)
@@ -169,12 +169,12 @@ static bool emit_guess(Prepared *prepared, Tail *tail, uint32_t track, const Tra
     }
     uint8_t header[GUESS_HEADER];
     builder_put16(header, GUESS_HEADER + album_length + artist_length);
-    builder_put16(header + 2, row->folder);
-    builder_put32(header + 4, track);
-    builder_put32(header + 8, row->text[BUILDER_ARTIST]);
-    builder_put16(header + 12, row->length[BUILDER_ARTIST]);
-    builder_put16(header + 14, album_length);
-    builder_put16(header + 16, artist_length);
+    builder_put32(header + 2, row->folder);
+    builder_put32(header + 6, track);
+    builder_put32(header + 10, row->text[BUILDER_ARTIST]);
+    builder_put16(header + 14, row->length[BUILDER_ARTIST]);
+    builder_put16(header + 16, album_length);
+    builder_put16(header + 18, artist_length);
     return out_put(&tail->out, header, sizeof header) &&
            out_put(&tail->out, buffers->album, album_length) &&
            out_put(&tail->out, buffers->artist, artist_length);
@@ -250,8 +250,8 @@ static bool decide(BuilderState *state, Region sorted, Region *decisions)
             }
             if (count > best_count) {
                 best_count = count;
-                builder_put32(best, builder_get32(artist + 8));
-                builder_put16(best + 4, builder_get16(artist + 12));
+                builder_put32(best, builder_get32(artist + 10));
+                builder_put16(best + 4, builder_get16(artist + 14));
             }
         }
         if (!out_put(&tail.out, best, sizeof best)) {
@@ -290,7 +290,7 @@ static bool assign(BuilderState *state, Region sorted, Region decisions, Region 
         while (stream.live && same_album(album, stream.record) == 0) {
             uint8_t tuple[ASSIGNMENT_SIZE];
             builder_put16(tuple, ASSIGNMENT_SIZE);
-            builder_put32(tuple + 2, builder_get32(stream.record + 4));
+            builder_put32(tuple + 2, builder_get32(stream.record + 6));
             for (uint32_t index = 0; index < DECISION_SIZE; index++) {
                 tuple[6 + index] = decision[index];
             }

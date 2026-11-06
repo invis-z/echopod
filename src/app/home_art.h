@@ -26,8 +26,8 @@ typedef struct HomeArt {
     bool searching;
     bool chosen;
     bool has_album;
-    uint16_t album;
-    uint16_t probe;
+    uint32_t album;
+    uint32_t probe;
     uint32_t probes_left;
     uint32_t next_change_ms;
 } HomeArt;

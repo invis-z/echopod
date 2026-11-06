@@ -28,8 +28,8 @@ static CoverFlowScreen flow;
 
 static int album_at(const Library *library, CoverFlowOrder order, uint32_t position)
 {
-    uint16_t album = 0;
-    return cover_flow_order_album(library, order, position, &album) ? album : -1;
+    uint32_t album = 0;
+    return cover_flow_order_album(library, order, position, &album) ? (int)album : -1;
 }
 
 static void albums_follow_their_album_artists(void)
@@ -42,7 +42,7 @@ static void albums_follow_their_album_artists(void)
         LibraryGroup group;
         CHECK(library_read_group(library, LIBRARY_ALBUM_ARTISTS, index, &group));
         for (uint32_t link = 0; link < group.link_count; link++) {
-            uint16_t album = 0;
+            uint32_t album = 0;
             CHECK(library_read_index(library, LIBRARY_LINKS, group.first_link + link, &album));
             CHECK_EQUAL(album, album_at(library, order, position++));
         }
@@ -56,7 +56,7 @@ static void each_album_is_found_where_it_is_shown(void)
     CoverFlowOrder order = cover_flow_order_make(library);
     for (uint32_t position = 0; position < order.count; position++) {
         uint32_t found = 0;
-        CHECK(cover_flow_order_find(library, order, (uint16_t)album_at(library, order, position),
+        CHECK(cover_flow_order_find(library, order, (uint32_t)album_at(library, order, position),
                                     &found));
         CHECK_EQUAL(position, found);
     }
@@ -74,7 +74,7 @@ static void every_album_of_a_big_library_is_shown_once(void)
         CHECK(album >= 0 && album < BIG_ALBUMS && seen[album] == 0);
         seen[album] = 1;
         uint32_t found = 0;
-        CHECK(cover_flow_order_find(library, order, (uint16_t)album, &found));
+        CHECK(cover_flow_order_find(library, order, (uint32_t)album, &found));
         CHECK_EQUAL(position, found);
     }
     big_library_close(&big);
@@ -117,7 +117,7 @@ static void out_of_order_links_fall_back_to_album_order(void)
     for (uint32_t position = 0; position < FIXTURE_ALBUMS; position++) {
         CHECK_EQUAL(position, album_at(library, order, position));
         uint32_t found = 0;
-        CHECK(cover_flow_order_find(library, order, (uint16_t)position, &found));
+        CHECK(cover_flow_order_find(library, order, (uint32_t)position, &found));
         CHECK_EQUAL(position, found);
     }
 }

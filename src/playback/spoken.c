@@ -72,7 +72,7 @@ bool spoken_near_end(uint32_t position_ms, uint32_t duration_ms)
     return position_ms + margin >= duration_ms;
 }
 
-static SpokenKind folder_kind(const Library *library, uint16_t folder)
+static SpokenKind folder_kind(const Library *library, uint32_t folder)
 {
     LibraryFolder record;
     char name[NAME_CAPACITY];
@@ -83,14 +83,14 @@ static SpokenKind folder_kind(const Library *library, uint16_t folder)
     return spoken_kind_of_name(name, text_length(name));
 }
 
-bool spoken_shelf_folder(const Library *library, SpokenKind kind, uint16_t *folder)
+bool spoken_shelf_folder(const Library *library, SpokenKind kind, uint32_t *folder)
 {
     LibraryFolder root;
     if (kind == SPOKEN_NONE || !library_read_folder(library, ROOT_FOLDER, &root)) {
         return false;
     }
     for (uint32_t index = 0; index < root.subfolder_count; index++) {
-        uint16_t child = 0;
+        uint32_t child = 0;
         if (library_read_index(library, LIBRARY_LINKS, root.first_link + index, &child) &&
             folder_kind(library, child) == kind) {
             *folder = child;
@@ -100,8 +100,8 @@ bool spoken_shelf_folder(const Library *library, SpokenKind kind, uint16_t *fold
     return false;
 }
 
-bool spoken_chapter_track(const Library *library, uint16_t folder, uint16_t chapter,
-                          uint16_t *track)
+bool spoken_chapter_track(const Library *library, uint32_t folder, uint32_t chapter,
+                          uint32_t *track)
 {
     LibraryFolder record;
     if (!library_read_folder(library, folder, &record) || chapter >= record.track_count) {
@@ -111,9 +111,9 @@ bool spoken_chapter_track(const Library *library, uint16_t folder, uint16_t chap
     return library_read_index(library, LIBRARY_LINKS, link, track);
 }
 
-bool spoken_folder_key(const Library *library, uint16_t folder, uint32_t *key)
+bool spoken_folder_key(const Library *library, uint32_t folder, uint32_t *key)
 {
-    uint16_t track = 0;
+    uint32_t track = 0;
     LibraryTrack record;
     char path[PATH_CAPACITY];
     if (!spoken_chapter_track(library, folder, 0, &track) ||
@@ -125,7 +125,7 @@ bool spoken_folder_key(const Library *library, uint16_t folder, uint32_t *key)
     return true;
 }
 
-bool spoken_chapter_of(const Library *library, uint16_t track, uint16_t *chapter)
+bool spoken_chapter_of(const Library *library, uint32_t track, uint32_t *chapter)
 {
     LibraryTrack record;
     LibraryFolder folder;
@@ -133,8 +133,8 @@ bool spoken_chapter_of(const Library *library, uint16_t track, uint16_t *chapter
         !library_read_folder(library, record.folder, &folder)) {
         return false;
     }
-    for (uint16_t index = 0; index < folder.track_count; index++) {
-        uint16_t candidate = 0;
+    for (uint32_t index = 0; index < folder.track_count; index++) {
+        uint32_t candidate = 0;
         if (spoken_chapter_track(library, record.folder, index, &candidate) && candidate == track) {
             *chapter = index;
             return true;
