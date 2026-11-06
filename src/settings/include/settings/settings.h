@@ -70,8 +70,16 @@ typedef enum SettingOption {
     OPTION_HIGHLIGHT,
     OPTION_COVER_ORDER,
     OPTION_ARTIST_VIEW,
+    OPTION_DRE,
     SETTINGS_OPTION_COUNT
 } SettingOption;
+
+typedef enum DreMode {
+    DRE_OFF,
+    DRE_ON,
+    DRE_ON_FIX,
+    DRE_MODE_COUNT
+} DreMode;
 
 typedef enum RockerMode {
     ROCKER_VOLUME_SKIP,
@@ -102,7 +110,7 @@ enum {
     SCREEN_TIMEOUT_OPTION_COUNT = 7,
     SLEEP_TIMER_OPTION_COUNT = 7,
     AUTO_OFF_OPTION_COUNT = 4,
-    SETTINGS_FILE_SIZE = 32
+    SETTINGS_FILE_SIZE = 36
 };
 
 typedef struct Settings {

@@ -331,6 +331,26 @@ static void the_gain_setting_writes_the_headphone_gain_register(void)
     CHECK_EQUAL(cursor, fake.count);
 }
 
+static void the_dre_setting_writes_its_registers_between_the_unlock_writes(void)
+{
+    DacBus bus = fresh_bus();
+    cursor = 0;
+    dac_set_dre(&bus, DAC_DRE_ON);
+    CHECK(next_both(0x010010, 0x99));
+    CHECK(next_both(0x0C0001, 0x01));
+    CHECK(next_both(0x010010, 0x00));
+    dac_set_dre(&bus, DAC_DRE_OFF);
+    CHECK(next_both(0x010010, 0x99));
+    CHECK(next_both(0x0C0001, 0x00));
+    CHECK(next_both(0x010010, 0x00));
+    dac_set_dre(&bus, DAC_DRE_ON_FIX);
+    CHECK(next_both(0x010010, 0x99));
+    CHECK(next_both(0x0C0001, 0x01));
+    CHECK(next_both(0x0C0056, 0x2F));
+    CHECK(next_both(0x010010, 0x00));
+    CHECK_EQUAL(cursor, fake.count);
+}
+
 static void volume_levels_map_onto_the_pcm_volume_scale(void)
 {
     CHECK_EQUAL(0xFF, dac_volume_value(0, DAC_CURVE_SINGLE_ENDED));
@@ -406,6 +426,7 @@ int main(void)
         TEST_CASE(muting_holds_the_pin_and_mutes_both_chips),
         TEST_CASE(setting_the_volume_writes_both_pcm_volume_registers),
         TEST_CASE(the_gain_setting_writes_the_headphone_gain_register),
+        TEST_CASE(the_dre_setting_writes_its_registers_between_the_unlock_writes),
         TEST_CASE(volume_levels_map_onto_the_pcm_volume_scale),
         TEST_CASE(the_balanced_curve_sits_three_units_lower),
         TEST_CASE(every_level_is_one_decibel_from_the_next),

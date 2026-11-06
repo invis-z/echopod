@@ -12,7 +12,8 @@ enum {
     LANGUAGE_FIELD = 18,
     CHECKSUM_FIELD = 20,
     OPTIONS_FIELD = 20,
-    OPTIONS_CHECKSUM_FIELD = 28,
+    OPTIONS_CHECKSUM_FIELD = 29,
+    VERSION_8_CHECKSUM_FIELD = 28,
     NEVER_OPTION = 6
 };
 
@@ -58,6 +59,7 @@ static void defaults_are_comfortable(void)
     CHECK_EQUAL(USB_MODE_STORAGE, settings.usb_mode);
     CHECK_EQUAL(60, settings.dac_volume);
     CHECK_EQUAL(ORIENTATION_LANDSCAPE, settings.orientation);
+    CHECK_EQUAL(DRE_OFF, settings.options[OPTION_DRE]);
 }
 
 static void auto_off_options_are_stocks(void)
@@ -102,7 +104,7 @@ static void the_usb_mode_and_dac_volume_are_saved_at_bytes_fifteen_and_sixteen(v
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(8, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(9, bytes[VERSION_FIELD]);
     CHECK_EQUAL(USB_MODE_DAC, bytes[USB_MODE_FIELD]);
     CHECK_EQUAL(37, bytes[DAC_VOLUME_FIELD]);
 }
@@ -225,7 +227,7 @@ static void a_newer_version_is_rejected(void)
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 8;
+    bytes[VERSION_FIELD] = 10;
     rewrite_checksum(bytes);
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
@@ -361,6 +363,41 @@ static void an_option_out_of_range_is_rejected(void)
     CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
 }
 
+static void a_version_8_file_keeps_its_options_and_gets_dre_off(void)
+{
+    Settings settings = custom_settings();
+    for (int option = 0; option < OPTION_DRE; option++) {
+        settings.options[option] = 1;
+    }
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[VERSION_FIELD] = 8;
+    uint32_t checksum = hash_update(HASH_START, bytes, VERSION_8_CHECKSUM_FIELD);
+    for (int index = 0; index < 4; index++) {
+        bytes[VERSION_8_CHECKSUM_FIELD + index] = (uint8_t)(checksum >> (8 * index));
+    }
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    for (int option = 0; option < OPTION_DRE; option++) {
+        CHECK_EQUAL(1, decoded.options[option]);
+    }
+    CHECK_EQUAL(DRE_OFF, decoded.options[OPTION_DRE]);
+}
+
+static void an_unknown_dre_setting_is_rejected(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[OPTIONS_FIELD + OPTION_DRE] = DRE_MODE_COUNT;
+    uint32_t checksum = hash_update(HASH_START, bytes, OPTIONS_CHECKSUM_FIELD);
+    for (int index = 0; index < 4; index++) {
+        bytes[OPTIONS_CHECKSUM_FIELD + index] = (uint8_t)(checksum >> (8 * index));
+    }
+    Settings decoded;
+    CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
+}
+
 static void a_version_7_file_loads_with_the_options_off(void)
 {
     Settings settings = custom_settings();
@@ -384,6 +421,8 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(the_new_options_are_saved_and_read_back),
         TEST_CASE(an_option_out_of_range_is_rejected),
+        TEST_CASE(a_version_8_file_keeps_its_options_and_gets_dre_off),
+        TEST_CASE(an_unknown_dre_setting_is_rejected),
         TEST_CASE(a_version_7_file_loads_with_the_options_off),
         TEST_CASE(defaults_are_comfortable),
         TEST_CASE(timeout_options_end_with_never),

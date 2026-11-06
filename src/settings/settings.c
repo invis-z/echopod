@@ -3,7 +3,7 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 8,
+    VERSION = 9,
     FIRST_VERSION = 1,
     AUTO_OFF_VERSION = 2,
     USB_MODE_VERSION = 3,
@@ -12,6 +12,7 @@ enum {
     LANGUAGE_VERSION = 6,
     DAC_VERSION = 7,
     OPTIONS_VERSION = 8,
+    DRE_VERSION = 9,
     FILTER_SHIFT = 5,
     BALANCE_MASK = 0x1F,
     MAGIC_SIZE = 4,
@@ -49,7 +50,7 @@ static const uint8_t AUTO_OFF_MINUTES[AUTO_OFF_OPTION_COUNT] = {0, 1, 5, 10};
 static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
     [OPTION_BATTERY] = 2,     [OPTION_VOLUME_KEYS] = 2,       [OPTION_ROCKER] = ROCKER_MODE_COUNT,
     [OPTION_MENU_KEY] = 2,    [OPTION_ACCENT] = ACCENT_COUNT, [OPTION_HIGHLIGHT] = 2,
-    [OPTION_COVER_ORDER] = 2, [OPTION_ARTIST_VIEW] = 2};
+    [OPTION_COVER_ORDER] = 2, [OPTION_ARTIST_VIEW] = 2,       [OPTION_DRE] = DRE_MODE_COUNT};
 
 _Static_assert(CHECKSUM_FIELD + 4 <= SETTINGS_FILE_SIZE, "the options must fit the file");
 
@@ -104,9 +105,15 @@ uint8_t settings_option_count(SettingOption option)
     return option < SETTINGS_OPTION_COUNT ? OPTION_COUNTS[option] : 0;
 }
 
+static int option_count_of(uint8_t version)
+{
+    return version < DRE_VERSION ? OPTION_DRE : SETTINGS_OPTION_COUNT;
+}
+
 static int checksum_field_of(uint8_t version)
 {
-    return version < OPTIONS_VERSION ? OLD_CHECKSUM_FIELD : CHECKSUM_FIELD;
+    return version < OPTIONS_VERSION ? OLD_CHECKSUM_FIELD
+                                     : OPTIONS_FIELD + option_count_of(version);
 }
 
 static uint32_t checksum_of(const uint8_t *bytes)
@@ -173,7 +180,7 @@ static bool options_valid(const uint8_t *bytes)
     if (bytes[VERSION_FIELD] < OPTIONS_VERSION) {
         return true;
     }
-    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
+    for (int option = 0; option < option_count_of(bytes[VERSION_FIELD]); option++) {
         if (bytes[OPTIONS_FIELD + option] >= OPTION_COUNTS[option]) {
             return false;
         }
@@ -230,7 +237,8 @@ bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
         .balance = bytes[VERSION_FIELD] < DAC_VERSION ? SETTINGS_BALANCE_CENTER
                                                       : bytes[DAC_FIELD] & BALANCE_MASK,
     };
-    for (int option = 0; option < SETTINGS_OPTION_COUNT && bytes[VERSION_FIELD] >= OPTIONS_VERSION;
+    for (int option = 0;
+         option < option_count_of(bytes[VERSION_FIELD]) && bytes[VERSION_FIELD] >= OPTIONS_VERSION;
          option++) {
         settings->options[option] = bytes[OPTIONS_FIELD + option];
     }

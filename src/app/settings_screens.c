@@ -40,6 +40,7 @@ static const char *const FILTER_OPTIONS[DAC_FILTER_COUNT] = {
 static const char *const BALANCE_OPTIONS[SETTINGS_BALANCE_STEPS] = {
     "L12", "L11", "L10", "L9", "L8", "L7", "L6", "L5", "L4", "L3",  "L2",  "L1", "0",
     "R1",  "R2",  "R3",  "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12"};
+static const StringId DRE_OPTIONS[DRE_MODE_COUNT] = {STR_OFF, STR_ON, STR_SETTINGS_DRE_FIX};
 static const StringId OUTPUT_OPTIONS[OUTPUT_JACK_COUNT] = {STR_SETTINGS_AUTO, STR_SETTINGS_JACK_35,
                                                            STR_SETTINGS_JACK_44};
 static const StringId OUTPUT_MESSAGES[OUTPUT_JACK_COUNT] = {
@@ -225,6 +226,17 @@ static void choose_balance(void *context, int index)
     apply_and_save(context);
 }
 
+static int current_dre(const void *context)
+{
+    return settings_of(context)->options[OPTION_DRE];
+}
+
+static void choose_dre(void *context, int index)
+{
+    editable_settings(context)->options[OPTION_DRE] = (uint8_t)index;
+    apply_and_save(context);
+}
+
 static int current_output(const void *context)
 {
     return (int)settings_of(context)->output;
@@ -324,6 +336,7 @@ static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
      NULL, 0},
     {STR_SETTINGS_BALANCE, NULL, BALANCE_OPTIONS, SETTINGS_BALANCE_STEPS, current_balance,
      choose_balance, NULL, 0},
+    {STR_SETTINGS_DRE, DRE_OPTIONS, NULL, DRE_MODE_COUNT, current_dre, choose_dre, NULL, 0},
     {STR_SETTINGS_OUTPUT, OUTPUT_OPTIONS, NULL, OUTPUT_JACK_COUNT, current_output, choose_output,
      describe_output, 0},
     {STR_SETTINGS_START_SCREEN, START_OPTIONS, NULL, START_SCREEN_COUNT, current_start,

@@ -330,6 +330,11 @@ void hal_audio_set_balance(uint8_t balance)
     (void)balance;
 }
 
+void hal_audio_set_dre(HalAudioDre dre)
+{
+    (void)dre;
+}
+
 void hal_audio_set_equalizer(const EqualizerCurve *curve)
 {
     lock();
