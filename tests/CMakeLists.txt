@@ -467,7 +467,7 @@ if(ARM_GCC)
     add_executable(check_device_image device/check_device_image.c)
     target_link_libraries(check_device_image PRIVATE rippl_device_logic rippl_options)
     add_test(NAME device_image_passes_the_updater_check
-        COMMAND check_device_image ${PROJECT_SOURCE_DIR}/build/device/HIFIEC90.IMG
+        COMMAND check_device_image ${PROJECT_SOURCE_DIR}/build/device/RIPPL.IMG
     )
     set_tests_properties(device_image_passes_the_updater_check PROPERTIES
         FIXTURES_REQUIRED device_image
