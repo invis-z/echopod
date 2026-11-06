@@ -5,6 +5,11 @@
 enum {
     STEP_END = 0xFF,
     SLEEP_OUT_DELAY_MS = 120,
+    SLEEP_SETTLE_MS = 5,
+    COMMAND_SLEEP_IN = 0x10,
+    COMMAND_SLEEP_OUT = 0x11,
+    COMMAND_DISPLAY_OFF = 0x28,
+    COMMAND_DISPLAY_ON = 0x29,
     COMMAND_COLUMNS = 0x2A,
     COMMAND_ROWS = 0x2B,
     COMMAND_WRITE = 0x2C,
@@ -80,6 +85,19 @@ void panel_begin_write(const PanelBus *bus, PanelWindow window)
     send_range(bus, COMMAND_COLUMNS, first_column, first_column + window.width - 1);
     send_range(bus, COMMAND_ROWS, first_row, first_row + window.height - 1);
     bus->command(bus->context, COMMAND_WRITE);
+}
+
+void panel_set_asleep(const PanelBus *bus, bool asleep)
+{
+    if (asleep) {
+        bus->command(bus->context, COMMAND_DISPLAY_OFF);
+        bus->command(bus->context, COMMAND_SLEEP_IN);
+        bus->delay_ms(bus->context, SLEEP_SETTLE_MS);
+        return;
+    }
+    bus->command(bus->context, COMMAND_SLEEP_OUT);
+    bus->delay_ms(bus->context, SLEEP_SETTLE_MS);
+    bus->command(bus->context, COMMAND_DISPLAY_ON);
 }
 
 PanelVariant panel_variant_of_id(uint32_t id)

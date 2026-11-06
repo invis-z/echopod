@@ -108,6 +108,19 @@ static void variant_a_sends_its_init_stream(void)
     check_log(&recorder, VARIANT_A_INIT, (int)(sizeof VARIANT_A_INIT / sizeof VARIANT_A_INIT[0]));
 }
 
+static void sleeping_turns_the_display_off_and_waking_turns_it_back_on(void)
+{
+    static const Entry asleep[] = {C(0x28), C(0x10), W(5)};
+    static const Entry awake[] = {C(0x11), W(5), C(0x29)};
+    Recorder recorder;
+    PanelBus bus = recording_bus(&recorder);
+    panel_set_asleep(&bus, true);
+    check_log(&recorder, asleep, (int)(sizeof asleep / sizeof asleep[0]));
+    bus = recording_bus(&recorder);
+    panel_set_asleep(&bus, false);
+    check_log(&recorder, awake, (int)(sizeof awake / sizeof awake[0]));
+}
+
 static void a_window_maps_visible_rows_to_panel_rows_from_35(void)
 {
     static const Entry expected[] = {
@@ -202,6 +215,7 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(variant_b_sends_its_init_stream),
         TEST_CASE(variant_a_sends_its_init_stream),
+        TEST_CASE(sleeping_turns_the_display_off_and_waking_turns_it_back_on),
         TEST_CASE(a_window_maps_visible_rows_to_panel_rows_from_35),
         TEST_CASE(a_partial_window_sets_its_columns_and_rows),
         TEST_CASE(each_rotation_sets_its_memory_access_mode),
