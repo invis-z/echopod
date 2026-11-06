@@ -13,63 +13,6 @@ enum {
     ROW_ALBUM_ARTIST_LENGTH = 24 + 2 * BUILDER_ALBUM_ARTIST
 };
 
-typedef struct Tail {
-    Out out;
-    uint32_t start;
-} Tail;
-
-typedef struct Stream {
-    In in;
-    uint8_t *record;
-    bool live;
-} Stream;
-
-static bool open_tail(BuilderState *state, Tail *tail, uint8_t *buffer)
-{
-    Store *store = &state->store;
-    if (store->end > store->io.size) {
-        store->failed = true;
-        return false;
-    }
-    tail->start = store->end;
-    out_open(&tail->out, store, (Region){.offset = store->end, .size = store->io.size - store->end},
-             buffer, STREAM_BUFFER);
-    return true;
-}
-
-static bool close_tail(BuilderState *state, Tail *tail, Region *written)
-{
-    if (!out_close(&tail->out)) {
-        return false;
-    }
-    *written = (Region){.offset = tail->start, .size = tail->out.written};
-    state->store.end = (tail->start + tail->out.written + 3) & ~3u;
-    return true;
-}
-
-static bool open_stream(BuilderState *state, Stream *stream, Region region)
-{
-    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
-    stream->record = arena_take(&state->arena, BUILDER_MAX_RECORD);
-    if (buffer == NULL || stream->record == NULL) {
-        return false;
-    }
-    in_open(&stream->in, &state->store, region.offset, region.offset + region.size, buffer,
-            STREAM_BUFFER);
-    stream->live = false;
-    return true;
-}
-
-static bool pull(Stream *stream)
-{
-    if (in_done(&stream->in)) {
-        stream->live = false;
-        return true;
-    }
-    stream->live = in_record(&stream->in, stream->record);
-    return stream->live;
-}
-
 static int compare_numbers(uint32_t left, uint32_t right)
 {
     return left < right ? -1 : left > right ? 1 : 0;
@@ -190,7 +133,8 @@ static bool emit_guesses(BuilderState *state, Prepared *prepared, Region *guesse
                           arena_take(&state->arena, SORT_KEY_CAPACITY)};
     Tail tail;
     if (row_buffer == NULL || tail_buffer == NULL || buffers.text == NULL ||
-        buffers.album == NULL || buffers.artist == NULL || !open_tail(state, &tail, tail_buffer)) {
+        buffers.album == NULL || buffers.artist == NULL ||
+        !builder_open_tail(state, &tail, tail_buffer)) {
         return false;
     }
     In rows;
@@ -212,7 +156,7 @@ static bool emit_guesses(BuilderState *state, Prepared *prepared, Region *guesse
         }
         (*count)++;
     }
-    bool closed = close_tail(state, &tail, guesses);
+    bool closed = builder_close_tail(state, &tail, guesses);
     state->arena.used = mark;
     return closed;
 }
@@ -226,8 +170,8 @@ static bool decide(BuilderState *state, Region sorted, Region *decisions)
     uint8_t *artist = arena_take(&state->arena, BUILDER_MAX_RECORD);
     Tail tail;
     if (tail_buffer == NULL || album == NULL || artist == NULL ||
-        !open_stream(state, &stream, sorted) || !open_tail(state, &tail, tail_buffer) ||
-        !pull(&stream)) {
+        !builder_open_stream(state, &stream, sorted) ||
+        !builder_open_tail(state, &tail, tail_buffer) || !builder_pull(&stream)) {
         return false;
     }
     while (stream.live) {
@@ -244,7 +188,7 @@ static bool decide(BuilderState *state, Region sorted, Region *decisions)
             while (stream.live && same_album(album, stream.record) == 0 &&
                    same_artist(artist, stream.record) == 0) {
                 count++;
-                if (!pull(&stream)) {
+                if (!builder_pull(&stream)) {
                     return false;
                 }
             }
@@ -258,7 +202,7 @@ static bool decide(BuilderState *state, Region sorted, Region *decisions)
             return false;
         }
     }
-    bool closed = close_tail(state, &tail, decisions);
+    bool closed = builder_close_tail(state, &tail, decisions);
     state->arena.used = mark;
     return closed && !state->store.io_failed;
 }
@@ -272,8 +216,8 @@ static bool assign(BuilderState *state, Region sorted, Region decisions, Region 
     uint8_t *album = arena_take(&state->arena, BUILDER_MAX_RECORD);
     Tail tail;
     if (tail_buffer == NULL || decision_buffer == NULL || album == NULL ||
-        !open_stream(state, &stream, sorted) || !open_tail(state, &tail, tail_buffer) ||
-        !pull(&stream)) {
+        !builder_open_stream(state, &stream, sorted) ||
+        !builder_open_tail(state, &tail, tail_buffer) || !builder_pull(&stream)) {
         return false;
     }
     In chosen;
@@ -294,12 +238,12 @@ static bool assign(BuilderState *state, Region sorted, Region decisions, Region 
             for (uint32_t index = 0; index < DECISION_SIZE; index++) {
                 tuple[6 + index] = decision[index];
             }
-            if (!out_put(&tail.out, tuple, sizeof tuple) || !pull(&stream)) {
+            if (!out_put(&tail.out, tuple, sizeof tuple) || !builder_pull(&stream)) {
                 return false;
             }
         }
     }
-    bool closed = close_tail(state, &tail, assignments);
+    bool closed = builder_close_tail(state, &tail, assignments);
     state->arena.used = mark;
     return closed && !state->store.io_failed;
 }
@@ -310,8 +254,8 @@ static bool rewrite_rows(BuilderState *state, Region sorted)
     Stream stream;
     uint8_t *in_buffer = arena_take(&state->arena, STREAM_BUFFER);
     uint8_t *out_buffer = arena_take(&state->arena, STREAM_BUFFER);
-    if (in_buffer == NULL || out_buffer == NULL || !open_stream(state, &stream, sorted) ||
-        !pull(&stream)) {
+    if (in_buffer == NULL || out_buffer == NULL || !builder_open_stream(state, &stream, sorted) ||
+        !builder_pull(&stream)) {
         return false;
     }
     Region region = {.offset = state->rows.offset, .size = state->track_count * BUILDER_ROW_SIZE};
@@ -328,7 +272,7 @@ static bool rewrite_rows(BuilderState *state, Region sorted)
         if (stream.live && builder_get32(stream.record + 2) == track) {
             builder_put32(bytes + ROW_ALBUM_ARTIST_TEXT, builder_get32(stream.record + 6));
             builder_put16(bytes + ROW_ALBUM_ARTIST_LENGTH, builder_get16(stream.record + 10));
-            if (!pull(&stream)) {
+            if (!builder_pull(&stream)) {
                 return false;
             }
         }
@@ -340,16 +284,6 @@ static bool rewrite_rows(BuilderState *state, Region sorted)
     bool closed = out_close(&out);
     state->arena.used = mark;
     return closed;
-}
-
-static bool sort_with(BuilderState *state, Region input, SortCompare compare, Region *sorted)
-{
-    SortJob job = {.store = &state->store,
-                   .arena = &state->arena,
-                   .input = input,
-                   .compare = compare,
-                   .context = NULL};
-    return sort_records(&job, sorted);
 }
 
 bool builder_guess_album_artists(BuilderState *state, Prepared *prepared)
@@ -368,10 +302,10 @@ bool builder_guess_album_artists(BuilderState *state, Prepared *prepared)
     Region decisions;
     Region assignments;
     Region ordered;
-    bool done = sort_with(state, guesses, by_album_artist_track, &sorted) &&
-                decide(state, sorted, &decisions) &&
-                assign(state, sorted, decisions, &assignments) &&
-                sort_with(state, assignments, by_track, &ordered) && rewrite_rows(state, ordered);
+    bool done =
+        builder_sort(state, guesses, by_album_artist_track, &sorted) &&
+        decide(state, sorted, &decisions) && assign(state, sorted, decisions, &assignments) &&
+        builder_sort(state, assignments, by_track, &ordered) && rewrite_rows(state, ordered);
     state->store.end = store_mark;
     return done;
 }

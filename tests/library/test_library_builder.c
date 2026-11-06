@@ -377,6 +377,83 @@ static void check_matches_reference(uint32_t tracks, uint32_t playlists, uint32_
     random_library_free(&library);
 }
 
+static void finish_wide(LibraryBuilder *builder, Built *built)
+{
+    built->output = fresh_output();
+    built->length = 0;
+    built->result = library_builder_finish_wide(builder, (ByteSink){write_output, &built->output},
+                                                0, &built->length);
+}
+
+static void check_wide_matches_narrow(uint32_t tracks, uint32_t playlists, uint32_t seed)
+{
+    RandomLibrary library;
+    random_library_make(&library, tracks, playlists, seed);
+    LibraryBuilder builder;
+    Built narrow;
+    Built wide;
+    start(&builder);
+    CHECK_EQUAL(BUILDER_OK, add_library(&builder, &library));
+    finish(&builder, &narrow);
+    start(&builder);
+    CHECK_EQUAL(BUILDER_OK, add_library(&builder, &library));
+    finish_wide(&builder, &wide);
+    CHECK_EQUAL(BUILDER_OK, narrow.result);
+    CHECK_EQUAL(BUILDER_OK, wide.result);
+    CHECK_EQUAL(0, memcmp("RLIB", wide.output.bytes, 4));
+    CHECK(library_compare(narrow.output.bytes, narrow.length, wide.output.bytes, wide.length));
+    free(narrow.output.bytes);
+    free(wide.output.bytes);
+    random_library_free(&library);
+}
+
+static void a_wide_library_means_the_same_as_a_16_bit_one(void)
+{
+    check_wide_matches_narrow(0, 0, 1);
+    check_wide_matches_narrow(1, 1, 1);
+    check_wide_matches_narrow(900, 12, 3);
+    check_wide_matches_narrow(20000, 30, 5);
+}
+
+static void the_fixture_tracks_mean_the_same_in_a_wide_library(void)
+{
+    LibraryBuilder builder;
+    start(&builder);
+    add_fixture_tracks(&builder);
+    Built built;
+    finish_wide(&builder, &built);
+    CHECK_EQUAL(BUILDER_OK, built.result);
+    check_means_fixture(&built, "small_library_tracks.db");
+}
+
+static void a_wide_library_takes_the_65536th_track(void)
+{
+    LibraryBuilder builder;
+    start(&builder);
+    char path[64];
+    for (uint32_t added = 0; added < 65537; added++) {
+        snprintf(path, sizeof path, "A/%05u.flac", added);
+        BuilderTrack next = track(path, "T", "A", "A", "B", "G", 2000, 1);
+        CHECK_EQUAL(BUILDER_OK, library_builder_add_track(&builder, &next));
+    }
+    Built built;
+    finish_wide(&builder, &built);
+    CHECK_EQUAL(BUILDER_OK, built.result);
+    MemorySource memory = {.bytes = built.output.bytes, .size = built.length};
+    Library opened;
+    CHECK_EQUAL(LIBRARY_OK, library_open(&opened, memory_source(&memory), built.length));
+    CHECK_EQUAL(65537, library_count(&opened, LIBRARY_TRACKS));
+    LibraryTrack last;
+    CHECK(library_read_track(&opened, 65536, &last));
+    char text[64];
+    CHECK(library_read_string(&opened, last.path, text, sizeof text));
+    CHECK_EQUAL(0, strcmp("A/65536.flac", text));
+    uint32_t value = 0;
+    CHECK(library_read_index(&opened, LIBRARY_TITLE_ORDER, 65536, &value));
+    CHECK_EQUAL(65536, value);
+    free(built.output.bytes);
+}
+
 static void random_libraries_match_the_reference_builder(void)
 {
     check_matches_reference(1, 1, 1);
@@ -630,6 +707,9 @@ int main(void)
         TEST_CASE(a_scratch_file_too_small_says_there_is_no_room),
         TEST_CASE(too_little_memory_says_so),
         TEST_CASE(a_16_bit_library_refuses_the_65536th_track),
+        TEST_CASE(a_wide_library_means_the_same_as_a_16_bit_one),
+        TEST_CASE(the_fixture_tracks_mean_the_same_in_a_wide_library),
+        TEST_CASE(a_wide_library_takes_the_65536th_track),
         TEST_CASE(a_library_bigger_than_its_room_writes_nothing),
         TEST_CASE(an_empty_library_still_writes_a_valid_header),
         TEST_CASE(a_books_chapter_count_reaches_its_track_record),

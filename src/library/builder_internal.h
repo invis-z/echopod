@@ -200,6 +200,17 @@ typedef struct BuilderState {
 
 typedef int (*SortCompare)(const uint8_t *left, const uint8_t *right, const void *context);
 
+typedef struct Tail {
+    Out out;
+    uint32_t start;
+} Tail;
+
+typedef struct Stream {
+    In in;
+    uint8_t *record;
+    bool live;
+} Stream;
+
 typedef struct SortJob {
     Store *store;
     Arena *arena;
@@ -238,6 +249,11 @@ bool cache_init(Cache *cache, Store *store, Arena *arena, uint32_t block_size, u
 bool cache_read(Cache *cache, uint32_t offset, void *bytes, uint32_t length);
 
 bool sort_records(const SortJob *job, Region *output);
+bool builder_sort(BuilderState *state, Region input, SortCompare compare, Region *sorted);
+bool builder_open_tail(BuilderState *state, Tail *tail, uint8_t *buffer);
+bool builder_close_tail(BuilderState *state, Tail *tail, Region *written);
+bool builder_open_stream(BuilderState *state, Stream *stream, Region region);
+bool builder_pull(Stream *stream);
 bool builder_put_pair(Out *out, uint32_t index, uint32_t value);
 bool builder_put_entry(Out *out, uint32_t index, const uint8_t *values, uint32_t size);
 bool builder_scatter(BuilderState *state, Region pairs, Region column, uint32_t count);
@@ -258,7 +274,7 @@ uint32_t builder_resolve_entry(BuilderState *state, Prepared *prepared, const ch
                                const char *entry);
 uint32_t builder_folded_path(BuilderState *state, Prepared *prepared, uint32_t position, char *out);
 BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink sink,
-                             uint32_t capacity, uint32_t *length);
+                             uint32_t capacity, uint32_t *length, bool wide);
 bool builder_read_text(Cache *heap, uint32_t offset, uint32_t length, char *text);
 bool builder_read_row(Cache *rows, const BuilderState *state, uint32_t track, TrackRow *row);
 bool builder_read_folder(Cache *folders, const BuilderState *state, uint32_t node, FolderRow *row);

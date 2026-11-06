@@ -319,3 +319,59 @@ bool builder_scatter_values(BuilderState *state, Region pairs, Region column, ui
     state->store.end = store_mark;
     return closed;
 }
+
+bool builder_sort(BuilderState *state, Region input, SortCompare compare, Region *sorted)
+{
+    SortJob job = {.store = &state->store,
+                   .arena = &state->arena,
+                   .input = input,
+                   .compare = compare,
+                   .context = NULL};
+    return sort_records(&job, sorted);
+}
+
+bool builder_open_tail(BuilderState *state, Tail *tail, uint8_t *buffer)
+{
+    Store *store = &state->store;
+    if (store->end > store->io.size) {
+        store->failed = true;
+        return false;
+    }
+    tail->start = store->end;
+    out_open(&tail->out, store, (Region){.offset = store->end, .size = store->io.size - store->end},
+             buffer, STREAM_BUFFER);
+    return true;
+}
+
+bool builder_close_tail(BuilderState *state, Tail *tail, Region *written)
+{
+    if (!out_close(&tail->out)) {
+        return false;
+    }
+    *written = (Region){.offset = tail->start, .size = tail->out.written};
+    state->store.end = (tail->start + tail->out.written + 3) & ~3u;
+    return true;
+}
+
+bool builder_open_stream(BuilderState *state, Stream *stream, Region region)
+{
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    stream->record = arena_take(&state->arena, BUILDER_MAX_RECORD);
+    if (buffer == NULL || stream->record == NULL) {
+        return false;
+    }
+    in_open(&stream->in, &state->store, region.offset, region.offset + region.size, buffer,
+            STREAM_BUFFER);
+    stream->live = false;
+    return true;
+}
+
+bool builder_pull(Stream *stream)
+{
+    if (in_done(&stream->in)) {
+        stream->live = false;
+        return true;
+    }
+    stream->live = in_record(&stream->in, stream->record);
+    return stream->live;
+}

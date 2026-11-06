@@ -51,3 +51,5 @@ BuilderResult library_builder_begin_playlist(LibraryBuilder *builder, const char
 BuilderResult library_builder_playlist_entry(LibraryBuilder *builder, const char *entry);
 BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uint32_t capacity,
                                      uint32_t *length);
+BuilderResult library_builder_finish_wide(LibraryBuilder *builder, ByteSink sink, uint32_t capacity,
+                                          uint32_t *length);
