@@ -10,34 +10,6 @@ enum {
     DISPLAY_SIZE = 8
 };
 
-typedef struct Tail {
-    Out out;
-    uint32_t start;
-} Tail;
-
-static bool open_tail(BuilderState *state, Tail *tail, uint8_t *buffer)
-{
-    Store *store = &state->store;
-    if (store->end > store->io.size) {
-        store->failed = true;
-        return false;
-    }
-    tail->start = store->end;
-    out_open(&tail->out, store, (Region){.offset = store->end, .size = store->io.size - store->end},
-             buffer, STREAM_BUFFER);
-    return true;
-}
-
-static bool close_tail(BuilderState *state, Tail *tail, Region *written)
-{
-    if (!out_close(&tail->out)) {
-        return false;
-    }
-    *written = (Region){.offset = tail->start, .size = tail->out.written};
-    state->store.end = (tail->start + tail->out.written + 3) & ~3u;
-    return true;
-}
-
 static int compare_bytes(const uint8_t *left, uint32_t left_length, const uint8_t *right,
                          uint32_t right_length)
 {
@@ -142,7 +114,7 @@ static bool collect_runs(BuilderState *state, Prepared *prepared, int field, Reg
     char *text = arena_take(arena, BUILDER_TEXT_CAPACITY);
     char *key = arena_take(arena, SORT_KEY_CAPACITY);
     Tail tail;
-    if (arena->failed || !open_tail(state, &tail, tail_buffer)) {
+    if (arena->failed || !builder_open_tail(state, &tail, tail_buffer)) {
         return false;
     }
     RunReader reader;
@@ -156,7 +128,7 @@ static bool collect_runs(BuilderState *state, Prepared *prepared, int field, Reg
         }
     }
     *runs = reader.started ? reader.run + 1 : 0;
-    return close_tail(state, &tail, input);
+    return builder_close_tail(state, &tail, input);
 }
 
 typedef struct RankTarget {
@@ -388,7 +360,7 @@ static bool collect_folders(BuilderState *state, Prepared *prepared, Region *inp
     char *text = arena_take(arena, BUILDER_TEXT_CAPACITY);
     char *key = arena_take(arena, SORT_KEY_CAPACITY);
     Tail tail;
-    if (arena->failed || !open_tail(state, &tail, tail_buffer)) {
+    if (arena->failed || !builder_open_tail(state, &tail, tail_buffer)) {
         return false;
     }
     In in;
@@ -419,7 +391,7 @@ static bool collect_folders(BuilderState *state, Prepared *prepared, Region *inp
             return false;
         }
     }
-    return close_tail(state, &tail, input);
+    return builder_close_tail(state, &tail, input);
 }
 
 static bool rank_folders(BuilderState *state, Prepared *prepared)

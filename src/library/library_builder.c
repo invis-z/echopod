@@ -410,8 +410,8 @@ BuilderResult library_builder_playlist_entry(LibraryBuilder *builder, const char
     return BUILDER_OK;
 }
 
-BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uint32_t capacity,
-                                     uint32_t *length)
+static BuilderResult finish(LibraryBuilder *builder, ByteSink sink, uint32_t capacity,
+                            uint32_t *length, bool wide)
 {
     BuilderResult result = library_builder_prepare(builder);
     if (result != BUILDER_OK) {
@@ -422,6 +422,18 @@ BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uin
     if (!out_close(&prepared->playlist_name_out) || !out_close(&prepared->playlist_link_out)) {
         return outcome(state);
     }
-    result = builder_encode(state, prepared, sink, capacity, length);
+    result = builder_encode(state, prepared, sink, capacity, length, wide);
     return result != BUILDER_OK ? result : outcome(state);
+}
+
+BuilderResult library_builder_finish(LibraryBuilder *builder, ByteSink sink, uint32_t capacity,
+                                     uint32_t *length)
+{
+    return finish(builder, sink, capacity, length, false);
+}
+
+BuilderResult library_builder_finish_wide(LibraryBuilder *builder, ByteSink sink, uint32_t capacity,
+                                          uint32_t *length)
+{
+    return finish(builder, sink, capacity, length, true);
 }

@@ -5,8 +5,14 @@
 
 enum {
     HEADER_SIZE = 128,
+    WIDE_HEADER_SIZE = 256,
     SECTION_COUNT = 10,
     VERSION = 3,
+    WIDE_VERSION = 1,
+    WIDE_TRACK_RECORD = 32,
+    WIDE_ALBUM_RECORD = 24,
+    WIDE_FOLDER_RECORD = 20,
+    WIDE_INDEX_RECORD = 4,
     ALIGNMENT = 4,
     TRACK_RECORD = 24,
     ALBUM_RECORD = 16,
@@ -51,7 +57,7 @@ typedef struct Layout {
     uint32_t offset[SECTION_COUNT];
     uint32_t count[SECTION_COUNT];
     uint16_t record_size[SECTION_COUNT];
-    uint16_t music[SECTION_COUNT];
+    uint32_t music[SECTION_COUNT];
     uint32_t end;
 } Layout;
 
@@ -59,6 +65,7 @@ typedef struct Encode {
     BuilderState *state;
     Prepared *prepared;
     Writer *writer;
+    bool wide;
     Region placed;
     uint16_t *playlist_order;
     uint8_t *stream;
@@ -103,6 +110,15 @@ static void put_bytes(Writer *writer, const char *bytes, uint32_t length)
 {
     for (uint32_t index = 0; index < length; index++) {
         put_byte(writer, (uint8_t)bytes[index]);
+    }
+}
+
+static void put_index(Encode *encode, uint32_t value)
+{
+    if (encode->wide) {
+        put_u32(encode->writer, value);
+    } else {
+        put_u16(encode->writer, value);
     }
 }
 
@@ -288,9 +304,13 @@ static void plan(Encode *encode, Layout *layout, uint32_t strings)
                                             prepared->playlist_count,
                                             links,
                                             strings};
-    const uint16_t sizes[SECTION_COUNT] = {
+    const uint16_t narrow[SECTION_COUNT] = {
         TRACK_RECORD,  ALBUM_RECORD, GROUP_RECORD, GROUP_RECORD, GROUP_RECORD,
         FOLDER_RECORD, INDEX_RECORD, GROUP_RECORD, INDEX_RECORD, 1};
+    const uint16_t wide[SECTION_COUNT] = {
+        WIDE_TRACK_RECORD,  WIDE_ALBUM_RECORD, GROUP_RECORD, GROUP_RECORD,      GROUP_RECORD,
+        WIDE_FOLDER_RECORD, WIDE_INDEX_RECORD, GROUP_RECORD, WIDE_INDEX_RECORD, 1};
+    const uint16_t *sizes = encode->wide ? wide : narrow;
     const uint32_t music[SECTION_COUNT] = {prepared->music_tracks,
                                            prepared->music_albums,
                                            prepared->music_ranks[BUILDER_ARTIST],
@@ -301,30 +321,35 @@ static void plan(Encode *encode, Layout *layout, uint32_t strings)
                                            0,
                                            0,
                                            0};
-    uint32_t offset = HEADER_SIZE;
+    uint32_t offset = encode->wide ? WIDE_HEADER_SIZE : HEADER_SIZE;
     for (int section = 0; section < SECTION_COUNT; section++) {
         offset = (offset + ALIGNMENT - 1) & ~(uint32_t)(ALIGNMENT - 1);
         layout->offset[section] = offset;
         layout->count[section] = counts[section];
         layout->record_size[section] = sizes[section];
-        layout->music[section] = (uint16_t)music[section];
+        layout->music[section] = music[section];
         offset += counts[section] * sizes[section];
     }
     layout->end = offset;
 }
 
-static void write_header(Writer *writer, const Layout *layout)
+static void write_header(Writer *writer, const Layout *layout, bool wide)
 {
     put_u32(writer, 0);
-    put_u16(writer, VERSION);
+    put_u16(writer, wide ? WIDE_VERSION : VERSION);
     put_u16(writer, SECTION_COUNT);
     for (int section = 0; section < SECTION_COUNT; section++) {
         put_u32(writer, layout->offset[section]);
         put_u32(writer, layout->count[section]);
         put_u16(writer, layout->record_size[section]);
-        put_u16(writer, layout->music[section]);
+        if (wide) {
+            put_u16(writer, 0);
+            put_u32(writer, layout->music[section]);
+        } else {
+            put_u16(writer, layout->music[section]);
+        }
     }
-    pad_to(writer, HEADER_SIZE);
+    pad_to(writer, wide ? WIDE_HEADER_SIZE : HEADER_SIZE);
 }
 
 typedef struct Placed {
@@ -524,10 +549,10 @@ static bool write_tracks(Encode *encode)
         Writer *writer = encode->writer;
         put_u32(writer, title);
         put_u32(writer, path);
-        put_u16(writer, placed.album);
-        put_u16(writer, placed.artist);
-        put_u16(writer, placed.genre);
-        put_u16(writer, placed.folder_index);
+        put_index(encode, placed.album);
+        put_index(encode, placed.artist);
+        put_index(encode, placed.genre);
+        put_index(encode, placed.folder_index);
         put_u32(writer, placed.duration_ms);
         put_byte(writer, placed.disc);
         put_byte(writer, placed.number);
@@ -547,8 +572,15 @@ static bool write_albums(Encode *encode)
         }
         Writer *writer = encode->writer;
         put_u32(writer, take_string(encode, builder_get16(record + 4)));
-        put_u16(writer, builder_get32(record + 6));
-        put_u16(writer, builder_get32(record + 10));
+        put_index(encode, builder_get32(record + 6));
+        put_index(encode, builder_get32(record + 10));
+        if (encode->wide) {
+            put_u32(writer, builder_get32(record + 16));
+            put_u32(writer, builder_get32(record + 20));
+            put_u16(writer, builder_get16(record + 14));
+            put_u16(writer, 0);
+            continue;
+        }
         put_u16(writer, builder_get16(record + 14));
         put_u16(writer, builder_get32(record + 16));
         put_u16(writer, builder_get32(record + 20));
@@ -569,8 +601,10 @@ static bool write_groups(Encode *encode, const GroupTable *table, uint32_t first
         Writer *writer = encode->writer;
         put_u32(writer, take_string(encode, builder_get16(display + 4)));
         put_u32(writer, first_link + builder_get32(entry));
-        put_u16(writer, builder_get32(entry + 4));
-        put_u16(writer, 0);
+        put_index(encode, builder_get32(entry + 4));
+        if (!encode->wide) {
+            put_u16(writer, 0);
+        }
     }
     return true;
 }
@@ -585,11 +619,13 @@ static bool write_folders(Encode *encode, uint32_t first_link)
         }
         Writer *writer = encode->writer;
         put_u32(writer, take_string(encode, builder_get16(record + 4)));
-        put_u16(writer, builder_get32(record + 6));
-        put_u16(writer, builder_get32(record + 10));
+        put_index(encode, builder_get32(record + 6));
+        put_index(encode, builder_get32(record + 10));
         put_u32(writer, first_link + builder_get32(record + 18));
-        put_u16(writer, builder_get32(record + 14));
-        put_u16(writer, 0);
+        put_index(encode, builder_get32(record + 14));
+        if (!encode->wide) {
+            put_u16(writer, 0);
+        }
     }
     return true;
 }
@@ -604,7 +640,7 @@ static bool copy_indices(Encode *encode, Region region, uint32_t first, uint32_t
             return false;
         }
         for (uint32_t index = 0; index < step; index++) {
-            put_u16(encode->writer, builder_get32(chunk + 4 * index));
+            put_index(encode, builder_get32(chunk + 4 * index));
         }
         done += step;
     }
@@ -619,8 +655,10 @@ static void write_playlists(Encode *encode, uint32_t first_link)
         Writer *writer = encode->writer;
         put_u32(writer, take_string(encode, playlist->length));
         put_u32(writer, first_link);
-        put_u16(writer, playlist->count);
-        put_u16(writer, 0);
+        put_index(encode, playlist->count);
+        if (!encode->wide) {
+            put_u16(writer, 0);
+        }
         first_link += playlist->count;
     }
 }
@@ -652,7 +690,7 @@ static bool write_records(Encode *encode, const Layout *layout)
     const Prepared *prepared = encode->prepared;
     Writer *writer = encode->writer;
     encode->strings = 1;
-    write_header(writer, layout);
+    write_header(writer, layout, encode->wide);
     if (!write_tracks(encode)) {
         return false;
     }
@@ -830,11 +868,11 @@ static bool fits_version_3(const BuilderState *state, const Prepared *prepared)
 }
 
 BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink sink,
-                             uint32_t capacity, uint32_t *length)
+                             uint32_t capacity, uint32_t *length, bool wide)
 {
     state->arena.used = prepared->index_mark;
     Writer *writer = arena_take(&state->arena, (uint32_t)sizeof(Writer));
-    Encode encode = {.state = state, .prepared = prepared, .writer = writer};
+    Encode encode = {.state = state, .prepared = prepared, .writer = writer, .wide = wide};
     encode.text = arena_take(&state->arena, BUILDER_TEXT_CAPACITY);
     if (writer == NULL || encode.text == NULL || !order_playlists(&encode) ||
         !load_columns(&encode)) {
@@ -842,7 +880,7 @@ BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink s
                : state->store.failed  ? BUILDER_NO_ROOM
                                       : BUILDER_OUT_OF_MEMORY;
     }
-    if (!fits_version_3(state, prepared)) {
+    if (!wide && !fits_version_3(state, prepared)) {
         return BUILDER_TOO_MANY;
     }
     uint32_t strings = string_total(&encode);
@@ -864,7 +902,8 @@ BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink s
     }
     flush(writer);
     static const uint8_t MAGIC[4] = {'E', 'M', 'D', 'B'};
-    if (writer->failed || !sink.write(sink.context, 0, MAGIC, sizeof MAGIC)) {
+    static const uint8_t WIDE_MAGIC[4] = {'R', 'L', 'I', 'B'};
+    if (writer->failed || !sink.write(sink.context, 0, wide ? WIDE_MAGIC : MAGIC, sizeof MAGIC)) {
         return BUILDER_WRITE_FAILED;
     }
     *length = layout.end;

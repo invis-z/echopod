@@ -80,6 +80,10 @@ echo_add_unit_test(NAME test_segment_scratch
     SOURCES library/test_segment_scratch.c library/fake_card.c
     LIBRARIES echo_library_scan echo_library_checks
 )
+echo_add_unit_test(NAME test_large_library
+    SOURCES library/test_large_library.c library/fake_card.c
+    LIBRARIES echo_library_scan echo_library_checks
+)
 add_library(echo_reference_builder STATIC
     library/reference/reference_builder.c
     library/reference/reference_builder_encode.c

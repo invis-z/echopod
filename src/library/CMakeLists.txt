@@ -6,6 +6,7 @@ add_library(echo_library STATIC
     library_browse.c
     music_fingerprint.c
     segment_store.c
+    segment_stream.c
     sort_initial.c
     spoken_path.c
 )

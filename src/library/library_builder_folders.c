@@ -38,16 +38,6 @@ static int by_canon_then_node(const uint8_t *left, const uint8_t *right, const v
     return 0;
 }
 
-static bool sort_by(BuilderState *state, Region input, SortCompare compare, Region *sorted)
-{
-    SortJob job = {.store = &state->store,
-                   .arena = &state->arena,
-                   .input = input,
-                   .compare = compare,
-                   .context = NULL};
-    return sort_records(&job, sorted);
-}
-
 static bool same_hash(const uint8_t *left, const uint8_t *right)
 {
     return builder_get32(left + 2) == builder_get32(right + 2) &&
@@ -237,13 +227,13 @@ bool builder_merge_folders(BuilderState *state)
     Region canons = store_take(&state->store, others * CANON_SIZE + CANON_SIZE);
     Region sorted;
     uint32_t merged = 0;
-    if (state->store.failed || !sort_by(state, hashes, by_hash_then_node, &sorted) ||
+    if (state->store.failed || !builder_sort(state, hashes, by_hash_then_node, &sorted) ||
         !find_canons(state, sorted, canons)) {
         return false;
     }
     canons.size = others * CANON_SIZE;
     Cache cache;
-    if (!sort_by(state, canons, by_canon_then_node, &sorted) ||
+    if (!builder_sort(state, canons, by_canon_then_node, &sorted) ||
         !number_canons(state, sorted, remap, &merged) ||
         !cache_init(&cache, &state->store, &state->arena, REMAP_BLOCK, REMAP_BLOCKS) ||
         !rewrite_folders(state, remap, &cache) || !rewrite_rows(state, remap, &cache)) {
