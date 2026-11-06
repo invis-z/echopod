@@ -218,7 +218,7 @@ const Font FONT_INTER_REGULAR_12 = {
     .bitmap_size = 2659,
     .ascent = 12,
     .descent = 3,
-    .pack_faces = {3, 2},
+    .pack_faces = {3, 2, 7},
 };
 
 static const uint8_t INTER_REGULAR_16_BITMAP[] = {
@@ -569,7 +569,7 @@ const Font FONT_INTER_REGULAR_16 = {
     .bitmap_size = 4481,
     .ascent = 16,
     .descent = 4,
-    .pack_faces = {4, 1},
+    .pack_faces = {4, 1, 6},
 };
 
 static const uint8_t INTER_SEMIBOLD_16_BITMAP[] = {
@@ -936,5 +936,5 @@ const Font FONT_INTER_SEMIBOLD_16 = {
     .bitmap_size = 4750,
     .ascent = 16,
     .descent = 4,
-    .pack_faces = {5, 1},
+    .pack_faces = {5, 1, 6},
 };
