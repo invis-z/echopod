@@ -21,7 +21,7 @@ static const uint16_t POOL_BASE[SEGMENT_POOL_COUNT] = {0, SEGMENT_LIBRARY_CAPACI
 static const char *const POOL_PREFIX[SEGMENT_POOL_COUNT] = {"/.rippl/library/L",
                                                             "/.rippl/covers/C"};
 
-static void segment_path(uint8_t pool, uint16_t number, char *path)
+void segment_store_path(uint8_t pool, uint16_t number, char *path)
 {
     const char *prefix = POOL_PREFIX[pool];
     uint32_t length = 0;
@@ -71,7 +71,7 @@ static bool read_stream(const SegmentStore *store, const SegmentStream *stream, 
     while (length > 0) {
         uint32_t within = offset % size;
         uint32_t part = size - within < length ? size - within : length;
-        segment_path(stream->pool, segment_at(store, stream, offset / size), path);
+        segment_store_path(stream->pool, segment_at(store, stream, offset / size), path);
         if (!store->files.read(store->files.context, path, within, to, part)) {
             return false;
         }
@@ -127,7 +127,7 @@ static void mark_state(SegmentStore *store, const SegmentState *state)
 static SegmentResult reserve_segment(SegmentStore *store, uint8_t pool, uint16_t number)
 {
     char path[SEGMENT_PATH_CAPACITY];
-    segment_path(pool, number, path);
+    segment_store_path(pool, number, path);
     SegmentFileResult result = store->files.reserve(store->files.context, path, POOL_SIZE[pool]);
     if (result == SEGMENT_FILE_NO_SPACE) {
         return SEGMENT_NO_SPACE;
@@ -183,7 +183,7 @@ static bool write_stream(SegmentStore *store, const SegmentStream *stream, uint3
     while (length > 0) {
         uint32_t within = offset % size;
         uint32_t part = size - within < length ? size - within : length;
-        segment_path(stream->pool, segment_at(store, stream, offset / size), path);
+        segment_store_path(stream->pool, segment_at(store, stream, offset / size), path);
         if (!store->files.write(store->files.context, path, within, bytes, part)) {
             return false;
         }
@@ -639,4 +639,23 @@ SegmentResult segment_store_commit(SegmentStore *store)
 void segment_store_cancel(SegmentStore *store)
 {
     segment_store_begin(store);
+}
+
+SegmentResult segment_store_grow(SegmentStore *store, uint8_t stream, uint16_t *number)
+{
+    if (stream >= SEGMENT_STREAM_COUNT) {
+        return SEGMENT_REFUSED;
+    }
+    SegmentStream *target = &store->working.streams[stream];
+    uint32_t size = POOL_SIZE[target->pool];
+    if (target->length != target->count * size) {
+        target->length = target->count * size;
+    }
+    SegmentResult result = grow(store, target);
+    if (result != SEGMENT_OK) {
+        return result;
+    }
+    target->length = target->count * size;
+    *number = segment_at(store, target, target->count - 1u);
+    return SEGMENT_OK;
 }
