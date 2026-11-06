@@ -61,6 +61,7 @@ static void defaults_are_comfortable(void)
     CHECK_EQUAL(USB_MODE_STORAGE, settings.usb_mode);
     CHECK_EQUAL(60, settings.dac_volume);
     CHECK_EQUAL(ORIENTATION_LANDSCAPE, settings.orientation);
+    CHECK_EQUAL(DRE_OFF, settings.options[OPTION_DRE]);
 }
 
 static void auto_off_options_are_stocks(void)
@@ -228,7 +229,7 @@ static void a_newer_version_is_rejected(void)
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 8;
+    bytes[VERSION_FIELD] = 10;
     rewrite_checksum(bytes);
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
@@ -564,6 +565,36 @@ static void a_value_in_a_spare_option_slot_is_ignored(void)
     CHECK_EQUAL(LANGUAGE_KOREAN, decoded.language);
 }
 
+static void a_version_8_file_gets_dre_off(void)
+{
+    Settings settings = custom_settings();
+    for (int option = 0; option < V8_OPTION_COUNT; option++) {
+        settings.options[option] = 1;
+    }
+    settings.options[OPTION_DRE] = DRE_ON;
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[VERSION_FIELD] = 8;
+    put_checksum(bytes, V8_CHECKSUM_FIELD);
+    Settings decoded;
+    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    for (int option = 0; option < V8_OPTION_COUNT; option++) {
+        CHECK_EQUAL(1, decoded.options[option]);
+    }
+    CHECK_EQUAL(DRE_OFF, decoded.options[OPTION_DRE]);
+}
+
+static void an_unknown_dre_setting_is_rejected(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[OPTIONS_FIELD + OPTION_DRE] = DRE_MODE_COUNT;
+    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+    Settings decoded;
+    CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
+}
+
 static void a_new_option_out_of_range_is_rejected(void)
 {
     Settings settings = custom_settings();
@@ -589,6 +620,8 @@ int main(void)
         TEST_CASE(a_value_in_a_spare_option_slot_is_ignored),
         TEST_CASE(a_new_option_out_of_range_is_rejected),
         TEST_CASE(an_option_out_of_range_is_rejected),
+        TEST_CASE(a_version_8_file_gets_dre_off),
+        TEST_CASE(an_unknown_dre_setting_is_rejected),
         TEST_CASE(a_version_7_file_loads_with_the_options_off),
         TEST_CASE(defaults_are_comfortable),
         TEST_CASE(timeout_options_end_with_never),

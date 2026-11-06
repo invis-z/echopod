@@ -20,6 +20,12 @@ typedef enum HalAudioGain {
     HAL_AUDIO_GAIN_HIGH
 } HalAudioGain;
 
+typedef enum HalAudioDre {
+    HAL_AUDIO_DRE_OFF,
+    HAL_AUDIO_DRE_ON,
+    HAL_AUDIO_DRE_ON_FIX
+} HalAudioDre;
+
 typedef enum HalAudioOutput {
     HAL_AUDIO_OUTPUT_AUTO,
     HAL_AUDIO_OUTPUT_SINGLE_ENDED,
@@ -132,6 +138,7 @@ void hal_audio_set_volume(uint8_t level);
 void hal_audio_set_gain(HalAudioGain gain);
 void hal_audio_set_filter(uint8_t filter);
 void hal_audio_set_balance(uint8_t balance);
+void hal_audio_set_dre(HalAudioDre dre);
 void hal_audio_set_output(HalAudioOutput output);
 void hal_audio_set_bluetooth_level(HalAudioBluetoothLevel level);
 void hal_audio_set_equalizer(const EqualizerCurve *curve);

@@ -134,9 +134,11 @@ static void hardware_settings_reach_the_hal(void)
     chosen.usb_mode = USB_MODE_DAC;
     chosen.options[OPTION_BLUETOOTH_LEVEL] = BLUETOOTH_LEVEL_LOUDER;
     chosen.options[OPTION_USB_PROMPT] = USB_PROMPT_ON;
+    chosen.options[OPTION_DRE] = DRE_ON_FIX;
     settings_store_apply_hardware(&chosen);
     CHECK_EQUAL(BRIGHT, fake_hal_display_brightness());
     CHECK_EQUAL(HAL_AUDIO_GAIN_HIGH, fake_hal_audio_gain());
+    CHECK_EQUAL(HAL_AUDIO_DRE_ON_FIX, fake_hal_audio_dre());
     CHECK_EQUAL(HAL_AUDIO_OUTPUT_BALANCED, fake_hal_audio_output());
     CHECK_EQUAL(HAL_AUDIO_BLUETOOTH_LOUDER, fake_hal_audio_bluetooth_level());
     CHECK_EQUAL(HAL_USB_MODE_DAC, fake_hal_usb_mode());

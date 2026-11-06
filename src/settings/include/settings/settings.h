@@ -84,8 +84,16 @@ typedef enum SettingOption {
     OPTION_RETIRED_INTERNAL_STORAGE,
     OPTION_STATUS_BAR,
     OPTION_POWER_ON,
+    OPTION_DRE,
     SETTINGS_OPTION_COUNT
 } SettingOption;
+
+typedef enum DreMode {
+    DRE_OFF,
+    DRE_ON,
+    DRE_ON_FIX,
+    DRE_MODE_COUNT
+} DreMode;
 
 enum {
     CLOCK_OFF,

@@ -23,6 +23,8 @@ typedef struct Write {
 #define PCM_VOLUME_B 0x090001u
 #define PCM_VOLUME_A 0x090002u
 #define HEADPHONE_GAIN 0x080000u
+#define DRE_CONTROL 0x0C0001u
+#define DRE_FIX 0x0C0056u
 
 enum {
     TOP_VOLUME_VALUE = 0xAC,
@@ -36,7 +38,10 @@ enum {
     VOLUME_STEP_NUMERATOR = 2,
     VOLUME_STEP_DENOMINATOR = 1,
     GAIN_HIGH_VALUE = 0x31,
-    GAIN_LOW_VALUE = 0x10
+    GAIN_LOW_VALUE = 0x10,
+    DRE_ON_VALUE = 0x01,
+    DRE_OFF_VALUE = 0x00,
+    DRE_FIX_VALUE = 0x2F
 };
 
 static const uint8_t CHIPS[CHIP_COUNT] = {DAC_LEFT_ADDRESS, DAC_RIGHT_ADDRESS};
@@ -257,6 +262,16 @@ void dac_set_filter(const DacBus *bus, uint8_t filter)
 void dac_set_gain(const DacBus *bus, bool high)
 {
     write_both(bus, HEADPHONE_GAIN, high ? GAIN_HIGH_VALUE : GAIN_LOW_VALUE);
+}
+
+void dac_set_dre(const DacBus *bus, DacDre dre)
+{
+    write_both(bus, 0x010010, 0x99);
+    write_both(bus, DRE_CONTROL, dre == DAC_DRE_OFF ? DRE_OFF_VALUE : DRE_ON_VALUE);
+    if (dre == DAC_DRE_ON_FIX) {
+        write_both(bus, DRE_FIX, DRE_FIX_VALUE);
+    }
+    write_both(bus, 0x010010, 0x00);
 }
 
 static uint32_t curve_top(DacCurve curve)
