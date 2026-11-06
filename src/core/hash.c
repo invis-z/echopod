@@ -9,3 +9,13 @@ uint32_t hash_update(uint32_t hash, const void *bytes, size_t length)
     }
     return hash;
 }
+
+uint64_t hash64_update(uint64_t hash, const void *bytes, size_t length)
+{
+    const uint8_t *data = bytes;
+    for (size_t index = 0; index < length; index++) {
+        hash ^= data[index];
+        hash *= HASH64_PRIME;
+    }
+    return hash;
+}
