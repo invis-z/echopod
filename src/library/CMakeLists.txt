@@ -7,6 +7,7 @@ add_library(rippl_library STATIC
     mp4_chapters.c
     music_fingerprint.c
     music_folders.c
+    segment_store.c
     sort_initial.c
     spoken_path.c
 )

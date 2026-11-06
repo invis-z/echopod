@@ -76,6 +76,10 @@ foreach(library_test block_cache library library_browse favorites covers sort_ke
         LIBRARIES rippl_library_fixtures
     )
 endforeach()
+rippl_add_unit_test(NAME test_segment_store
+    SOURCES library/test_segment_store.c library/fake_card.c
+    LIBRARIES rippl_library
+)
 add_library(rippl_reference_builder STATIC
     library/reference/reference_builder.c
     library/reference/reference_builder_encode.c
