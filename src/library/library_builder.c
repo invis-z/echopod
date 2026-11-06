@@ -47,7 +47,7 @@ static BuilderState *state_of(const LibraryBuilder *builder)
 static bool write_folder_row(BuilderState *state, uint32_t name, uint32_t length, uint32_t parent)
 {
     uint8_t bytes[BUILDER_FOLDER_SIZE];
-    FolderRow row = {.name = name, .length = (uint16_t)length, .parent = (uint16_t)parent};
+    FolderRow row = {.name = name, .length = (uint16_t)length, .parent = parent};
     builder_folder_encode(&row, bytes);
     return out_put(&state->scan->folders, bytes, sizeof bytes);
 }
@@ -93,7 +93,7 @@ void library_builder_init(LibraryBuilder *builder, void *memory, uint32_t size,
         scan->previous_length[field] = 0;
     }
     state->folder_count = 1;
-    write_folder_row(state, 0, 0, BUILDER_NONE);
+    write_folder_row(state, 0, 0, BUILDER_NO_INDEX);
 }
 
 static bool same_text(const char *left, const char *right, uint32_t length)
@@ -189,10 +189,6 @@ static bool push_folder(BuilderState *state, const char *name, uint32_t length)
     }
     uint64_t hash = scan->chain_depth == 0 ? HASH64_START : scan->chain[scan->chain_depth - 1].hash;
     hash = hash64_update(hash64_update(hash, "/", 1), name, length);
-    if (state->folder_count >= BUILDER_MAX_INDEX) {
-        state->error = BUILDER_TOO_MANY;
-        return false;
-    }
     uint32_t offset = length > 0 ? heap_put(state, name, length) : 0;
     if (offset == BUILDER_UNSET || !write_folder_row(state, offset, length, parent)) {
         return false;
@@ -205,7 +201,7 @@ static bool push_folder(BuilderState *state, const char *name, uint32_t length)
         scan->chain_text[start + index] = name[index];
     }
     scan->chain[scan->chain_depth++] = (ChainLevel){
-        .hash = hash, .node = (uint16_t)node, .start = (uint16_t)start, .length = (uint16_t)length};
+        .hash = hash, .node = node, .start = (uint16_t)start, .length = (uint16_t)length};
     scan->chain_path_length += length + 1;
     scan->sibling_depth = scan->chain_depth;
     return true;
@@ -257,7 +253,7 @@ BuilderResult library_builder_add_track(LibraryBuilder *builder, const BuilderTr
     if (state->prepare_done) {
         return BUILDER_OUT_OF_MEMORY;
     }
-    if (state->track_count >= BUILDER_MAX_INDEX) {
+    if (state->track_count == BUILDER_UNSET - 1u) {
         return BUILDER_TOO_MANY;
     }
 
@@ -404,8 +400,8 @@ BuilderResult library_builder_playlist_entry(LibraryBuilder *builder, const char
     if (position == BUILDER_UNSET) {
         return BUILDER_OK;
     }
-    uint8_t bytes[2];
-    builder_put16(bytes, position);
+    uint8_t bytes[4];
+    builder_put32(bytes, position);
     if (!out_put(&prepared->playlist_link_out, bytes, sizeof bytes)) {
         return outcome(state);
     }

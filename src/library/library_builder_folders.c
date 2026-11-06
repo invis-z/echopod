@@ -141,11 +141,11 @@ static bool number_canons(BuilderState *state, Region sorted, Region remap, uint
 
 static bool remapped(Cache *cache, Region remap, uint32_t node, uint32_t *value)
 {
-    uint8_t bytes[2];
-    if (!cache_read(cache, remap.offset + node * 2, bytes, sizeof bytes)) {
+    uint8_t bytes[4];
+    if (!cache_read(cache, remap.offset + node * 4, bytes, sizeof bytes)) {
         return false;
     }
-    *value = builder_get16(bytes);
+    *value = builder_get32(bytes);
     return true;
 }
 
@@ -175,11 +175,11 @@ static bool rewrite_folders(BuilderState *state, Region remap, Cache *cache)
             continue;
         }
         builder_folder_decode(bytes, &row);
-        uint32_t parent = BUILDER_NONE;
+        uint32_t parent = BUILDER_NO_INDEX;
         if (node != 0 && !remapped(cache, remap, row.parent, &parent)) {
             return false;
         }
-        row.parent = (uint16_t)parent;
+        row.parent = parent;
         builder_folder_encode(&row, bytes);
         if (!out_put(&out, bytes, sizeof bytes)) {
             return false;
@@ -215,7 +215,7 @@ static bool rewrite_rows(BuilderState *state, Region remap, Cache *cache)
         if (!remapped(cache, remap, row.folder, &folder)) {
             return false;
         }
-        row.folder = (uint16_t)folder;
+        row.folder = folder;
         builder_row_encode(&row, bytes);
         if (!out_put(&out, bytes, sizeof bytes)) {
             return false;
@@ -233,7 +233,7 @@ bool builder_merge_folders(BuilderState *state)
     uint32_t others = state->folder_count - 1u;
     Region hashes = {.offset = state->folder_hashes.offset,
                      .size = others * BUILDER_FOLDER_HASH_SIZE};
-    Region remap = store_take(&state->store, state->folder_count * 2 + 2);
+    Region remap = store_take(&state->store, state->folder_count * 4 + 4);
     Region canons = store_take(&state->store, others * CANON_SIZE + CANON_SIZE);
     Region sorted;
     uint32_t merged = 0;

@@ -15,13 +15,13 @@ enum {
     INDEX_RECORD = 2,
     BUFFER_SIZE = 512,
     STREAM_BUFFER = 4096,
-    ALBUM_FINAL = 20,
+    ALBUM_FINAL = 28,
     GROUP_ENTRY = 8,
     DISPLAY_SIZE = 8,
-    FOLDER_FINAL = 16,
+    FOLDER_FINAL = 24,
     NAME_HEADER = 6,
-    PLACE_SIZE = 8,
-    PLACED_SIZE = 30,
+    PLACE_SIZE = 16,
+    PLACED_SIZE = 40,
     COLUMN_BLOCK = 1024,
     COLUMN_BLOCKS = 4
 };
@@ -349,15 +349,15 @@ static void placed_encode(const Placed *placed, uint8_t *bytes)
     builder_put16(bytes + 4, placed->title_length);
     builder_put32(bytes + 6, placed->file);
     builder_put16(bytes + 10, placed->file_length);
-    builder_put16(bytes + 12, placed->folder);
-    builder_put16(bytes + 14, placed->album);
-    builder_put16(bytes + 16, placed->artist);
-    builder_put16(bytes + 18, placed->genre);
-    builder_put16(bytes + 20, placed->folder_index);
-    builder_put16(bytes + 22, placed->path_length);
-    builder_put32(bytes + 24, placed->duration_ms);
-    bytes[28] = placed->disc;
-    bytes[29] = placed->number;
+    builder_put32(bytes + 12, placed->folder);
+    builder_put32(bytes + 16, placed->album);
+    builder_put32(bytes + 20, placed->artist);
+    builder_put32(bytes + 24, placed->genre);
+    builder_put32(bytes + 28, placed->folder_index);
+    builder_put16(bytes + 32, placed->path_length);
+    builder_put32(bytes + 34, placed->duration_ms);
+    bytes[38] = placed->disc;
+    bytes[39] = placed->number;
 }
 
 static void placed_decode(const uint8_t *bytes, Placed *placed)
@@ -366,15 +366,15 @@ static void placed_decode(const uint8_t *bytes, Placed *placed)
                        .title_length = builder_get16(bytes + 4),
                        .file = builder_get32(bytes + 6),
                        .file_length = builder_get16(bytes + 10),
-                       .folder = builder_get16(bytes + 12),
-                       .album = builder_get16(bytes + 14),
-                       .artist = builder_get16(bytes + 16),
-                       .genre = builder_get16(bytes + 18),
-                       .folder_index = builder_get16(bytes + 20),
-                       .path_length = builder_get16(bytes + 22),
-                       .duration_ms = builder_get32(bytes + 24),
-                       .disc = bytes[28],
-                       .number = bytes[29]};
+                       .folder = builder_get32(bytes + 12),
+                       .album = builder_get32(bytes + 16),
+                       .artist = builder_get32(bytes + 20),
+                       .genre = builder_get32(bytes + 24),
+                       .folder_index = builder_get32(bytes + 28),
+                       .path_length = builder_get16(bytes + 32),
+                       .duration_ms = builder_get32(bytes + 34),
+                       .disc = bytes[38],
+                       .number = bytes[39]};
 }
 
 static bool open_in(BuilderState *state, In *in, Region region, uint32_t length)
@@ -387,23 +387,23 @@ static bool open_in(BuilderState *state, In *in, Region region, uint32_t length)
     return true;
 }
 
-static bool get_u16(In *in, uint32_t *value)
+static bool get_u32(In *in, uint32_t *value)
 {
-    uint8_t bytes[2];
+    uint8_t bytes[4];
     if (!in_get(in, bytes, sizeof bytes)) {
         return false;
     }
-    *value = builder_get16(bytes);
+    *value = builder_get32(bytes);
     return true;
 }
 
-static bool cached_u16(Cache *cache, Region column, uint32_t index, uint32_t *value)
+static bool cached_u32(Cache *cache, Region column, uint32_t index, uint32_t *value)
 {
-    uint8_t bytes[2];
-    if (!cache_read(cache, column.offset + index * 2, bytes, sizeof bytes)) {
+    uint8_t bytes[4];
+    if (!cache_read(cache, column.offset + index * 4, bytes, sizeof bytes)) {
         return false;
     }
-    *value = builder_get16(bytes);
+    *value = builder_get32(bytes);
     return true;
 }
 
@@ -424,8 +424,8 @@ static bool open_place_inputs(Encode *encode, PlaceInputs *inputs, Region pairs)
     uint32_t count = state->track_count;
     uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
     if (buffer == NULL || !open_in(state, &inputs->rows, state->rows, count * BUILDER_ROW_SIZE) ||
-        !open_in(state, &inputs->artists, prepared->columns[BUILDER_ARTIST], count * 2) ||
-        !open_in(state, &inputs->genres, prepared->columns[BUILDER_GENRE], count * 2) ||
+        !open_in(state, &inputs->artists, prepared->columns[BUILDER_ARTIST], count * 4) ||
+        !open_in(state, &inputs->genres, prepared->columns[BUILDER_GENRE], count * 4) ||
         !open_in(state, &inputs->places, prepared->track_place, count * PLACE_SIZE) ||
         !cache_init(&inputs->folder_index, &state->store, &state->arena, COLUMN_BLOCK,
                     COLUMN_BLOCKS) ||
@@ -445,14 +445,14 @@ static bool place_track(Encode *encode, PlaceInputs *inputs)
     TrackRow row;
     Placed placed;
     uint32_t folder_path = 0;
-    if (!in_get(&inputs->rows, bytes, sizeof bytes) || !get_u16(&inputs->artists, &placed.artist) ||
-        !get_u16(&inputs->genres, &placed.genre) || !in_get(&inputs->places, place, sizeof place)) {
+    if (!in_get(&inputs->rows, bytes, sizeof bytes) || !get_u32(&inputs->artists, &placed.artist) ||
+        !get_u32(&inputs->genres, &placed.genre) || !in_get(&inputs->places, place, sizeof place)) {
         return false;
     }
     builder_row_decode(bytes, &row);
-    if (!cached_u16(&inputs->folder_index, prepared->folder_new_index, row.folder,
+    if (!cached_u32(&inputs->folder_index, prepared->folder_new_index, row.folder,
                     &placed.folder_index) ||
-        !cached_u16(&inputs->folder_path, prepared->folder_path_length, row.folder, &folder_path)) {
+        !cached_u32(&inputs->folder_path, prepared->folder_path_length, row.folder, &folder_path)) {
         return false;
     }
     placed.title = row.text[BUILDER_TITLE];
@@ -460,14 +460,14 @@ static bool place_track(Encode *encode, PlaceInputs *inputs)
     placed.file = row.text[BUILDER_FILE];
     placed.file_length = row.length[BUILDER_FILE];
     placed.folder = row.folder;
-    placed.album = builder_get16(place + 2);
+    placed.album = builder_get32(place + 4);
     placed.path_length = folder_path + row.length[BUILDER_FILE];
     placed.duration_ms = row.duration_ms;
     placed.disc = row.disc;
     placed.number = row.number;
     uint8_t value[PLACED_SIZE];
     placed_encode(&placed, value);
-    return builder_put_entry(&inputs->pairs, builder_get16(place), value, sizeof value);
+    return builder_put_entry(&inputs->pairs, builder_get32(place), value, sizeof value);
 }
 
 static bool place_rows(Encode *encode)
@@ -547,12 +547,12 @@ static bool write_albums(Encode *encode)
         }
         Writer *writer = encode->writer;
         put_u32(writer, take_string(encode, builder_get16(record + 4)));
-        put_u16(writer, builder_get16(record + 6));
-        put_u16(writer, builder_get16(record + 8));
-        put_u16(writer, builder_get16(record + 10));
-        put_u16(writer, builder_get16(record + 12));
+        put_u16(writer, builder_get32(record + 6));
+        put_u16(writer, builder_get32(record + 10));
         put_u16(writer, builder_get16(record + 14));
-        put_u16(writer, BUILDER_NONE);
+        put_u16(writer, builder_get32(record + 16));
+        put_u16(writer, builder_get32(record + 20));
+        put_u16(writer, 0xFFFF);
     }
     return true;
 }
@@ -569,7 +569,7 @@ static bool write_groups(Encode *encode, const GroupTable *table, uint32_t first
         Writer *writer = encode->writer;
         put_u32(writer, take_string(encode, builder_get16(display + 4)));
         put_u32(writer, first_link + builder_get32(entry));
-        put_u16(writer, builder_get16(entry + 4));
+        put_u16(writer, builder_get32(entry + 4));
         put_u16(writer, 0);
     }
     return true;
@@ -585,10 +585,10 @@ static bool write_folders(Encode *encode, uint32_t first_link)
         }
         Writer *writer = encode->writer;
         put_u32(writer, take_string(encode, builder_get16(record + 4)));
-        put_u16(writer, builder_get16(record + 6));
-        put_u16(writer, builder_get16(record + 8));
-        put_u32(writer, first_link + builder_get32(record + 12));
-        put_u16(writer, builder_get16(record + 10));
+        put_u16(writer, builder_get32(record + 6));
+        put_u16(writer, builder_get32(record + 10));
+        put_u32(writer, first_link + builder_get32(record + 18));
+        put_u16(writer, builder_get32(record + 14));
         put_u16(writer, 0);
     }
     return true;
@@ -599,12 +599,12 @@ static bool copy_indices(Encode *encode, Region region, uint32_t first, uint32_t
     uint8_t *chunk = encode->stream;
     uint32_t done = 0;
     while (done < count) {
-        uint32_t step = count - done < STREAM_BUFFER / 2 ? count - done : STREAM_BUFFER / 2;
-        if (!read_region(encode, region, (first + done) * 2, chunk, step * 2)) {
+        uint32_t step = count - done < STREAM_BUFFER / 4 ? count - done : STREAM_BUFFER / 4;
+        if (!read_region(encode, region, (first + done) * 4, chunk, step * 4)) {
             return false;
         }
         for (uint32_t index = 0; index < step; index++) {
-            put_u16(encode->writer, builder_get16(chunk + 2 * index));
+            put_u16(encode->writer, builder_get32(chunk + 4 * index));
         }
         done += step;
     }
@@ -815,6 +815,20 @@ static bool load_columns(Encode *encode)
     return !state->arena.failed;
 }
 
+static bool fits_version_3(const BuilderState *state, const Prepared *prepared)
+{
+    const uint32_t counts[] = {state->track_count,      prepared->album_count,
+                               prepared->artists.count, prepared->album_artists.count,
+                               prepared->genres.count,  state->folder_count,
+                               prepared->playlist_count};
+    for (uint32_t index = 0; index < sizeof counts / sizeof counts[0]; index++) {
+        if (counts[index] > BUILDER_V3_LIMIT) {
+            return false;
+        }
+    }
+    return true;
+}
+
 BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink sink,
                              uint32_t capacity, uint32_t *length)
 {
@@ -827,6 +841,9 @@ BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink s
         return state->store.io_failed ? BUILDER_WRITE_FAILED
                : state->store.failed  ? BUILDER_NO_ROOM
                                       : BUILDER_OUT_OF_MEMORY;
+    }
+    if (!fits_version_3(state, prepared)) {
+        return BUILDER_TOO_MANY;
     }
     uint32_t strings = string_total(&encode);
     if (strings == 0) {
