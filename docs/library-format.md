@@ -86,7 +86,7 @@ On the device, `track_tags_read` reads through a `ByteSource` with small bounded
 
 ## Building on the device
 
-`library/library_builder` builds a database that means the same as the PC indexer's, from tracks given in scan order (the PC indexer's sorted path order), with a block of RAM and a scratch file on the card (`/.rippl/build.tmp`, 24 MB, reserved with the other player files). It handles up to 65,535 tracks; 20,000 are tested inside 360 KB of RAM. RAM only ever holds what one step needs: buffers and small caches. Nothing in RAM grows with the number of tracks, albums or folders: wherever a step needs a value by track, album or folder number, the values go to the card as (number, value) pairs and come back in number order through the external sort.
+`library/library_builder` builds a database that means the same as the PC indexer's, from tracks given in scan order (the PC indexer's sorted path order), with a block of RAM and a scratch file on the card (`/.rippl/build.tmp`, 24 MB, reserved with the other player files). Inside it, every track, album, group, folder and rank number is 32-bit, and the scan's regions are a share of the scratch space (rows an eighth, folders and their hashes a 512th per folder). `library_builder_finish` writes this file and refuses a library with more than 65,535 of anything; `library_builder_finish_wide` writes the Rippl format below. 20,000 tracks are tested inside 360 KB of RAM against the reference builder, and 250,000 through the Rippl format. RAM only ever holds what one step needs: buffers and small caches. Nothing in RAM grows with the number of tracks, albums or folders: wherever a step needs a value by track, album or folder number, the values go to the card as (number, value) pairs and come back in number order through the external sort.
 - During the scan each track becomes a 48-byte row on the card (text offsets and lengths, folder, year, disc, number, duration) and its texts go to a heap on the card (a text equal to the previous track's same field is stored once). Folders become 8-byte rows, each with a 64-bit FNV-1a hash of its full path. In sorted input a folder never comes back once left; when sibling folders arrive out of order, a pass after the scan sorts the path hashes, keeps the first-created folder of each path, renumbers the folders and rewrites the track rows in place.
 - Before ranking, tracks marked as having no album-artist tag (a spare row byte) get their shared album artist: one record per such track (folder, track, artist text, album and artist sort keys) is sorted by folder, album key, artist key and track; one pass picks each group's winner, a second writes (track, artist text) pairs, which are sorted by track and merged back into the rows in one sequential rewrite. Nothing runs when no track is marked.
 - Each field is then ranked: one record per run of equal text (its sort key, its bytes and its first track) goes through a stable external merge sort on the card (sorted chunks in RAM, then up to 32-way merges), giving a dense key rank per track, a spelling rank for genres, and each group's first spelling. Folder names are ranked by key, then bytes.
@@ -95,6 +95,23 @@ On the device, `track_tags_read` reads through a `ByteSource` with small bounded
 - Tests decode both files and compare them field by field (`tests/library/library_compare.c`): the fixtures `small_library_tracks.db` and `builder_random/`, and seeded random libraries of 1 to 20,000 tracks (`tests/library/random_library.c`) against the previous in-RAM builder kept as a test-only reference (`tests/library/reference/`).
 
 `library/library_scan` walks the card for it through a `ScanFileSystem` (list a folder, open a file): each folder is read whole, names starting with `.` are dropped, the rest sorted by their UTF-8 bytes (the PC's part-wise path order), and the walk goes depth first without recursion, with one folder open at a time. Files with a stock extension get `track_tags_read` and `library/track_fields` (the fallbacks below), then go to the builder. A file whose tags can't be read is skipped and counted. An eighth of the scratch block (16–96 KB) holds the folder listings unless a separate listing buffer is given; the builder gets the rest and the scan job's scratch file. Its test scans `tests/fixtures/tags` through the simulator's file HAL and must mean the same as `tests/fixtures/tags_library.db`, which `tags_library_up_to_date` re-indexes with the PC tool. On 2026-10-18 it also matched the PC indexer byte for byte on a 50-track sample folder.
+
+## Rippl library format (version 1)
+
+Rippl's own library uses the same sections, order, sorting and meaning as version 3, with 32-bit numbers. It lives in a stream of the segment store (`library/segment_store`, see `docs/architecture.md`), not in `library.db`: `library/segment_stream` gives the builder a sink that appends to a working stream and gives the reader a source over the committed one.
+
+- Header: 256 bytes, magic `RLIB`, `u16` version 1, `u16` section count 10, then ten 16-byte entries: `u32 offset`, `u32 count`, `u16 record size`, `u16` 0, `u32 music count`.
+- No `none` value is stored except a folder's parent: the root's is `0xFFFFFFFF`. Albums have no cover field; the reader reports `LIBRARY_NONE`.
+
+| Record | Size | Layout |
+|---|---|---|
+| Track | 32 | `u32 title`, `u32 path`, `u32 album`, `u32 artist`, `u32 genre`, `u32 folder`, `u32 duration_ms`, `u8 disc`, `u8 number`, `u16` 0 |
+| Album | 24 | `u32 title`, `u32 album_artist`, `u32 genre`, `u32 first_track`, `u32 track_count`, `u16 year`, `u16` 0 |
+| Group | 12 | `u32 name`, `u32 first_link`, `u32 link_count` |
+| Folder | 20 | `u32 name`, `u32 parent`, `u32 subfolder_count`, `u32 first_link`, `u32 track_count` |
+| Title order, links | 4 | `u32` |
+
+`library_open` reads either format from the magic (`Library.wide`), and `library.h` gives 32-bit numbers for both (`LIBRARY_NONE` is `0xFFFFFFFF`; a version-3 `0xFFFF` parent or cover reads as it). Tests build every random library and the PC fixture in both formats and compare them field by field, and build 250,000 tracks with the player's 360 KB through segment scratch into a stream, commit it and read it back (`test_large_library`): about 36 MB, 143 bytes a track.
 
 ## Fallbacks for missing tags
 

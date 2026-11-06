@@ -83,6 +83,10 @@ rippl_add_unit_test(NAME test_segment_scratch
     SOURCES library/test_segment_scratch.c library/fake_card.c
     LIBRARIES rippl_library_scan rippl_library_checks
 )
+rippl_add_unit_test(NAME test_large_library
+    SOURCES library/test_large_library.c library/fake_card.c
+    LIBRARIES rippl_library_scan rippl_library_checks
+)
 add_library(rippl_reference_builder STATIC
     library/reference/reference_builder.c
     library/reference/reference_builder_encode.c

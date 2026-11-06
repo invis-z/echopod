@@ -20,34 +20,6 @@ enum {
     FOLDER_CACHE_BLOCKS = 4
 };
 
-typedef struct Tail {
-    Out out;
-    uint32_t start;
-} Tail;
-
-static bool open_tail(BuilderState *state, Tail *tail, uint8_t *buffer)
-{
-    Store *store = &state->store;
-    if (store->end > store->io.size) {
-        store->failed = true;
-        return false;
-    }
-    tail->start = store->end;
-    out_open(&tail->out, store, (Region){.offset = store->end, .size = store->io.size - store->end},
-             buffer, STREAM_BUFFER);
-    return true;
-}
-
-static bool close_tail(BuilderState *state, Tail *tail, Region *written)
-{
-    if (!out_close(&tail->out)) {
-        return false;
-    }
-    *written = (Region){.offset = tail->start, .size = tail->out.written};
-    state->store.end = (tail->start + tail->out.written + 3) & ~3u;
-    return true;
-}
-
 static int compare_u16(const uint8_t *left, const uint8_t *right, uint32_t offset)
 {
     uint32_t a = builder_get16(left + offset);
@@ -65,16 +37,6 @@ static int compare_u32(const uint8_t *left, const uint8_t *right, uint32_t offse
 static int compare_u8(const uint8_t *left, const uint8_t *right, uint32_t offset)
 {
     return (int)left[offset] - (int)right[offset];
-}
-
-static bool sort_with(BuilderState *state, Region input, SortCompare compare, Region *sorted)
-{
-    SortJob job = {.store = &state->store,
-                   .arena = &state->arena,
-                   .input = input,
-                   .compare = compare,
-                   .context = NULL};
-    return sort_records(&job, sorted);
 }
 
 typedef struct Column {
@@ -147,7 +109,7 @@ static bool emit_album_tuples(BuilderState *state, Prepared *prepared, Region *i
         !open_column(state, &genre, prepared->genre_spelling, count) ||
         !open_column(state, &genre_key, prepared->columns[BUILDER_GENRE], count) ||
         !open_column(state, &title, prepared->columns[BUILDER_TITLE], count) ||
-        !open_tail(state, &tail, tail_buffer)) {
+        !builder_open_tail(state, &tail, tail_buffer)) {
         return false;
     }
     In rows;
@@ -178,38 +140,9 @@ static bool emit_album_tuples(BuilderState *state, Prepared *prepared, Region *i
             return false;
         }
     }
-    bool closed = close_tail(state, &tail, input);
+    bool closed = builder_close_tail(state, &tail, input);
     state->arena.used = mark;
     return closed;
-}
-
-typedef struct Stream {
-    In in;
-    uint8_t *record;
-    bool live;
-} Stream;
-
-static bool open_stream(BuilderState *state, Stream *stream, Region region)
-{
-    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
-    stream->record = arena_take(&state->arena, BUILDER_MAX_RECORD);
-    if (buffer == NULL || stream->record == NULL) {
-        return false;
-    }
-    in_open(&stream->in, &state->store, region.offset, region.offset + region.size, buffer,
-            STREAM_BUFFER);
-    stream->live = false;
-    return true;
-}
-
-static bool pull(Stream *stream)
-{
-    if (in_done(&stream->in)) {
-        stream->live = false;
-        return true;
-    }
-    stream->live = in_record(&stream->in, stream->record);
-    return stream->live;
 }
 
 static bool album_genres(BuilderState *state, Region sorted, Region genres, uint32_t *albums)
@@ -218,8 +151,8 @@ static bool album_genres(BuilderState *state, Region sorted, Region genres, uint
     Stream stream;
     uint8_t *previous = arena_take(&state->arena, ALBUM_TUPLE);
     uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
-    if (previous == NULL || buffer == NULL || !open_stream(state, &stream, sorted) ||
-        !pull(&stream)) {
+    if (previous == NULL || buffer == NULL || !builder_open_stream(state, &stream, sorted) ||
+        !builder_pull(&stream)) {
         return false;
     }
     Out out;
@@ -240,7 +173,7 @@ static bool album_genres(BuilderState *state, Region sorted, Region genres, uint
             while (stream.live && by_album_key(previous, stream.record, NULL) == 0 &&
                    builder_get32(stream.record + 14) == genre) {
                 occurrences++;
-                if (!pull(&stream)) {
+                if (!builder_pull(&stream)) {
                     return false;
                 }
             }
@@ -272,7 +205,7 @@ static bool write_album_rows(BuilderState *state, Region sorted, Region genres, 
     uint8_t *genre_buffer = arena_take(&state->arena, STREAM_BUFFER);
     uint8_t *previous = arena_take(&state->arena, ALBUM_TUPLE);
     if (buffer == NULL || genre_buffer == NULL || previous == NULL ||
-        !open_stream(state, &stream, sorted) || !pull(&stream)) {
+        !builder_open_stream(state, &stream, sorted) || !builder_pull(&stream)) {
         return false;
     }
     Out out;
@@ -293,7 +226,7 @@ static bool write_album_rows(BuilderState *state, Region sorted, Region genres, 
                 year = candidate;
             }
             members++;
-            if (!pull(&stream)) {
+            if (!builder_pull(&stream)) {
                 return false;
             }
         }
@@ -324,13 +257,13 @@ static bool write_members(BuilderState *state, Region sorted, Region members)
     uint32_t mark = state->arena.used;
     Stream stream;
     uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
-    if (buffer == NULL || !open_stream(state, &stream, sorted) || !pull(&stream)) {
+    if (buffer == NULL || !builder_open_stream(state, &stream, sorted) || !builder_pull(&stream)) {
         return false;
     }
     Out out;
     out_open(&out, &state->store, members, buffer, STREAM_BUFFER);
     while (stream.live) {
-        if (!out_put(&out, stream.record + 10, 4) || !pull(&stream)) {
+        if (!out_put(&out, stream.record + 10, 4) || !builder_pull(&stream)) {
             return false;
         }
     }
@@ -359,17 +292,17 @@ static bool group_albums(BuilderState *state, Prepared *prepared, AlbumPhase *al
     Region input;
     Region sorted;
     if (state->store.failed || !emit_album_tuples(state, prepared, &input) ||
-        !sort_with(state, input, by_album_genre, &sorted) ||
+        !builder_sort(state, input, by_album_genre, &sorted) ||
         !album_genres(state, sorted, genres, &albums->count)) {
         return false;
     }
     state->store.end = (input.offset + input.size + 3) & ~3u;
-    if (!sort_with(state, input, by_album_key, &sorted) ||
+    if (!builder_sort(state, input, by_album_key, &sorted) ||
         !write_album_rows(state, sorted, genres, albums->count, albums->pre)) {
         return false;
     }
     state->store.end = (input.offset + input.size + 3) & ~3u;
-    if (!sort_with(state, input, by_album_track, &sorted) ||
+    if (!builder_sort(state, input, by_album_track, &sorted) ||
         !write_members(state, sorted, albums->members)) {
         return false;
     }
@@ -395,7 +328,7 @@ static bool order_albums(BuilderState *state, const AlbumPhase *albums, Region *
     uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
     uint8_t *pre_buffer = arena_take(&state->arena, STREAM_BUFFER);
     Tail tail;
-    if (buffer == NULL || pre_buffer == NULL || !open_tail(state, &tail, buffer)) {
+    if (buffer == NULL || pre_buffer == NULL || !builder_open_tail(state, &tail, buffer)) {
         return false;
     }
     In pre;
@@ -416,11 +349,11 @@ static bool order_albums(BuilderState *state, const AlbumPhase *albums, Region *
         }
     }
     Region input;
-    if (!close_tail(state, &tail, &input)) {
+    if (!builder_close_tail(state, &tail, &input)) {
         return false;
     }
     state->arena.used = arena_mark;
-    return sort_with(state, input, by_album_order, sorted);
+    return builder_sort(state, input, by_album_order, sorted);
 }
 
 typedef struct Placing {
@@ -521,7 +454,7 @@ static bool place_tracks(BuilderState *state, Prepared *prepared, const AlbumPha
     Stream stream;
     uint8_t *members = arena_take(&state->arena, STREAM_BUFFER);
     if (members == NULL || !open_placing(state, prepared, &placing) ||
-        !open_stream(state, &stream, order) || !pull(&stream)) {
+        !builder_open_stream(state, &stream, order) || !builder_pull(&stream)) {
         return false;
     }
     uint32_t position = 0;
@@ -530,7 +463,7 @@ static bool place_tracks(BuilderState *state, Prepared *prepared, const AlbumPha
     for (uint32_t final = 0; stream.live; final++) {
         if (!place_album(state, prepared, albums, &placing, final, stream.record + 18, &position,
                          members) ||
-            !pull(&stream)) {
+            !builder_pull(&stream)) {
             return false;
         }
     }
@@ -633,7 +566,7 @@ static bool emit_group_tuples(BuilderState *state, Prepared *prepared, int field
     Tail tail;
     if (buffer == NULL ||
         !open_column(state, &groups, prepared->columns[field], state->track_count) ||
-        !open_places(state, prepared, &places) || !open_tail(state, &tail, buffer)) {
+        !open_places(state, prepared, &places) || !builder_open_tail(state, &tail, buffer)) {
         return false;
     }
     for (uint32_t track = 0; track < state->track_count; track++) {
@@ -651,7 +584,7 @@ static bool emit_group_tuples(BuilderState *state, Prepared *prepared, int field
             return false;
         }
     }
-    return close_tail(state, &tail, input);
+    return builder_close_tail(state, &tail, input);
 }
 
 static bool write_group_links(BuilderState *state, Region sorted, GroupTable *table)
@@ -659,8 +592,8 @@ static bool write_group_links(BuilderState *state, Region sorted, GroupTable *ta
     Stream stream;
     uint8_t *link_buffer = arena_take(&state->arena, STREAM_BUFFER);
     uint8_t *group_buffer = arena_take(&state->arena, STREAM_BUFFER);
-    if (link_buffer == NULL || group_buffer == NULL || !open_stream(state, &stream, sorted) ||
-        !pull(&stream)) {
+    if (link_buffer == NULL || group_buffer == NULL ||
+        !builder_open_stream(state, &stream, sorted) || !builder_pull(&stream)) {
         return false;
     }
     Out links;
@@ -682,7 +615,7 @@ static bool write_group_links(BuilderState *state, Region sorted, GroupTable *ta
                 total++;
                 last_album = album;
             }
-            if (!pull(&stream)) {
+            if (!builder_pull(&stream)) {
                 return false;
             }
         }
@@ -713,7 +646,7 @@ static bool build_group(BuilderState *state, Prepared *prepared, int field, Grou
         return false;
     }
     state->arena.used = arena_mark;
-    if (!sort_with(state, input, order, &sorted) || !write_group_links(state, sorted, table)) {
+    if (!builder_sort(state, input, order, &sorted) || !write_group_links(state, sorted, table)) {
         return false;
     }
     state->arena.used = arena_mark;
@@ -753,7 +686,7 @@ static bool emit_folder_paths(BuilderState *state, Prepared *prepared, Region *i
     Tail tail;
     if (buffer == NULL ||
         !cache_init(&order, &state->store, &state->arena, COLUMN_BUFFER, FOLDER_CACHE_BLOCKS) ||
-        !open_tail(state, &tail, buffer)) {
+        !builder_open_tail(state, &tail, buffer)) {
         return false;
     }
     for (uint32_t node = 0; node < state->folder_count; node++) {
@@ -778,7 +711,7 @@ static bool emit_folder_paths(BuilderState *state, Prepared *prepared, Region *i
             return false;
         }
     }
-    return close_tail(state, &tail, input);
+    return builder_close_tail(state, &tail, input);
 }
 
 static bool number_folders(BuilderState *state, Prepared *prepared, Region node_at)
@@ -799,8 +732,8 @@ static bool number_folders(BuilderState *state, Prepared *prepared, Region node_
     uint8_t *node_buffer = arena_take(&state->arena, STREAM_BUFFER);
     uint8_t *pair_buffer = arena_take(&state->arena, STREAM_BUFFER);
     if (state->store.failed || node_buffer == NULL || pair_buffer == NULL ||
-        !sort_with(state, input, by_rank_path, &sorted) || !open_stream(state, &stream, sorted) ||
-        !pull(&stream)) {
+        !builder_sort(state, input, by_rank_path, &sorted) ||
+        !builder_open_stream(state, &stream, sorted) || !builder_pull(&stream)) {
         return false;
     }
     out_open(&nodes, &state->store, node_at, node_buffer, STREAM_BUFFER);
@@ -811,7 +744,7 @@ static bool number_folders(BuilderState *state, Prepared *prepared, Region node_
         uint8_t value[4];
         builder_put32(value, node);
         if (!out_put(&nodes, value, sizeof value) || !builder_put_pair(&pairs, node, position) ||
-            !pull(&stream)) {
+            !builder_pull(&stream)) {
             return false;
         }
         position++;
@@ -941,11 +874,12 @@ static bool emit_folder_links(BuilderState *state, Prepared *prepared, Region *i
     Tail tail;
     if (buffer == NULL ||
         !cache_init(&new_index, &state->store, &state->arena, COLUMN_BUFFER, FOLDER_CACHE_BLOCKS) ||
-        !open_tail(state, &tail, buffer) || !emit_child_links(state, prepared, &new_index, &tail) ||
+        !builder_open_tail(state, &tail, buffer) ||
+        !emit_child_links(state, prepared, &new_index, &tail) ||
         !emit_track_links(state, prepared, &new_index, &tail)) {
         return false;
     }
-    return close_tail(state, &tail, input);
+    return builder_close_tail(state, &tail, input);
 }
 
 static bool write_folder_rows(BuilderState *state, Prepared *prepared, Region node_at,
@@ -958,7 +892,7 @@ static bool write_folder_rows(BuilderState *state, Prepared *prepared, Region no
     uint8_t *node_buffer = arena_take(&state->arena, STREAM_BUFFER);
     if (link_buffer == NULL || row_buffer == NULL || node_buffer == NULL ||
         !cache_init(&new_index, &state->store, &state->arena, COLUMN_BUFFER, FOLDER_CACHE_BLOCKS) ||
-        !open_stream(state, &stream, sorted) || !pull(&stream)) {
+        !builder_open_stream(state, &stream, sorted) || !builder_pull(&stream)) {
         return false;
     }
     Out links;
@@ -979,7 +913,7 @@ static bool write_folder_rows(BuilderState *state, Prepared *prepared, Region no
             tracks += stream.record[6] == KIND_TRACK;
             children += stream.record[6] == KIND_CHILD;
             total++;
-            if (!out_put(&links, value, sizeof value) || !pull(&stream)) {
+            if (!out_put(&links, value, sizeof value) || !builder_pull(&stream)) {
                 return false;
             }
         }
@@ -1034,7 +968,7 @@ static bool build_folders(BuilderState *state, Prepared *prepared)
         return false;
     }
     state->arena.used = arena_mark;
-    if (!sort_with(state, input, by_folder_link, &sorted) ||
+    if (!builder_sort(state, input, by_folder_link, &sorted) ||
         !write_folder_rows(state, prepared, node_at, sorted)) {
         return false;
     }
@@ -1060,7 +994,7 @@ static bool emit_title_tuples(BuilderState *state, Prepared *prepared, Region *i
     Tail tail;
     if (buffer == NULL || !open_column(state, &titles, prepared->columns[BUILDER_TITLE], count) ||
         !open_column(state, &artists, prepared->columns[BUILDER_ARTIST], count) ||
-        !open_places(state, prepared, &places) || !open_tail(state, &tail, buffer)) {
+        !open_places(state, prepared, &places) || !builder_open_tail(state, &tail, buffer)) {
         return false;
     }
     for (uint32_t track = 0; track < count; track++) {
@@ -1079,7 +1013,7 @@ static bool emit_title_tuples(BuilderState *state, Prepared *prepared, Region *i
             return false;
         }
     }
-    return close_tail(state, &tail, input);
+    return builder_close_tail(state, &tail, input);
 }
 
 static int by_title_order(const uint8_t *left, const uint8_t *right, const void *context)
@@ -1103,18 +1037,19 @@ static bool build_title_order(BuilderState *state, Prepared *prepared)
         return false;
     }
     state->arena.used = arena_mark;
-    if (!sort_with(state, input, by_title_order, &sorted)) {
+    if (!builder_sort(state, input, by_title_order, &sorted)) {
         return false;
     }
     Stream stream;
     uint8_t *out_buffer = arena_take(&state->arena, STREAM_BUFFER);
-    if (out_buffer == NULL || !open_stream(state, &stream, sorted) || !pull(&stream)) {
+    if (out_buffer == NULL || !builder_open_stream(state, &stream, sorted) ||
+        !builder_pull(&stream)) {
         return false;
     }
     Out out;
     out_open(&out, &state->store, prepared->title_order, out_buffer, STREAM_BUFFER);
     while (stream.live) {
-        if (!out_put(&out, stream.record + 10, 4) || !pull(&stream)) {
+        if (!out_put(&out, stream.record + 10, 4) || !builder_pull(&stream)) {
             return false;
         }
     }
