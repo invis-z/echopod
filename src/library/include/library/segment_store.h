@@ -103,5 +103,7 @@ bool segment_store_read_working(const SegmentStore *store, uint8_t stream, uint3
                                 void *buffer, uint32_t length);
 void segment_store_set_region(SegmentStore *store, uint8_t region, SegmentRegion value);
 void segment_store_set_value(SegmentStore *store, uint8_t index, uint32_t value);
+SegmentResult segment_store_grow(SegmentStore *store, uint8_t stream, uint16_t *number);
+void segment_store_path(uint8_t pool, uint16_t number, char *path);
 SegmentResult segment_store_commit(SegmentStore *store);
 void segment_store_cancel(SegmentStore *store);

@@ -20,7 +20,9 @@ enum {
     PLAYLIST_LINK_BYTES = 2 * 1024 * 1024,
     LINK_BUFFER = 1024,
     NAME_BUFFER = 1024,
-    FOLDER_ENTRY_BYTES = 14
+    FOLDER_ENTRY_BYTES = 14,
+    TRACK_SHARE = 8 * BUILDER_ROW_SIZE,
+    FOLDER_SHARE = 512
 };
 
 static BuilderResult outcome(const BuilderState *state)
@@ -62,9 +64,11 @@ void library_builder_init(LibraryBuilder *builder, void *memory, uint32_t size,
     }
     *state = (BuilderState){.arena = arena, .error = BUILDER_OK, .prepare_done = false};
     store_init(&state->store, scratch, 0);
-    state->rows = store_take(&state->store, BUILDER_MAX_INDEX * BUILDER_ROW_SIZE);
-    state->folders = store_take(&state->store, BUILDER_MAX_INDEX * BUILDER_FOLDER_SIZE);
-    state->folder_hashes = store_take(&state->store, BUILDER_MAX_INDEX * BUILDER_FOLDER_HASH_SIZE);
+    uint32_t track_room = scratch.size / TRACK_SHARE;
+    uint32_t folder_room = scratch.size / FOLDER_SHARE;
+    state->rows = store_take(&state->store, track_room * BUILDER_ROW_SIZE);
+    state->folders = store_take(&state->store, folder_room * BUILDER_FOLDER_SIZE);
+    state->folder_hashes = store_take(&state->store, folder_room * BUILDER_FOLDER_HASH_SIZE);
     state->heap_start = state->store.end;
     ScanTime *scan = arena_take(&state->arena, (uint32_t)sizeof(ScanTime));
     uint8_t *row_buffer = arena_take(&state->arena, ROW_BUFFER);
