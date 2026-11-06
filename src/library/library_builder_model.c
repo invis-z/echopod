@@ -5,16 +5,16 @@
 enum {
     STREAM_BUFFER = 4096,
     COLUMN_BUFFER = 1024,
-    ALBUM_TUPLE = 18,
-    ALBUM_PRE = 16,
-    ORDER_TUPLE = 10 + 16,
-    PLACE_SIZE = 8,
-    ALBUM_FINAL = 20,
-    GROUP_TUPLE = 10,
+    ALBUM_TUPLE = 30,
+    ALBUM_PRE = 26,
+    ORDER_TUPLE = 18 + ALBUM_PRE,
+    PLACE_SIZE = 16,
+    ALBUM_FINAL = 28,
+    GROUP_TUPLE = 16,
     GROUP_ENTRY = 8,
-    LINK_TUPLE = 12,
-    FOLDER_FINAL = 16,
-    TITLE_TUPLE = 8,
+    LINK_TUPLE = 18,
+    FOLDER_FINAL = 24,
+    TITLE_TUPLE = 14,
     KIND_CHILD = 0,
     KIND_TRACK = 1,
     FOLDER_CACHE_BLOCKS = 4
@@ -55,6 +55,13 @@ static int compare_u16(const uint8_t *left, const uint8_t *right, uint32_t offse
     return a < b ? -1 : a > b ? 1 : 0;
 }
 
+static int compare_u32(const uint8_t *left, const uint8_t *right, uint32_t offset)
+{
+    uint32_t a = builder_get32(left + offset);
+    uint32_t b = builder_get32(right + offset);
+    return a < b ? -1 : a > b ? 1 : 0;
+}
+
 static int compare_u8(const uint8_t *left, const uint8_t *right, uint32_t offset)
 {
     return (int)left[offset] - (int)right[offset];
@@ -80,32 +87,32 @@ static bool open_column(BuilderState *state, Column *column, Region region, uint
     if (buffer == NULL) {
         return false;
     }
-    in_open(&column->in, &state->store, region.offset, region.offset + count * 2, buffer,
+    in_open(&column->in, &state->store, region.offset, region.offset + count * 4, buffer,
             COLUMN_BUFFER);
     return true;
 }
 
-static bool next_value(Column *column, uint16_t *value)
+static bool next_value(Column *column, uint32_t *value)
 {
-    uint8_t bytes[2];
+    uint8_t bytes[4];
     if (!in_get(&column->in, bytes, sizeof bytes)) {
         return false;
     }
-    *value = builder_get16(bytes);
+    *value = builder_get32(bytes);
     return true;
 }
 
 static int by_album_key(const uint8_t *left, const uint8_t *right, const void *context)
 {
     (void)context;
-    int artist = compare_u16(left, right, 2);
-    return artist != 0 ? artist : compare_u16(left, right, 4);
+    int artist = compare_u32(left, right, 2);
+    return artist != 0 ? artist : compare_u32(left, right, 6);
 }
 
 static int by_album_genre(const uint8_t *left, const uint8_t *right, const void *context)
 {
     int album = by_album_key(left, right, context);
-    return album != 0 ? album : compare_u16(left, right, 8);
+    return album != 0 ? album : compare_u32(left, right, 14);
 }
 
 static int by_album_track(const uint8_t *left, const uint8_t *right, const void *context)
@@ -114,12 +121,12 @@ static int by_album_track(const uint8_t *left, const uint8_t *right, const void 
     if (album != 0) {
         return album;
     }
-    int disc = compare_u8(left, right, 14);
+    int disc = compare_u8(left, right, 24);
     if (disc != 0) {
         return disc;
     }
-    int number = compare_u8(left, right, 15);
-    return number != 0 ? number : compare_u16(left, right, 12);
+    int number = compare_u8(left, right, 25);
+    return number != 0 ? number : compare_u32(left, right, 20);
 }
 
 static bool emit_album_tuples(BuilderState *state, Prepared *prepared, Region *input)
@@ -149,7 +156,7 @@ static bool emit_album_tuples(BuilderState *state, Prepared *prepared, Region *i
     for (uint32_t track = 0; track < count; track++) {
         uint8_t bytes[BUILDER_ROW_SIZE];
         TrackRow row;
-        uint16_t values[5];
+        uint32_t values[5];
         if (!in_get(&rows, bytes, sizeof bytes) || !next_value(&album_artist, &values[0]) ||
             !next_value(&album, &values[1]) || !next_value(&genre, &values[2]) ||
             !next_value(&title, &values[3]) || !next_value(&genre_key, &values[4])) {
@@ -158,15 +165,15 @@ static bool emit_album_tuples(BuilderState *state, Prepared *prepared, Region *i
         builder_row_decode(bytes, &row);
         uint8_t tuple[ALBUM_TUPLE];
         builder_put16(tuple, ALBUM_TUPLE);
-        builder_put16(tuple + 2, values[0]);
-        builder_put16(tuple + 4, values[1]);
-        builder_put16(tuple + 6, track);
-        builder_put16(tuple + 8, values[2]);
-        builder_put16(tuple + 10, row.year);
-        builder_put16(tuple + 12, values[3]);
-        tuple[14] = row.disc;
-        tuple[15] = row.number;
-        builder_put16(tuple + 16, values[4]);
+        builder_put32(tuple + 2, values[0]);
+        builder_put32(tuple + 6, values[1]);
+        builder_put32(tuple + 10, track);
+        builder_put32(tuple + 14, values[2]);
+        builder_put16(tuple + 18, row.year);
+        builder_put32(tuple + 20, values[3]);
+        tuple[24] = row.disc;
+        tuple[25] = row.number;
+        builder_put32(tuple + 26, values[4]);
         if (!out_put(&tail.out, tuple, sizeof tuple)) {
             return false;
         }
@@ -222,16 +229,16 @@ static bool album_genres(BuilderState *state, Region sorted, Region genres, uint
         for (uint32_t index = 0; index < ALBUM_TUPLE; index++) {
             previous[index] = stream.record[index];
         }
-        uint32_t best_genre = builder_get16(previous + 16);
+        uint32_t best_genre = builder_get32(previous + 26);
         uint32_t best_count = 0;
         uint32_t best_first = BUILDER_UNSET;
         while (stream.live && by_album_key(previous, stream.record, NULL) == 0) {
-            uint32_t genre = builder_get16(stream.record + 8);
-            uint32_t genre_key = builder_get16(stream.record + 16);
-            uint32_t first = builder_get16(stream.record + 6);
+            uint32_t genre = builder_get32(stream.record + 14);
+            uint32_t genre_key = builder_get32(stream.record + 26);
+            uint32_t first = builder_get32(stream.record + 10);
             uint32_t occurrences = 0;
             while (stream.live && by_album_key(previous, stream.record, NULL) == 0 &&
-                   builder_get16(stream.record + 8) == genre) {
+                   builder_get32(stream.record + 14) == genre) {
                 occurrences++;
                 if (!pull(&stream)) {
                     return false;
@@ -243,8 +250,8 @@ static bool album_genres(BuilderState *state, Region sorted, Region genres, uint
                 best_genre = genre_key;
             }
         }
-        uint8_t value[2];
-        builder_put16(value, best_genre);
+        uint8_t value[4];
+        builder_put32(value, best_genre);
         if (!out_put(&out, value, sizeof value)) {
             return false;
         }
@@ -271,7 +278,7 @@ static bool write_album_rows(BuilderState *state, Region sorted, Region genres, 
     Out out;
     out_open(&out, &state->store, albums, buffer, STREAM_BUFFER);
     In genre_of_album;
-    in_open(&genre_of_album, &state->store, genres.offset, genres.offset + count * 2, genre_buffer,
+    in_open(&genre_of_album, &state->store, genres.offset, genres.offset + count * 4, genre_buffer,
             STREAM_BUFFER);
     uint32_t member_start = 0;
     while (stream.live) {
@@ -281,7 +288,7 @@ static bool write_album_rows(BuilderState *state, Region sorted, Region genres, 
         uint32_t members = 0;
         uint32_t year = 0;
         while (stream.live && by_album_key(previous, stream.record, NULL) == 0) {
-            uint32_t candidate = builder_get16(stream.record + 10);
+            uint32_t candidate = builder_get16(stream.record + 18);
             if (candidate != 0 && (year == 0 || candidate < year)) {
                 year = candidate;
             }
@@ -290,18 +297,18 @@ static bool write_album_rows(BuilderState *state, Region sorted, Region genres, 
                 return false;
             }
         }
-        uint8_t genre[2];
+        uint8_t genre[4];
         if (!in_get(&genre_of_album, genre, sizeof genre)) {
             return false;
         }
         uint8_t row[ALBUM_PRE];
-        builder_put16(row, builder_get16(previous + 6));
-        builder_put16(row + 2, builder_get16(previous + 2));
-        builder_put16(row + 4, builder_get16(previous + 4));
-        builder_put16(row + 6, year);
-        builder_put16(row + 8, members);
-        builder_put16(row + 10, builder_get16(genre));
-        builder_put32(row + 12, member_start);
+        builder_put32(row, builder_get32(previous + 10));
+        builder_put32(row + 4, builder_get32(previous + 2));
+        builder_put32(row + 8, builder_get32(previous + 6));
+        builder_put16(row + 12, year);
+        builder_put32(row + 14, members);
+        builder_put32(row + 18, builder_get32(genre));
+        builder_put32(row + 22, member_start);
         member_start += members;
         if (!out_put(&out, row, sizeof row)) {
             return false;
@@ -323,7 +330,7 @@ static bool write_members(BuilderState *state, Region sorted, Region members)
     Out out;
     out_open(&out, &state->store, members, buffer, STREAM_BUFFER);
     while (stream.live) {
-        if (!out_put(&out, stream.record + 6, 2) || !pull(&stream)) {
+        if (!out_put(&out, stream.record + 10, 4) || !pull(&stream)) {
             return false;
         }
     }
@@ -342,13 +349,13 @@ static bool group_albums(BuilderState *state, Prepared *prepared, AlbumPhase *al
 {
     uint32_t count = state->track_count;
     albums->pre = store_take(&state->store, count * ALBUM_PRE + ALBUM_PRE);
-    albums->members = store_take(&state->store, count * 2 + 2);
+    albums->members = store_take(&state->store, count * 4 + 4);
     if (state->store.failed) {
         return false;
     }
     uint32_t arena_mark = state->arena.used;
     uint32_t store_mark = state->store.end;
-    Region genres = store_take(&state->store, count * 2 + 2);
+    Region genres = store_take(&state->store, count * 4 + 4);
     Region input;
     Region sorted;
     if (state->store.failed || !emit_album_tuples(state, prepared, &input) ||
@@ -374,12 +381,12 @@ static bool group_albums(BuilderState *state, Prepared *prepared, AlbumPhase *al
 static int by_album_order(const uint8_t *left, const uint8_t *right, const void *context)
 {
     (void)context;
-    int title = compare_u16(left, right, 2);
+    int title = compare_u32(left, right, 2);
     if (title != 0) {
         return title;
     }
-    int artist = compare_u16(left, right, 4);
-    return artist != 0 ? artist : compare_u16(left, right, 6);
+    int artist = compare_u32(left, right, 6);
+    return artist != 0 ? artist : compare_u32(left, right, 10);
 }
 
 static bool order_albums(BuilderState *state, const AlbumPhase *albums, Region *sorted)
@@ -396,14 +403,14 @@ static bool order_albums(BuilderState *state, const AlbumPhase *albums, Region *
             pre_buffer, STREAM_BUFFER);
     for (uint32_t album = 0; album < albums->count; album++) {
         uint8_t tuple[ORDER_TUPLE];
-        if (!in_get(&pre, tuple + 10, ALBUM_PRE)) {
+        if (!in_get(&pre, tuple + 18, ALBUM_PRE)) {
             return false;
         }
         builder_put16(tuple, ORDER_TUPLE);
-        builder_put16(tuple + 2, builder_get16(tuple + 14));
-        builder_put16(tuple + 4, builder_get16(tuple + 12));
-        builder_put16(tuple + 6, builder_get16(tuple + 10));
-        builder_put16(tuple + 8, album);
+        builder_put32(tuple + 2, builder_get32(tuple + 18 + 8));
+        builder_put32(tuple + 6, builder_get32(tuple + 18 + 4));
+        builder_put32(tuple + 10, builder_get32(tuple + 18));
+        builder_put32(tuple + 14, album);
         if (!out_put(&tail.out, tuple, sizeof tuple)) {
             return false;
         }
@@ -448,17 +455,17 @@ static bool open_placing(BuilderState *state, Prepared *prepared, Placing *placi
 static bool place_member(Placing *placing, uint32_t track, uint32_t position, uint32_t album,
                          const uint8_t *pre)
 {
-    uint8_t value[2];
+    uint8_t value[4];
     uint8_t place[PLACE_SIZE];
-    builder_put16(place, position);
-    builder_put16(place + 2, album);
-    builder_put16(place + 4, builder_get16(pre + 6));
-    builder_put16(place + 6, builder_get16(pre + 4));
-    builder_put16(value, track);
+    builder_put32(place, position);
+    builder_put32(place + 4, album);
+    builder_put32(place + 8, builder_get16(pre + 12));
+    builder_put32(place + 12, builder_get32(pre + 8));
+    builder_put32(value, track);
     if (!out_put(&placing->final_tracks, value, sizeof value)) {
         return false;
     }
-    builder_put16(value, album);
+    builder_put32(value, album);
     return out_put(&placing->track_album, value, sizeof value) &&
            builder_put_entry(&placing->places, track, place, sizeof place);
 }
@@ -467,26 +474,26 @@ static bool place_album(BuilderState *state, Prepared *prepared, const AlbumPhas
                         Placing *placing, uint32_t final, const uint8_t *pre, uint32_t *position,
                         uint8_t *members)
 {
-    uint32_t first_seen = builder_get16(pre);
-    uint32_t member_count = builder_get16(pre + 8);
-    uint32_t member_start = builder_get32(pre + 12);
+    uint32_t first_seen = builder_get32(pre);
+    uint32_t member_count = builder_get32(pre + 14);
+    uint32_t member_start = builder_get32(pre + 22);
     uint32_t first_track = *position;
     for (uint32_t done = 0; done < member_count;) {
         uint32_t step =
-            member_count - done < STREAM_BUFFER / 2 ? member_count - done : STREAM_BUFFER / 2;
-        if (!store_read(&state->store, albums->members.offset + (member_start + done) * 2, members,
-                        step * 2)) {
+            member_count - done < STREAM_BUFFER / 4 ? member_count - done : STREAM_BUFFER / 4;
+        if (!store_read(&state->store, albums->members.offset + (member_start + done) * 4, members,
+                        step * 4)) {
             return false;
         }
         for (uint32_t index = 0; index < step; index++) {
-            if (!place_member(placing, builder_get16(members + 2 * index), (*position)++, final,
+            if (!place_member(placing, builder_get32(members + 4 * index), (*position)++, final,
                               pre)) {
                 return false;
             }
         }
         done += step;
     }
-    if (builder_get16(pre + 4) < prepared->music_ranks[BUILDER_ALBUM]) {
+    if (builder_get32(pre + 8) < prepared->music_ranks[BUILDER_ALBUM]) {
         prepared->music_albums = final + 1;
         prepared->music_tracks = *position;
     }
@@ -497,13 +504,12 @@ static bool place_album(BuilderState *state, Prepared *prepared, const AlbumPhas
     uint8_t record[ALBUM_FINAL];
     builder_put32(record, row.text[BUILDER_ALBUM]);
     builder_put16(record + 4, row.length[BUILDER_ALBUM]);
-    builder_put16(record + 6, builder_get16(pre + 2));
-    builder_put16(record + 8, builder_get16(pre + 10));
-    builder_put16(record + 10, builder_get16(pre + 6));
-    builder_put16(record + 12, first_track);
-    builder_put16(record + 14, member_count);
-    builder_put16(record + 16, builder_get16(pre + 4));
-    builder_put16(record + 18, 0);
+    builder_put32(record + 6, builder_get32(pre + 4));
+    builder_put32(record + 10, builder_get32(pre + 18));
+    builder_put16(record + 14, builder_get16(pre + 12));
+    builder_put32(record + 16, first_track);
+    builder_put32(record + 20, member_count);
+    builder_put32(record + 24, builder_get32(pre + 8));
     return out_put(&placing->albums, record, sizeof record);
 }
 
@@ -522,7 +528,7 @@ static bool place_tracks(BuilderState *state, Prepared *prepared, const AlbumPha
     prepared->music_albums = 0;
     prepared->music_tracks = 0;
     for (uint32_t final = 0; stream.live; final++) {
-        if (!place_album(state, prepared, albums, &placing, final, stream.record + 10, &position,
+        if (!place_album(state, prepared, albums, &placing, final, stream.record + 18, &position,
                          members) ||
             !pull(&stream)) {
             return false;
@@ -540,8 +546,8 @@ static bool place_tracks(BuilderState *state, Prepared *prepared, const AlbumPha
 static bool build_albums(BuilderState *state, Prepared *prepared)
 {
     uint32_t count = state->track_count;
-    prepared->final_tracks = store_take(&state->store, count * 2 + 2);
-    prepared->track_album = store_take(&state->store, count * 2 + 2);
+    prepared->final_tracks = store_take(&state->store, count * 4 + 4);
+    prepared->track_album = store_take(&state->store, count * 4 + 4);
     prepared->track_place = store_take(&state->store, count * PLACE_SIZE + PLACE_SIZE);
     prepared->albums = store_take(&state->store, count * ALBUM_FINAL + ALBUM_FINAL);
     if (state->store.failed) {
@@ -586,34 +592,37 @@ static bool next_place(TrackPlaces *places)
     if (!in_get(&places->in, place, sizeof place)) {
         return false;
     }
-    places->position = builder_get16(place);
-    places->album = builder_get16(place + 2);
-    places->year = builder_get16(place + 4);
-    places->title = builder_get16(place + 6);
+    places->position = builder_get32(place);
+    places->album = builder_get32(place + 4);
+    places->year = builder_get32(place + 8);
+    places->title = builder_get32(place + 12);
     return true;
 }
 
 static int by_group_chronology(const uint8_t *left, const uint8_t *right, const void *context)
 {
     (void)context;
-    for (uint32_t offset = 2; offset <= 8; offset += 2) {
-        int order = compare_u16(left, right, offset);
-        if (order != 0) {
-            return order;
-        }
+    int group = compare_u32(left, right, 2);
+    if (group != 0) {
+        return group;
     }
-    return 0;
+    int year = compare_u16(left, right, 6);
+    if (year != 0) {
+        return year;
+    }
+    int title = compare_u32(left, right, 8);
+    return title != 0 ? title : compare_u32(left, right, 12);
 }
 
 static int by_group_title(const uint8_t *left, const uint8_t *right, const void *context)
 {
     (void)context;
-    int group = compare_u16(left, right, 2);
+    int group = compare_u32(left, right, 2);
     if (group != 0) {
         return group;
     }
-    int title = compare_u16(left, right, 6);
-    return title != 0 ? title : compare_u16(left, right, 8);
+    int title = compare_u32(left, right, 8);
+    return title != 0 ? title : compare_u32(left, right, 12);
 }
 
 static bool emit_group_tuples(BuilderState *state, Prepared *prepared, int field, Region *input)
@@ -628,16 +637,16 @@ static bool emit_group_tuples(BuilderState *state, Prepared *prepared, int field
         return false;
     }
     for (uint32_t track = 0; track < state->track_count; track++) {
-        uint16_t group = 0;
+        uint32_t group = 0;
         if (!next_value(&groups, &group) || !next_place(&places)) {
             return false;
         }
         uint8_t tuple[GROUP_TUPLE];
         builder_put16(tuple, GROUP_TUPLE);
-        builder_put16(tuple + 2, group);
-        builder_put16(tuple + 4, places.year);
-        builder_put16(tuple + 6, places.title);
-        builder_put16(tuple + 8, places.album);
+        builder_put32(tuple + 2, group);
+        builder_put16(tuple + 6, places.year);
+        builder_put32(tuple + 8, places.title);
+        builder_put32(tuple + 12, places.album);
         if (!out_put(&tail.out, tuple, sizeof tuple)) {
             return false;
         }
@@ -662,11 +671,11 @@ static bool write_group_links(BuilderState *state, Region sorted, GroupTable *ta
     for (uint32_t group = 0; group < table->count; group++) {
         uint32_t first = total;
         uint32_t last_album = BUILDER_UNSET;
-        while (stream.live && builder_get16(stream.record + 2) == group) {
-            uint32_t album = builder_get16(stream.record + 8);
+        while (stream.live && builder_get32(stream.record + 2) == group) {
+            uint32_t album = builder_get32(stream.record + 12);
             if (album != last_album) {
-                uint8_t value[2];
-                builder_put16(value, album);
+                uint8_t value[4];
+                builder_put32(value, album);
                 if (!out_put(&links, value, sizeof value)) {
                     return false;
                 }
@@ -679,8 +688,7 @@ static bool write_group_links(BuilderState *state, Region sorted, GroupTable *ta
         }
         uint8_t entry[GROUP_ENTRY];
         builder_put32(entry, first);
-        builder_put16(entry + 4, total - first);
-        builder_put16(entry + 6, 0);
+        builder_put32(entry + 4, total - first);
         if (!out_put(&groups, entry, sizeof entry)) {
             return false;
         }
@@ -693,7 +701,7 @@ static bool build_group(BuilderState *state, Prepared *prepared, int field, Grou
                         SortCompare order)
 {
     table->groups = store_take(&state->store, table->count * GROUP_ENTRY + GROUP_ENTRY);
-    table->links = store_take(&state->store, state->track_count * 2 + 2);
+    table->links = store_take(&state->store, state->track_count * 4 + 4);
     if (state->store.failed) {
         return false;
     }
@@ -716,11 +724,11 @@ static bool build_group(BuilderState *state, Prepared *prepared, int field, Grou
 static int by_rank_path(const uint8_t *left, const uint8_t *right, const void *context)
 {
     (void)context;
-    uint32_t left_depth = (builder_get16(left) - 4u) / 2;
-    uint32_t right_depth = (builder_get16(right) - 4u) / 2;
+    uint32_t left_depth = (builder_get16(left) - 6u) / 4;
+    uint32_t right_depth = (builder_get16(right) - 6u) / 4;
     uint32_t shorter = left_depth < right_depth ? left_depth : right_depth;
     for (uint32_t level = 0; level < shorter; level++) {
-        int order = compare_u16(left, right, 4 + 2 * level);
+        int order = compare_u32(left, right, 6 + 4 * level);
         if (order != 0) {
             return order;
         }
@@ -730,11 +738,11 @@ static int by_rank_path(const uint8_t *left, const uint8_t *right, const void *c
 
 static bool column_at(Cache *cache, Region column, uint32_t index, uint32_t *value)
 {
-    uint8_t bytes[2];
-    if (!cache_read(cache, column.offset + index * 2, bytes, sizeof bytes)) {
+    uint8_t bytes[4];
+    if (!cache_read(cache, column.offset + index * 4, bytes, sizeof bytes)) {
         return false;
     }
-    *value = builder_get16(bytes);
+    *value = builder_get32(bytes);
     return true;
 }
 
@@ -760,13 +768,13 @@ static bool emit_folder_paths(BuilderState *state, Prepared *prepared, Region *i
             depth++;
             walk = row.parent;
         }
-        uint8_t record[4 + 2 * BUILDER_MAX_DEPTH];
-        builder_put16(record, 4 + 2 * depth);
-        builder_put16(record + 2, node);
+        uint8_t record[6 + 4 * BUILDER_MAX_DEPTH];
+        builder_put16(record, 6 + 4 * depth);
+        builder_put32(record + 2, node);
         for (uint32_t level = 0; level < depth; level++) {
-            builder_put16(record + 4 + 2 * level, chain[depth - 1 - level]);
+            builder_put32(record + 6 + 4 * level, chain[depth - 1 - level]);
         }
-        if (!out_put(&tail.out, record, 4 + 2 * depth)) {
+        if (!out_put(&tail.out, record, 6 + 4 * depth)) {
             return false;
         }
     }
@@ -799,9 +807,9 @@ static bool number_folders(BuilderState *state, Prepared *prepared, Region node_
     out_open(&pairs, &state->store, new_index_pairs, pair_buffer, STREAM_BUFFER);
     uint32_t position = 0;
     while (stream.live) {
-        uint32_t node = builder_get16(stream.record + 2);
-        uint8_t value[2];
-        builder_put16(value, node);
+        uint32_t node = builder_get32(stream.record + 2);
+        uint8_t value[4];
+        builder_put32(value, node);
         if (!out_put(&nodes, value, sizeof value) || !builder_put_pair(&pairs, node, position) ||
             !pull(&stream)) {
             return false;
@@ -835,8 +843,8 @@ static bool measure_folders(BuilderState *state, Prepared *prepared)
             length += row.length + 1u;
             walk = row.parent;
         }
-        uint8_t value[2];
-        builder_put16(value, length);
+        uint8_t value[4];
+        builder_put32(value, length);
         if (!out_put(&out, value, sizeof value)) {
             return false;
         }
@@ -849,18 +857,18 @@ static bool measure_folders(BuilderState *state, Prepared *prepared)
 static int by_folder_link(const uint8_t *left, const uint8_t *right, const void *context)
 {
     (void)context;
-    int folder = compare_u16(left, right, 2);
+    int folder = compare_u32(left, right, 2);
     if (folder != 0) {
         return folder;
     }
-    for (uint32_t offset = 4; offset <= 6; offset++) {
+    for (uint32_t offset = 6; offset <= 8; offset++) {
         int order = compare_u8(left, right, offset);
         if (order != 0) {
             return order;
         }
     }
-    int key = compare_u16(left, right, 8);
-    return key != 0 ? key : compare_u16(left, right, 10);
+    int key = compare_u32(left, right, 10);
+    return key != 0 ? key : compare_u32(left, right, 14);
 }
 
 static bool put_link_tuple(Tail *tail, uint32_t folder, uint32_t kind, uint32_t disc,
@@ -868,13 +876,13 @@ static bool put_link_tuple(Tail *tail, uint32_t folder, uint32_t kind, uint32_t 
 {
     uint8_t tuple[LINK_TUPLE];
     builder_put16(tuple, LINK_TUPLE);
-    builder_put16(tuple + 2, folder);
-    tuple[4] = (uint8_t)kind;
-    tuple[5] = (uint8_t)disc;
-    tuple[6] = (uint8_t)number;
-    tuple[7] = 0;
-    builder_put16(tuple + 8, key);
-    builder_put16(tuple + 10, value);
+    builder_put32(tuple + 2, folder);
+    tuple[6] = (uint8_t)kind;
+    tuple[7] = (uint8_t)disc;
+    tuple[8] = (uint8_t)number;
+    tuple[9] = 0;
+    builder_put32(tuple + 10, key);
+    builder_put32(tuple + 14, value);
     return out_put(&tail->out, tuple, sizeof tuple);
 }
 
@@ -910,7 +918,7 @@ static bool emit_track_links(BuilderState *state, Prepared *prepared, Cache *new
     for (uint32_t track = 0; track < state->track_count; track++) {
         uint8_t bytes[BUILDER_ROW_SIZE];
         TrackRow row;
-        uint16_t file = 0;
+        uint32_t file = 0;
         uint32_t folder = 0;
         if (!in_get(&rows, bytes, sizeof bytes) || !next_value(&files, &file) ||
             !next_place(&places)) {
@@ -958,30 +966,30 @@ static bool write_folder_rows(BuilderState *state, Prepared *prepared, Region no
     In nodes;
     out_open(&links, &state->store, prepared->folder_links, link_buffer, STREAM_BUFFER);
     out_open(&rows, &state->store, prepared->folders_final, row_buffer, STREAM_BUFFER);
-    in_open(&nodes, &state->store, node_at.offset, node_at.offset + state->folder_count * 2,
+    in_open(&nodes, &state->store, node_at.offset, node_at.offset + state->folder_count * 4,
             node_buffer, STREAM_BUFFER);
     uint32_t total = 0;
     for (uint32_t position = 0; position < state->folder_count; position++) {
         uint32_t first = total;
         uint32_t tracks = 0;
         uint32_t children = 0;
-        while (stream.live && builder_get16(stream.record + 2) == position) {
-            uint8_t value[2];
-            builder_put16(value, builder_get16(stream.record + 10));
-            tracks += stream.record[4] == KIND_TRACK;
-            children += stream.record[4] == KIND_CHILD;
+        while (stream.live && builder_get32(stream.record + 2) == position) {
+            uint8_t value[4];
+            builder_put32(value, builder_get32(stream.record + 14));
+            tracks += stream.record[6] == KIND_TRACK;
+            children += stream.record[6] == KIND_CHILD;
             total++;
             if (!out_put(&links, value, sizeof value) || !pull(&stream)) {
                 return false;
             }
         }
-        uint8_t node_bytes[2];
+        uint8_t node_bytes[4];
         FolderRow row;
-        uint32_t parent = BUILDER_NONE;
+        uint32_t parent = BUILDER_NO_INDEX;
         if (!in_get(&nodes, node_bytes, sizeof node_bytes)) {
             return false;
         }
-        uint32_t node = builder_get16(node_bytes);
+        uint32_t node = builder_get32(node_bytes);
         if (!builder_read_folder(&prepared->folders, state, node, &row) ||
             (node != 0 &&
              !column_at(&new_index, prepared->folder_new_index, row.parent, &parent))) {
@@ -990,10 +998,11 @@ static bool write_folder_rows(BuilderState *state, Prepared *prepared, Region no
         uint8_t record[FOLDER_FINAL];
         builder_put32(record, row.name);
         builder_put16(record + 4, row.length);
-        builder_put16(record + 6, parent);
-        builder_put16(record + 8, children);
-        builder_put16(record + 10, tracks);
-        builder_put32(record + 12, first);
+        builder_put32(record + 6, parent);
+        builder_put32(record + 10, children);
+        builder_put32(record + 14, tracks);
+        builder_put32(record + 18, first);
+        builder_put16(record + 22, 0);
         if (!out_put(&rows, record, sizeof record)) {
             return false;
         }
@@ -1005,16 +1014,16 @@ static bool write_folder_rows(BuilderState *state, Prepared *prepared, Region no
 static bool build_folders(BuilderState *state, Prepared *prepared)
 {
     uint32_t count = state->folder_count;
-    prepared->folder_new_index = store_take(&state->store, count * 2 + 2);
-    prepared->folder_path_length = store_take(&state->store, count * 2 + 2);
+    prepared->folder_new_index = store_take(&state->store, count * 4 + 4);
+    prepared->folder_path_length = store_take(&state->store, count * 4 + 4);
     prepared->folders_final = store_take(&state->store, count * FOLDER_FINAL + FOLDER_FINAL);
-    prepared->folder_links = store_take(&state->store, (count + state->track_count) * 2 + 2);
+    prepared->folder_links = store_take(&state->store, (count + state->track_count) * 4 + 4);
     if (state->store.failed) {
         return false;
     }
     uint32_t arena_mark = state->arena.used;
     uint32_t store_mark = state->store.end;
-    Region node_at = store_take(&state->store, count * 2 + 2);
+    Region node_at = store_take(&state->store, count * 4 + 4);
     if (state->store.failed || !number_folders(state, prepared, node_at) ||
         !measure_folders(state, prepared)) {
         return false;
@@ -1037,8 +1046,8 @@ static bool build_folders(BuilderState *state, Prepared *prepared)
 static int by_title_then_artist(const uint8_t *left, const uint8_t *right, const void *context)
 {
     (void)context;
-    int title = compare_u16(left, right, 2);
-    return title != 0 ? title : compare_u16(left, right, 4);
+    int title = compare_u32(left, right, 2);
+    return title != 0 ? title : compare_u32(left, right, 6);
 }
 
 static bool emit_title_tuples(BuilderState *state, Prepared *prepared, Region *input)
@@ -1055,17 +1064,17 @@ static bool emit_title_tuples(BuilderState *state, Prepared *prepared, Region *i
         return false;
     }
     for (uint32_t track = 0; track < count; track++) {
-        uint16_t title = 0;
-        uint16_t artist = 0;
+        uint32_t title = 0;
+        uint32_t artist = 0;
         if (!next_value(&titles, &title) || !next_value(&artists, &artist) ||
             !next_place(&places)) {
             return false;
         }
         uint8_t tuple[TITLE_TUPLE];
         builder_put16(tuple, TITLE_TUPLE);
-        builder_put16(tuple + 2, title);
-        builder_put16(tuple + 4, artist);
-        builder_put16(tuple + 6, places.position);
+        builder_put32(tuple + 2, title);
+        builder_put32(tuple + 6, artist);
+        builder_put32(tuple + 10, places.position);
         if (!out_put(&tail.out, tuple, sizeof tuple)) {
             return false;
         }
@@ -1076,13 +1085,13 @@ static bool emit_title_tuples(BuilderState *state, Prepared *prepared, Region *i
 static int by_title_order(const uint8_t *left, const uint8_t *right, const void *context)
 {
     int order = by_title_then_artist(left, right, context);
-    return order != 0 ? order : compare_u16(left, right, 6);
+    return order != 0 ? order : compare_u32(left, right, 10);
 }
 
 static bool build_title_order(BuilderState *state, Prepared *prepared)
 {
     uint32_t count = state->track_count;
-    prepared->title_order = store_take(&state->store, count * 2 + 2);
+    prepared->title_order = store_take(&state->store, count * 4 + 4);
     if (state->store.failed) {
         return false;
     }
@@ -1105,7 +1114,7 @@ static bool build_title_order(BuilderState *state, Prepared *prepared)
     Out out;
     out_open(&out, &state->store, prepared->title_order, out_buffer, STREAM_BUFFER);
     while (stream.live) {
-        if (!out_put(&out, stream.record + 6, 2) || !pull(&stream)) {
+        if (!out_put(&out, stream.record + 10, 4) || !pull(&stream)) {
             return false;
         }
     }

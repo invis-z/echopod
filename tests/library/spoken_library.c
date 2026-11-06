@@ -127,7 +127,7 @@ void spoken_library_close(SpokenLibrary *spoken)
     spoken->bytes = NULL;
 }
 
-uint16_t spoken_library_track(const Library *library, const char *path)
+uint32_t spoken_library_track(const Library *library, const char *path)
 {
     uint32_t count = library_count(library, LIBRARY_TRACKS);
     for (uint32_t index = 0; index < count; index++) {
@@ -136,7 +136,7 @@ uint16_t spoken_library_track(const Library *library, const char *path)
         if (library_read_track(library, index, &track) &&
             library_read_string(library, track.path, found, sizeof found) &&
             strcmp(found, path) == 0) {
-            return (uint16_t)index;
+            return (uint32_t)index;
         }
     }
     fail("no such track");

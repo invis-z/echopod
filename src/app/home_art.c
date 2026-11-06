@@ -23,7 +23,7 @@ static uint32_t album_count(const HomeArt *art)
     return art->store->available ? library_music_count(&art->store->library, LIBRARY_ALBUMS) : 0;
 }
 
-static bool playing_album(const HomeArt *art, uint16_t *album)
+static bool playing_album(const HomeArt *art, uint32_t *album)
 {
     PlayerStatus status = player_status(art->player);
     LibraryTrack track;
@@ -37,15 +37,15 @@ static bool playing_album(const HomeArt *art, uint16_t *album)
 static void start_search(HomeArt *art, uint32_t from, uint32_t count, uint32_t now_ms)
 {
     art->searching = true;
-    art->probe = (uint16_t)(from % count);
+    art->probe = (uint32_t)(from % count);
     art->probes_left = count;
     art->next_change_ms = now_ms + HOME_ART_CYCLE_MS;
 }
 
 static bool probe_next(HomeArt *art, uint32_t count)
 {
-    uint16_t album = (uint16_t)(art->probe % count);
-    art->probe = (uint16_t)((album + 1u) % count);
+    uint32_t album = (uint32_t)(art->probe % count);
+    art->probe = (uint32_t)((album + 1u) % count);
     art->probes_left--;
     if (!cover_cache_has_cover(art->covers, album)) {
         return false;
@@ -80,7 +80,7 @@ static void forget_album(HomeArt *art)
     art->chosen = false;
 }
 
-static void follow_playing(HomeArt *art, uint16_t album)
+static void follow_playing(HomeArt *art, uint32_t album)
 {
     forget_album(art);
     art->album = album;
@@ -91,7 +91,7 @@ void home_art_update(void *context, uint32_t now_ms)
 {
     HomeArt *art = context;
     uint32_t count = album_count(art);
-    uint16_t album;
+    uint32_t album;
     if (count == 0) {
         forget_album(art);
     } else if (playing_album(art, &album)) {

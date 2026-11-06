@@ -227,7 +227,7 @@ static void playlists_list_their_tracks_in_order(void)
     CHECK(label_is(library, tracks, item_at(library, tracks, 2), "Jóga"));
 }
 
-static uint32_t expected_tracks(Library *library, BrowseQuery albums, uint16_t *tracks)
+static uint32_t expected_tracks(Library *library, BrowseQuery albums, uint32_t *tracks)
 {
     uint32_t count = 0;
     for (uint32_t album = 0; album < browse_count(library, albums); album++) {
@@ -241,7 +241,7 @@ static uint32_t expected_tracks(Library *library, BrowseQuery albums, uint16_t *
 
 static void check_group_tracks(Library *library, BrowseQuery albums)
 {
-    uint16_t expected[16];
+    uint32_t expected[16];
     uint32_t count = expected_tracks(library, albums, expected);
     BrowseQuery all = browse_group_tracks(albums);
     CHECK_EQUAL(BROWSE_GROUP_TRACKS, all.kind);

@@ -401,7 +401,7 @@ static ScreenAction open_child(BrowseScreen *browse, BrowseItem item)
     return screen_action_push(next);
 }
 
-static bool playing_folder(const BrowseScreen *browse, uint16_t folder)
+static bool playing_folder(const BrowseScreen *browse, uint32_t folder)
 {
     LibraryTrack record;
     PlayerStatus status = player_status(browse->pool->config.player);
@@ -425,7 +425,7 @@ static ScreenAction resume_book(BrowseScreen *browse, BrowseItem item)
         }
         return screen_action_push(config->now_playing);
     }
-    uint16_t chapter = spoken_store_resume_chapter(config->spoken, item.index);
+    uint32_t chapter = spoken_store_resume_chapter(config->spoken, item.index);
     return start_list(browse, child, (uint32_t)folder.subfolder_count + chapter);
 }
 
@@ -538,7 +538,7 @@ static ScreenAction add_song_to_up_next(void *context)
     return queue_song(context, false);
 }
 
-static ScreenAction open_song_actions(BrowseScreen *browse, int index, uint16_t track)
+static ScreenAction open_song_actions(BrowseScreen *browse, int index, uint32_t track)
 {
     BrowsePool *pool = browse->pool;
     SongActions *actions = &pool->song_actions;
@@ -707,7 +707,7 @@ Screen *browse_pool_open_favorites(BrowsePool *pool, int level)
 
 static BrowseQuery shelf_query(const BrowsePool *pool, SpokenKind shelf, bool *found)
 {
-    uint16_t folder = 0;
+    uint32_t folder = 0;
     BrowseQuery query = browse_root_query(BROWSE_FOLDER);
     *found = spoken_shelf_folder(pool->config.library, shelf, &folder);
     if (*found) {

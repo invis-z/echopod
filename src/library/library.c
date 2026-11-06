@@ -15,10 +15,27 @@ enum {
     FOLDER_SIZE = 16,
     INDEX_SIZE = 2,
     STRING_SIZE = 1,
-    BITS_PER_BYTE = 8
+    BITS_PER_BYTE = 8,
+    WIDE_SECTION_ENTRY_SIZE = 16,
+    WIDE_TRACK_SIZE = 32,
+    WIDE_ALBUM_SIZE = 24,
+    WIDE_GROUP_SIZE = 12,
+    WIDE_FOLDER_SIZE = 20,
+    WIDE_INDEX_SIZE = 4,
+    MAX_RECORD = WIDE_TRACK_SIZE,
+    NARROW_NONE = 0xFFFF
 };
 
-static const uint8_t MAGIC[MAGIC_SIZE] = {'E', 'M', 'D', 'B'};
+#define NARROW_MAGIC UINT32_C(0x42444D45)
+#define WIDE_MAGIC UINT32_C(0x42494C52)
+
+static const uint16_t WIDE_RECORD_SIZES[LIBRARY_SECTION_COUNT] = {
+    [LIBRARY_TRACKS] = WIDE_TRACK_SIZE,      [LIBRARY_ALBUMS] = WIDE_ALBUM_SIZE,
+    [LIBRARY_ARTISTS] = WIDE_GROUP_SIZE,     [LIBRARY_ALBUM_ARTISTS] = WIDE_GROUP_SIZE,
+    [LIBRARY_GENRES] = WIDE_GROUP_SIZE,      [LIBRARY_FOLDERS] = WIDE_FOLDER_SIZE,
+    [LIBRARY_TITLE_ORDER] = WIDE_INDEX_SIZE, [LIBRARY_PLAYLISTS] = WIDE_GROUP_SIZE,
+    [LIBRARY_LINKS] = WIDE_INDEX_SIZE,       [LIBRARY_STRINGS] = STRING_SIZE,
+};
 
 static const uint16_t RECORD_SIZES[LIBRARY_SECTION_COUNT] = {
     [LIBRARY_TRACKS] = TRACK_SIZE,      [LIBRARY_ALBUMS] = ALBUM_SIZE,
@@ -43,53 +60,54 @@ static bool read_source(const Library *library, uint32_t offset, void *buffer, u
     return library->source.read(library->source.context, offset, buffer, length);
 }
 
-static bool magic_matches(const uint8_t *header)
+static LibrarySectionInfo decode_section(const uint8_t *header, int section, bool wide)
 {
-    for (int index = 0; index < MAGIC_SIZE; index++) {
-        if (header[index] != MAGIC[index]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static LibrarySectionInfo decode_section(const uint8_t *header, int section)
-{
-    uint32_t entry = (uint32_t)(SECTION_TABLE + section * SECTION_ENTRY_SIZE);
+    uint32_t size = wide ? WIDE_SECTION_ENTRY_SIZE : SECTION_ENTRY_SIZE;
+    uint32_t entry = (uint32_t)SECTION_TABLE + (uint32_t)section * size;
     return (LibrarySectionInfo){
         .offset = u32_at(header, entry),
         .count = u32_at(header, entry + 4),
         .record_size = u16_at(header, entry + 8),
-        .music = u16_at(header, entry + 10),
+        .music = wide ? u32_at(header, entry + 12) : u16_at(header, entry + 10),
     };
 }
 
-static bool section_fits(LibrarySectionInfo section, uint16_t expected_size, uint32_t size)
+static bool section_fits(LibrarySectionInfo section, uint16_t expected_size, uint32_t header_size,
+                         uint32_t size)
 {
     uint64_t end = (uint64_t)section.offset + (uint64_t)section.count * section.record_size;
-    return section.record_size == expected_size && section.offset >= LIBRARY_HEADER_SIZE &&
-           end <= size;
+    return section.record_size == expected_size && section.offset >= header_size && end <= size;
 }
 
 static LibraryStatus decode_header(Library *library, const uint8_t *header, uint32_t size)
 {
-    if (!magic_matches(header)) {
+    uint32_t magic = u32_at(header, 0);
+    bool wide = magic == WIDE_MAGIC;
+    if (!wide && magic != NARROW_MAGIC) {
         return LIBRARY_BAD_MAGIC;
     }
-    if (u16_at(header, VERSION_FIELD) != LIBRARY_VERSION) {
+    if (u16_at(header, VERSION_FIELD) != (wide ? LIBRARY_WIDE_VERSION : LIBRARY_VERSION)) {
         return LIBRARY_BAD_VERSION;
     }
     if (u16_at(header, SECTION_COUNT_FIELD) != LIBRARY_SECTION_COUNT) {
         return LIBRARY_BAD_LAYOUT;
     }
+    const uint16_t *sizes = wide ? WIDE_RECORD_SIZES : RECORD_SIZES;
+    uint32_t header_size = wide ? LIBRARY_WIDE_HEADER_SIZE : LIBRARY_HEADER_SIZE;
     for (int section = 0; section < LIBRARY_SECTION_COUNT; section++) {
-        LibrarySectionInfo info = decode_section(header, section);
-        if (!section_fits(info, RECORD_SIZES[section], size)) {
+        LibrarySectionInfo info = decode_section(header, section, wide);
+        if (!section_fits(info, sizes[section], header_size, size)) {
             return LIBRARY_BAD_LAYOUT;
         }
         library->sections[section] = info;
     }
+    library->wide = wide;
     return LIBRARY_OK;
+}
+
+static uint32_t narrow_index(uint16_t value)
+{
+    return value == NARROW_NONE ? LIBRARY_NONE : value;
 }
 
 static bool read_record(const Library *library, LibrarySection section, uint32_t index,
@@ -113,16 +131,23 @@ static bool is_index_section(LibrarySection section)
     return section == LIBRARY_TITLE_ORDER || section == LIBRARY_LINKS;
 }
 
-LibraryStatus library_open(Library *library, ByteSource source, uint32_t size)
+static void clear(Library *library, ByteSource source)
 {
     *library = (Library){.source = source};
-    uint8_t header[LIBRARY_HEADER_SIZE];
-    if (size < LIBRARY_HEADER_SIZE || !read_source(library, 0, header, sizeof header)) {
+}
+
+LibraryStatus library_open(Library *library, ByteSource source, uint32_t size)
+{
+    clear(library, source);
+    uint8_t header[LIBRARY_WIDE_HEADER_SIZE];
+    uint32_t wanted =
+        size < LIBRARY_WIDE_HEADER_SIZE ? LIBRARY_HEADER_SIZE : LIBRARY_WIDE_HEADER_SIZE;
+    if (size < LIBRARY_HEADER_SIZE || !read_source(library, 0, header, wanted)) {
         return LIBRARY_UNREADABLE;
     }
     LibraryStatus status = decode_header(library, header, size);
     if (status != LIBRARY_OK) {
-        *library = (Library){.source = source};
+        clear(library, source);
     }
     return status;
 }
@@ -139,6 +164,74 @@ uint32_t library_music_count(const Library *library, LibrarySection section)
     return counted && info.music < info.count ? info.music : info.count;
 }
 
+enum {
+    FIELD_OFFSET = 0x3F,
+    FIELD_U8 = 0x00,
+    FIELD_U16 = 0x40,
+    FIELD_U32 = 0x80,
+    FIELD_INDEX = 0xC0,
+    FIELD_NONE = 0xFF,
+    TRACK_FIELDS = 10,
+    ALBUM_FIELDS = 7,
+    GROUP_FIELDS = 3,
+    FOLDER_FIELDS = 5
+};
+
+static const uint8_t TRACK_LAYOUT[2][TRACK_FIELDS] = {
+    {FIELD_U32 | 0, FIELD_U32 | 4, FIELD_U16 | 8, FIELD_U16 | 10, FIELD_U16 | 12, FIELD_U16 | 14,
+     FIELD_U32 | 16, FIELD_U8 | 20, FIELD_U8 | 21, FIELD_U16 | 22},
+    {FIELD_U32 | 0, FIELD_U32 | 4, FIELD_U32 | 8, FIELD_U32 | 12, FIELD_U32 | 16, FIELD_U32 | 20,
+     FIELD_U32 | 24, FIELD_U8 | 28, FIELD_U8 | 29, FIELD_U16 | 30},
+};
+
+static const uint8_t ALBUM_LAYOUT[2][ALBUM_FIELDS] = {
+    {FIELD_U32 | 0, FIELD_U16 | 4, FIELD_U16 | 6, FIELD_U16 | 8, FIELD_U16 | 10, FIELD_U16 | 12,
+     FIELD_INDEX | 14},
+    {FIELD_U32 | 0, FIELD_U32 | 4, FIELD_U32 | 8, FIELD_U16 | 20, FIELD_U32 | 12, FIELD_U32 | 16,
+     FIELD_NONE},
+};
+
+static const uint8_t GROUP_LAYOUT[2][GROUP_FIELDS] = {
+    {FIELD_U32 | 0, FIELD_U32 | 4, FIELD_U16 | 8},
+    {FIELD_U32 | 0, FIELD_U32 | 4, FIELD_U32 | 8},
+};
+
+static const uint8_t FOLDER_LAYOUT[2][FOLDER_FIELDS] = {
+    {FIELD_U32 | 0, FIELD_INDEX | 4, FIELD_U16 | 6, FIELD_U32 | 8, FIELD_U16 | 12},
+    {FIELD_U32 | 0, FIELD_U32 | 4, FIELD_U32 | 8, FIELD_U32 | 12, FIELD_U32 | 16},
+};
+
+static uint32_t field_value(const uint8_t *record, uint8_t field)
+{
+    uint32_t offset = field & FIELD_OFFSET;
+    if (field == FIELD_NONE) {
+        return LIBRARY_NONE;
+    }
+    switch (field & (uint8_t)~FIELD_OFFSET) {
+    case FIELD_U8:
+        return record[offset];
+    case FIELD_U16:
+        return u16_at(record, offset);
+    case FIELD_U32:
+        return u32_at(record, offset);
+    default:
+        return narrow_index(u16_at(record, offset));
+    }
+}
+
+static bool read_fields(const Library *library, LibrarySection section, uint32_t index,
+                        const uint8_t *layout, uint32_t count, uint32_t *values)
+{
+    uint8_t record[MAX_RECORD];
+    if (!read_record(library, section, index, record)) {
+        return false;
+    }
+    for (uint32_t field = 0; field < count; field++) {
+        values[field] = field_value(record, layout[field]);
+    }
+    return true;
+}
+
 static bool range_fits(const Library *library, LibrarySection section, uint32_t first,
                        uint64_t count)
 {
@@ -148,84 +241,75 @@ static bool range_fits(const Library *library, LibrarySection section, uint32_t 
 
 bool library_read_track(const Library *library, uint32_t index, LibraryTrack *track)
 {
-    uint8_t record[TRACK_SIZE];
-    if (!read_record(library, LIBRARY_TRACKS, index, record)) {
+    uint32_t v[TRACK_FIELDS];
+    if (!read_fields(library, LIBRARY_TRACKS, index, TRACK_LAYOUT[library->wide], TRACK_FIELDS,
+                     v)) {
         return false;
     }
-    *track = (LibraryTrack){
-        .title = u32_at(record, 0),
-        .path = u32_at(record, 4),
-        .album = u16_at(record, 8),
-        .artist = u16_at(record, 10),
-        .genre = u16_at(record, 12),
-        .folder = u16_at(record, 14),
-        .duration_ms = u32_at(record, 16),
-        .disc = record[20],
-        .number = record[21],
-        .chapters = u16_at(record, 22),
-    };
+    *track = (LibraryTrack){.title = v[0],
+                            .path = v[1],
+                            .album = v[2],
+                            .artist = v[3],
+                            .genre = v[4],
+                            .folder = v[5],
+                            .duration_ms = v[6],
+                            .disc = (uint8_t)v[7],
+                            .number = (uint8_t)v[8],
+                            .chapters = (uint16_t)v[9]};
     return true;
 }
 
 bool library_read_album(const Library *library, uint32_t index, LibraryAlbum *album)
 {
-    uint8_t record[ALBUM_SIZE];
-    if (!read_record(library, LIBRARY_ALBUMS, index, record)) {
+    uint32_t v[ALBUM_FIELDS];
+    if (!read_fields(library, LIBRARY_ALBUMS, index, ALBUM_LAYOUT[library->wide], ALBUM_FIELDS,
+                     v)) {
         return false;
     }
-    *album = (LibraryAlbum){
-        .title = u32_at(record, 0),
-        .album_artist = u16_at(record, 4),
-        .genre = u16_at(record, 6),
-        .year = u16_at(record, 8),
-        .first_track = u16_at(record, 10),
-        .track_count = u16_at(record, 12),
-        .cover = u16_at(record, 14),
-    };
+    *album = (LibraryAlbum){.title = v[0],
+                            .album_artist = v[1],
+                            .genre = v[2],
+                            .year = (uint16_t)v[3],
+                            .first_track = v[4],
+                            .track_count = v[5],
+                            .cover = v[6]};
     return range_fits(library, LIBRARY_TRACKS, album->first_track, album->track_count);
 }
 
 bool library_read_group(const Library *library, LibrarySection section, uint32_t index,
                         LibraryGroup *group)
 {
-    uint8_t record[GROUP_SIZE];
-    if (!is_group_section(section) || !read_record(library, section, index, record)) {
+    uint32_t v[GROUP_FIELDS];
+    if (!is_group_section(section) ||
+        !read_fields(library, section, index, GROUP_LAYOUT[library->wide], GROUP_FIELDS, v)) {
         return false;
     }
-    *group = (LibraryGroup){
-        .name = u32_at(record, 0),
-        .first_link = u32_at(record, 4),
-        .link_count = u16_at(record, 8),
-    };
+    *group = (LibraryGroup){.name = v[0], .first_link = v[1], .link_count = v[2]};
     return range_fits(library, LIBRARY_LINKS, group->first_link, group->link_count);
 }
 
 bool library_read_folder(const Library *library, uint32_t index, LibraryFolder *folder)
 {
-    uint8_t record[FOLDER_SIZE];
-    if (!read_record(library, LIBRARY_FOLDERS, index, record)) {
+    uint32_t v[FOLDER_FIELDS];
+    if (!read_fields(library, LIBRARY_FOLDERS, index, FOLDER_LAYOUT[library->wide], FOLDER_FIELDS,
+                     v)) {
         return false;
     }
-    *folder = (LibraryFolder){
-        .name = u32_at(record, 0),
-        .parent = u16_at(record, 4),
-        .subfolder_count = u16_at(record, 6),
-        .first_link = u32_at(record, 8),
-        .track_count = u16_at(record, 12),
-    };
+    *folder = (LibraryFolder){.name = v[0],
+                              .parent = v[1],
+                              .subfolder_count = v[2],
+                              .first_link = v[3],
+                              .track_count = v[4]};
     return range_fits(library, LIBRARY_LINKS, folder->first_link,
                       (uint64_t)folder->subfolder_count + folder->track_count);
 }
 
 bool library_read_index(const Library *library, LibrarySection section, uint32_t position,
-                        uint16_t *value)
+                        uint32_t *value)
 {
-    uint8_t record[INDEX_SIZE];
-    if (!is_index_section(section) || !read_record(library, section, position, record)) {
-        return false;
-    }
-    *value = u16_at(record, 0);
-    return true;
+    static const uint8_t INDEX_LAYOUT[2] = {FIELD_U16 | 0, FIELD_U32 | 0};
+    return is_index_section(section) &&
+           read_fields(library, section, position, &INDEX_LAYOUT[library->wide], 1, value);
 }
 
 static size_t terminated_length(const char *buffer, uint32_t length)

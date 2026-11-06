@@ -67,14 +67,14 @@ typedef struct BrowsePoolConfig {
     Toast *toast;
     SpokenStore *spoken;
     const uint8_t *options;
-    Screen *(*open_flow)(void *context, LibrarySection group, uint16_t subject, int level);
+    Screen *(*open_flow)(void *context, LibrarySection group, uint32_t subject, int level);
     void *flow_context;
 } BrowsePoolConfig;
 
 typedef struct SongActions {
     MenuScreen menu;
     MenuItem items[SONG_ACTION_COUNT];
-    uint16_t track;
+    uint32_t track;
     uint32_t now_ms;
     char title[BROWSE_LABEL_CAPACITY];
 } SongActions;
@@ -84,8 +84,8 @@ struct BrowsePool {
     BrowseRows rows[BROWSE_ROW_CACHES];
     uint32_t row_uses;
     BrowseScreen screens[BROWSE_DEPTH];
-    uint16_t favorite_albums[FAVORITES_CAPACITY];
-    uint16_t favorite_count;
+    uint32_t favorite_albums[FAVORITES_CAPACITY];
+    uint32_t favorite_count;
     bool favorites_collected;
     uint32_t favorites_revision;
     SongActions song_actions;

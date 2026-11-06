@@ -270,14 +270,14 @@ bool builder_put_entry(Out *out, uint32_t index, const uint8_t *values, uint32_t
 
 bool builder_put_pair(Out *out, uint32_t index, uint32_t value)
 {
-    uint8_t bytes[2];
-    builder_put16(bytes, value);
+    uint8_t bytes[4];
+    builder_put32(bytes, value);
     return builder_put_entry(out, index, bytes, sizeof bytes);
 }
 
 bool builder_scatter(BuilderState *state, Region pairs, Region column, uint32_t count)
 {
-    return builder_scatter_values(state, pairs, column, count, 2);
+    return builder_scatter_values(state, pairs, column, count, 4);
 }
 
 bool builder_scatter_values(BuilderState *state, Region pairs, Region column, uint32_t count,
@@ -285,6 +285,7 @@ bool builder_scatter_values(BuilderState *state, Region pairs, Region column, ui
 {
     uint32_t arena_mark = state->arena.used;
     uint32_t store_mark = state->store.end;
+    pairs.size = count * (BUILDER_ENTRY_HEADER + size);
     SortJob job = {.store = &state->store,
                    .arena = &state->arena,
                    .input = pairs,

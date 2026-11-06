@@ -8,8 +8,8 @@ enum {
     PATH_CAPACITY = 1024,
     MAX_PARTS = 64,
     STREAM_BUFFER = 4096,
-    PLACE_SIZE = 8,
-    INDEX_ENTRY = 8,
+    PLACE_SIZE = 16,
+    INDEX_ENTRY = 10,
     LOOKUP_BLOCK = 1024,
     LOOKUP_BLOCKS = 4
 };
@@ -53,12 +53,12 @@ static uint32_t append_folded(char *out, uint32_t used, const char *text, uint32
 
 static bool track_at(Prepared *prepared, uint32_t position, uint32_t *track)
 {
-    uint8_t bytes[2];
-    if (!cache_read(&prepared->positions, prepared->final_tracks.offset + position * 2, bytes,
+    uint8_t bytes[4];
+    if (!cache_read(&prepared->positions, prepared->final_tracks.offset + position * 4, bytes,
                     sizeof bytes)) {
         return false;
     }
-    *track = builder_get16(bytes);
+    *track = builder_get32(bytes);
     return true;
 }
 
@@ -144,8 +144,8 @@ static int by_hash_then_position(const uint8_t *left, const uint8_t *right, cons
     if (a != b) {
         return a < b ? -1 : 1;
     }
-    uint32_t c = builder_get16(left + 6);
-    uint32_t d = builder_get16(right + 6);
+    uint32_t c = builder_get32(left + 6);
+    uint32_t d = builder_get32(right + 6);
     return c < d ? -1 : c > d ? 1 : 0;
 }
 
@@ -154,7 +154,7 @@ static bool put_index_entry(Out *out, uint32_t hash, uint32_t position)
     uint8_t entry[INDEX_ENTRY];
     builder_put16(entry, INDEX_ENTRY);
     builder_put32(entry + 2, hash);
-    builder_put16(entry + 6, position);
+    builder_put32(entry + 6, position);
     return out_put(out, entry, sizeof entry);
 }
 
@@ -173,7 +173,7 @@ static bool emit_index_entries(BuilderState *state, Prepared *prepared, Out *exa
         if (!in_get(&places, place, sizeof place)) {
             return false;
         }
-        uint32_t position = builder_get16(place);
+        uint32_t position = builder_get32(place);
         uint32_t length = folded_track_path(state, prepared, track, scratch->folded);
         uint32_t path_hash = hash_update(HASH_START, scratch->folded, length);
         uint32_t name_hash = folded_name_hash(state, prepared, track, scratch->folded);
@@ -219,6 +219,8 @@ bool builder_index_paths(BuilderState *state, Prepared *prepared)
     out_open(&names, &state->store, name_input, name_buffer, STREAM_BUFFER);
     bool emitted = emit_index_entries(state, prepared, &exact, &names) && out_close(&exact) &&
                    out_close(&names);
+    exact_input.size = exact.written;
+    name_input.size = names.written;
     state->arena.used = prepared->index_mark;
     bool sorted = emitted && sort_index(state, exact_input, &prepared->exact) &&
                   sort_index(state, name_input, &prepared->by_name);
@@ -234,7 +236,7 @@ static bool index_entry(Prepared *prepared, Region table, uint32_t index, uint32
         return false;
     }
     *hash = builder_get32(entry + 2);
-    *position = builder_get16(entry + 6);
+    *position = builder_get32(entry + 6);
     return true;
 }
 

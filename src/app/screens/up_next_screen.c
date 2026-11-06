@@ -81,7 +81,7 @@ static void count_rows(UpNextScreen *up_next)
     const Player *player = up_next->config.player;
     up_next->chapters = player->has_track && player->chapters.count > 0;
     up_next->chapter_track = player->track;
-    up_next->added = player->up_next.count;
+    up_next->added = (int)player->up_next.count;
     if (up_next->chapters) {
         up_next->count = player->chapters.count;
     } else {
@@ -101,7 +101,7 @@ static bool chapters_changed(const UpNextScreen *up_next)
            (player->track != up_next->chapter_track || player->chapters.count != up_next->count);
 }
 
-static bool track_at(const UpNextScreen *up_next, int index, QueueWalk *walk, uint16_t *track)
+static bool track_at(const UpNextScreen *up_next, int index, QueueWalk *walk, uint32_t *track)
 {
     const Player *player = up_next->config.player;
     switch (kind_of(up_next, index)) {
@@ -150,7 +150,7 @@ static void load_row(UpNextScreen *up_next, int row, int index, QueueWalk *walk)
     char *detail = up_next->details[row];
     label[0] = '\0';
     detail[0] = '\0';
-    uint16_t track_index = 0;
+    uint32_t track_index = 0;
     LibraryTrack track;
     if (!track_at(up_next, index, walk, &track_index) ||
         !library_read_track(library, track_index, &track)) {
@@ -224,7 +224,7 @@ static ScreenAction select_row(void *context, int index)
     case ROW_PLAYING:
         break;
     case ROW_ADDED:
-        player_jump_to_up_next(player, (uint16_t)(index - 1));
+        player_jump_to_up_next(player, (uint32_t)(index - 1));
         break;
     case ROW_QUEUE:
         if (walk_to(player, &walk, index - up_next->added)) {

@@ -15,7 +15,7 @@ typedef enum PlayerState {
 typedef struct PlayerStatus {
     PlayerState state;
     bool has_track;
-    uint16_t track;
+    uint32_t track;
     uint32_t position_ms;
     uint32_t duration_ms;
     uint8_t volume;

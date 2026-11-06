@@ -44,10 +44,10 @@ static void start(void)
 
 static BrowseQuery folder_of(const char *path, uint32_t *position)
 {
-    uint16_t track = spoken_library_track(library, path);
+    uint32_t track = spoken_library_track(library, path);
     LibraryTrack record;
     LibraryFolder folder;
-    uint16_t chapter = 0;
+    uint32_t chapter = 0;
     BrowseQuery query = browse_root_query(BROWSE_FOLDER);
     library_read_track(library, track, &record);
     library_read_folder(library, record.folder, &folder);

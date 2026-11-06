@@ -23,8 +23,8 @@ typedef enum BrowseKind {
 typedef struct BrowseQuery {
     BrowseKind kind;
     LibrarySection group;
-    uint16_t subject;
-    uint16_t artist;
+    uint32_t subject;
+    uint32_t artist;
 } BrowseQuery;
 
 typedef enum BrowseItemKind {
@@ -37,7 +37,7 @@ typedef enum BrowseItemKind {
 typedef struct BrowseItem {
     BrowseItemKind kind;
     LibrarySection group;
-    uint16_t index;
+    uint32_t index;
 } BrowseItem;
 
 typedef struct BrowseText {

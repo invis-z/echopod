@@ -28,7 +28,7 @@ void favorites_store_load(FavoritesStore *store, const Library *library)
     }
 }
 
-bool favorites_store_contains_album(const FavoritesStore *store, uint16_t album)
+bool favorites_store_contains_album(const FavoritesStore *store, uint32_t album)
 {
     if (store->favorites.count == 0) {
         return false;
@@ -43,7 +43,7 @@ static bool save(const FavoritesStore *store)
     return hal_file_write(FAVORITES_STORE_PATH, bytes, length);
 }
 
-FavoriteResult favorites_store_toggle_album(FavoritesStore *store, uint16_t album)
+FavoriteResult favorites_store_toggle_album(FavoritesStore *store, uint32_t album)
 {
     uint32_t key = library_album_key(store->library, album);
     bool present = favorites_contains(&store->favorites, key);

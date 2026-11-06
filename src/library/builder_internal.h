@@ -6,10 +6,10 @@
 #include "library/library_builder.h"
 
 #define BUILDER_UNSET 0xFFFFFFFFu
+#define BUILDER_NO_INDEX 0xFFFFFFFFu
+#define BUILDER_V3_LIMIT 0xFFFFu
 
 enum {
-    BUILDER_NONE = 0xFFFF,
-    BUILDER_MAX_INDEX = 0xFFFF,
     BUILDER_FIELDS = 6,
     BUILDER_TITLE = 0,
     BUILDER_ARTIST = 1,
@@ -17,10 +17,10 @@ enum {
     BUILDER_ALBUM = 3,
     BUILDER_GENRE = 4,
     BUILDER_FILE = 5,
-    BUILDER_ROW_SIZE = 48,
+    BUILDER_ROW_SIZE = 52,
     BUILDER_ROW_SPOKEN_BIT = 1,
     BUILDER_ROW_GUESSED_BIT = 2,
-    BUILDER_FOLDER_SIZE = 8,
+    BUILDER_FOLDER_SIZE = 12,
     BUILDER_FOLDER_HASH_SIZE = 14,
     BUILDER_MAX_DEPTH = 64,
     BUILDER_TEXT_CAPACITY = 1024,
@@ -28,8 +28,8 @@ enum {
     BUILDER_MAX_PLAYLISTS = 1024,
     BUILDER_ALIGNMENT = 8,
     BUILDER_ENTRY_HEADER = 6,
-    BUILDER_ENTRY_VALUES = 32,
-    BUILDER_PAIR_SIZE = BUILDER_ENTRY_HEADER + 2
+    BUILDER_ENTRY_VALUES = 42,
+    BUILDER_PAIR_SIZE = BUILDER_ENTRY_HEADER + 4
 };
 
 typedef struct Arena {
@@ -84,7 +84,7 @@ typedef struct Region {
 typedef struct TrackRow {
     uint32_t text[BUILDER_FIELDS];
     uint16_t length[BUILDER_FIELDS];
-    uint16_t folder;
+    uint32_t folder;
     uint16_t year;
     uint8_t disc;
     uint8_t number;
@@ -97,12 +97,12 @@ typedef struct TrackRow {
 typedef struct FolderRow {
     uint32_t name;
     uint16_t length;
-    uint16_t parent;
+    uint32_t parent;
 } FolderRow;
 
 typedef struct ChainLevel {
     uint64_t hash;
-    uint16_t node;
+    uint32_t node;
     uint16_t start;
     uint16_t length;
 } ChainLevel;

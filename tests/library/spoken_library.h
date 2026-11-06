@@ -33,4 +33,4 @@ typedef struct SpokenLibrary {
 
 Library *spoken_library_open(SpokenLibrary *spoken);
 void spoken_library_close(SpokenLibrary *spoken);
-uint16_t spoken_library_track(const Library *library, const char *path);
+uint32_t spoken_library_track(const Library *library, const char *path);

@@ -11,7 +11,7 @@ enum {
     TIME_CAPACITY = 16
 };
 
-static bool track_path(const Library *library, uint16_t track, LibraryTrack *record, char *path)
+static bool track_path(const Library *library, uint32_t track, LibraryTrack *record, char *path)
 {
     return library_read_track(library, track, record) &&
            library_read_string(library, record->path, path, PLAYER_PATH_CAPACITY);
@@ -80,11 +80,11 @@ static bool single_file_book(const SpokenStore *store, const LibraryTrack *recor
     return library_read_folder(store->library, record->folder, &folder) && folder.track_count == 1;
 }
 
-static void begin(SpokenStore *store, uint16_t track)
+static void begin(SpokenStore *store, uint32_t track)
 {
     LibraryTrack record;
     char path[PLAYER_PATH_CAPACITY];
-    uint16_t chapter = 0;
+    uint32_t chapter = 0;
     store->follow = (SpokenFollow){.known = true, .active = false, .track = track};
     if (!track_path(store->library, track, &record, path) || spoken_kind_of(path) == SPOKEN_NONE) {
         return;
@@ -93,8 +93,10 @@ static void begin(SpokenStore *store, uint16_t track)
     store->follow.embedded = record.chapters > 0 && single_file_book(store, &record, path);
     store->follow.active = true;
     store->follow.duration_ms = record.duration_ms;
-    store->follow.bookmark = (Bookmark){
-        .key = spoken_bookmark_key(path), .track_key = spoken_track_key(path), .chapter = chapter};
+    store->follow.bookmark =
+        (Bookmark){.key = spoken_bookmark_key(path),
+                   .track_key = spoken_track_key(path),
+                   .chapter = (uint16_t)(chapter < UINT16_MAX ? chapter : UINT16_MAX)};
 }
 
 static void record(SpokenStore *store, PlayerStatus status, uint32_t now_ms)
@@ -154,7 +156,7 @@ void spoken_store_flush(SpokenStore *store, PlayerStatus status, uint32_t now_ms
     }
 }
 
-bool spoken_store_track(const SpokenStore *store, uint16_t track, Bookmark *bookmark)
+bool spoken_store_track(const SpokenStore *store, uint32_t track, Bookmark *bookmark)
 {
     LibraryTrack record;
     char path[PLAYER_PATH_CAPACITY];
@@ -163,7 +165,7 @@ bool spoken_store_track(const SpokenStore *store, uint16_t track, Bookmark *book
            bookmark->track_key == spoken_track_key(path);
 }
 
-static uint32_t resume_position(void *context, uint16_t track)
+static uint32_t resume_position(void *context, uint32_t track)
 {
     Bookmark bookmark;
     if (!spoken_store_track(context, track, &bookmark) || bookmark_finished(bookmark)) {
@@ -177,24 +179,24 @@ PlayerResume spoken_store_resume(SpokenStore *store)
     return (PlayerResume){.position_for = resume_position, .context = store};
 }
 
-bool spoken_store_book(const SpokenStore *store, uint16_t folder, Bookmark *bookmark)
+bool spoken_store_book(const SpokenStore *store, uint32_t folder, Bookmark *bookmark)
 {
     uint32_t key = 0;
     return spoken_folder_key(store->library, folder, &key) &&
            bookmarks_find(&store->bookmarks, key, bookmark);
 }
 
-static bool chapter_matches(const SpokenStore *store, uint16_t folder, uint16_t chapter,
+static bool chapter_matches(const SpokenStore *store, uint32_t folder, uint32_t chapter,
                             uint32_t track_key)
 {
-    uint16_t track = 0;
+    uint32_t track = 0;
     LibraryTrack record;
     char path[PLAYER_PATH_CAPACITY];
     return spoken_chapter_track(store->library, folder, chapter, &track) &&
            track_path(store->library, track, &record, path) && spoken_track_key(path) == track_key;
 }
 
-uint16_t spoken_store_resume_chapter(const SpokenStore *store, uint16_t folder)
+uint32_t spoken_store_resume_chapter(const SpokenStore *store, uint32_t folder)
 {
     Bookmark bookmark;
     LibraryFolder record;
@@ -205,7 +207,7 @@ uint16_t spoken_store_resume_chapter(const SpokenStore *store, uint16_t folder)
     if (chapter_matches(store, folder, bookmark.chapter, bookmark.track_key)) {
         return bookmark.chapter;
     }
-    for (uint16_t chapter = 0; chapter < record.track_count; chapter++) {
+    for (uint32_t chapter = 0; chapter < record.track_count; chapter++) {
         if (chapter_matches(store, folder, chapter, bookmark.track_key)) {
             return chapter;
         }
@@ -245,9 +247,9 @@ static void describe_book(StringBuilder *builder, uint32_t count, const Bookmark
     }
 }
 
-static uint16_t embedded_chapters(const SpokenStore *store, uint16_t folder)
+static uint16_t embedded_chapters(const SpokenStore *store, uint32_t folder)
 {
-    uint16_t track = 0;
+    uint32_t track = 0;
     LibraryTrack record;
     return spoken_chapter_track(store->library, folder, 0, &track) &&
                    library_read_track(store->library, track, &record)

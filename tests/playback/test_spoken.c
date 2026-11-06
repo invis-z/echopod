@@ -48,8 +48,8 @@ static void the_end_of_a_track_is_its_last_tenth_up_to_30_seconds(void)
 static void the_shelves_are_found_under_the_music_root(void)
 {
     Library *library = spoken_library_open(&spoken);
-    uint16_t books = 0;
-    uint16_t shows = 0;
+    uint32_t books = 0;
+    uint32_t shows = 0;
     CHECK(spoken_shelf_folder(library, SPOKEN_AUDIOBOOK, &books));
     CHECK(spoken_shelf_folder(library, SPOKEN_PODCAST, &shows));
     CHECK(books != shows);
@@ -59,7 +59,7 @@ static void the_shelves_are_found_under_the_music_root(void)
 static void a_book_folder_key_matches_its_chapters(void)
 {
     Library *library = &spoken.library;
-    uint16_t track = spoken_library_track(library, SPOKEN_CHAPTER_TWO_PATH);
+    uint32_t track = spoken_library_track(library, SPOKEN_CHAPTER_TWO_PATH);
     LibraryTrack record;
     uint32_t key = 0;
     CHECK(library_read_track(library, track, &record));
@@ -70,10 +70,10 @@ static void a_book_folder_key_matches_its_chapters(void)
 static void chapters_are_counted_in_folder_order(void)
 {
     Library *library = &spoken.library;
-    uint16_t three = spoken_library_track(library, SPOKEN_CHAPTER_THREE_PATH);
+    uint32_t three = spoken_library_track(library, SPOKEN_CHAPTER_THREE_PATH);
     LibraryTrack record;
-    uint16_t chapter = 0;
-    uint16_t found = 0;
+    uint32_t chapter = 0;
+    uint32_t found = 0;
     CHECK(spoken_chapter_of(library, three, &chapter));
     CHECK_EQUAL(2, chapter);
     CHECK(library_read_track(library, three, &record));

@@ -33,7 +33,7 @@ typedef enum PlayerNextSource {
 } PlayerNextSource;
 
 typedef struct PlayerResume {
-    uint32_t (*position_for)(void *context, uint16_t track);
+    uint32_t (*position_for)(void *context, uint32_t track);
     void *context;
 } PlayerResume;
 
@@ -57,7 +57,7 @@ typedef struct Player {
     PlayerState state;
     bool has_track;
     bool loaded;
-    uint16_t track;
+    uint32_t track;
     uint32_t paused_position_ms;
     uint32_t token_counter;
     uint32_t current_token;
@@ -89,9 +89,9 @@ void player_seek(Player *player, uint32_t position_ms);
 void player_change_volume(Player *player, int delta);
 void player_set_shuffle(Player *player, ShuffleMode shuffle, uint32_t seed);
 void player_set_repeat(Player *player, RepeatMode repeat);
-PlayerUpNextResult player_play_next(Player *player, uint16_t track);
-PlayerUpNextResult player_add_to_up_next(Player *player, uint16_t track);
-bool player_jump_to_up_next(Player *player, uint16_t index);
+PlayerUpNextResult player_play_next(Player *player, uint32_t track);
+PlayerUpNextResult player_add_to_up_next(Player *player, uint32_t track);
+bool player_jump_to_up_next(Player *player, uint32_t index);
 bool player_jump_to_queue(Player *player, PlayQueueCursor cursor);
 void player_update(Player *player, uint32_t now_ms);
 void player_sync(Player *player);

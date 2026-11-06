@@ -12,16 +12,16 @@ enum {
     SEED_FIELD = 12,
     SOURCE_KIND_FIELD = 16,
     SOURCE_GROUP_FIELD = 17,
-    SOURCE_SUBJECT_FIELD = 18,
-    SOURCE_ARTIST_FIELD = 20,
-    ANCHOR_FIELD = 22,
-    CURSOR_POSITION_FIELD = 24,
-    CURSOR_ALBUM_TRACK_FIELD = 26,
-    TRACK_FIELD = 28,
-    VOLUME_FIELD = 30,
-    POSITION_FIELD = 32,
-    FROM_UP_NEXT_FIELD = 36,
-    CHECKSUM_FIELD = 40,
+    VOLUME_FIELD = 18,
+    SOURCE_SUBJECT_FIELD = 20,
+    SOURCE_ARTIST_FIELD = 24,
+    ANCHOR_FIELD = 28,
+    CURSOR_POSITION_FIELD = 32,
+    CURSOR_ALBUM_TRACK_FIELD = 36,
+    TRACK_FIELD = 40,
+    POSITION_FIELD = 44,
+    FROM_UP_NEXT_FIELD = 48,
+    CHECKSUM_FIELD = 52,
     MAGIC_SIZE = 4,
     BITS_PER_BYTE = 8
 };
@@ -61,9 +61,9 @@ static void encode_plan(const PlayQueuePlan *plan, uint8_t *bytes)
     put_u32(bytes, SEED_FIELD, plan->seed);
     bytes[SOURCE_KIND_FIELD] = (uint8_t)plan->source.kind;
     bytes[SOURCE_GROUP_FIELD] = (uint8_t)plan->source.group;
-    put_u16(bytes, SOURCE_SUBJECT_FIELD, plan->source.subject);
-    put_u16(bytes, SOURCE_ARTIST_FIELD, plan->source.artist);
-    put_u16(bytes, ANCHOR_FIELD, plan->anchor_track);
+    put_u32(bytes, SOURCE_SUBJECT_FIELD, plan->source.subject);
+    put_u32(bytes, SOURCE_ARTIST_FIELD, plan->source.artist);
+    put_u32(bytes, ANCHOR_FIELD, plan->anchor_track);
 }
 
 void resume_state_encode(const ResumeState *state, uint8_t *bytes)
@@ -75,9 +75,9 @@ void resume_state_encode(const ResumeState *state, uint8_t *bytes)
     bytes[REPEAT_FIELD] = (uint8_t)state->repeat;
     put_u32(bytes, FINGERPRINT_FIELD, state->library_fingerprint);
     encode_plan(&state->plan, bytes);
-    put_u16(bytes, CURSOR_POSITION_FIELD, state->cursor.position);
-    put_u16(bytes, CURSOR_ALBUM_TRACK_FIELD, state->cursor.album_track);
-    put_u16(bytes, TRACK_FIELD, state->track);
+    put_u32(bytes, CURSOR_POSITION_FIELD, state->cursor.position);
+    put_u32(bytes, CURSOR_ALBUM_TRACK_FIELD, state->cursor.album_track);
+    put_u32(bytes, TRACK_FIELD, state->track);
     bytes[VOLUME_FIELD] = state->volume;
     put_u32(bytes, POSITION_FIELD, state->position_ms);
     bytes[FROM_UP_NEXT_FIELD] = state->from_up_next ? 1 : 0;
@@ -114,10 +114,10 @@ static PlayQueuePlan decode_plan(const uint8_t *bytes)
             {
                 .kind = (BrowseKind)bytes[SOURCE_KIND_FIELD],
                 .group = (LibrarySection)bytes[SOURCE_GROUP_FIELD],
-                .subject = get_u16(bytes, SOURCE_SUBJECT_FIELD),
-                .artist = get_u16(bytes, SOURCE_ARTIST_FIELD),
+                .subject = get_u32(bytes, SOURCE_SUBJECT_FIELD),
+                .artist = get_u32(bytes, SOURCE_ARTIST_FIELD),
             },
-        .anchor_track = get_u16(bytes, ANCHOR_FIELD),
+        .anchor_track = get_u32(bytes, ANCHOR_FIELD),
         .shuffle = (ShuffleMode)bytes[SHUFFLE_FIELD],
         .seed = get_u32(bytes, SEED_FIELD),
     };
@@ -133,8 +133,8 @@ bool resume_state_decode(const uint8_t *bytes, uint32_t length, ResumeState *sta
         .plan = decode_plan(bytes),
         .repeat = (RepeatMode)bytes[REPEAT_FIELD],
         .volume = bytes[VOLUME_FIELD],
-        .cursor = {get_u16(bytes, CURSOR_POSITION_FIELD), get_u16(bytes, CURSOR_ALBUM_TRACK_FIELD)},
-        .track = get_u16(bytes, TRACK_FIELD),
+        .cursor = {get_u32(bytes, CURSOR_POSITION_FIELD), get_u32(bytes, CURSOR_ALBUM_TRACK_FIELD)},
+        .track = get_u32(bytes, TRACK_FIELD),
         .position_ms = get_u32(bytes, POSITION_FIELD),
         .from_up_next = bytes[FROM_UP_NEXT_FIELD] != 0,
     };

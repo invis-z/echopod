@@ -3,7 +3,7 @@
 
 static const uint32_t FINGERPRINT = 0xCAFEF00Du;
 
-static UpNext with_tracks(const uint16_t *tracks, int count)
+static UpNext with_tracks(const uint32_t *tracks, int count)
 {
     UpNext up_next;
     up_next_clear(&up_next);
@@ -17,14 +17,14 @@ static void a_new_list_is_empty(void)
 {
     UpNext up_next;
     up_next_clear(&up_next);
-    uint16_t track = 0;
+    uint32_t track = 0;
     CHECK_EQUAL(0, up_next.count);
     CHECK(!up_next_first(&up_next, &track));
 }
 
 static void added_songs_keep_their_order(void)
 {
-    static const uint16_t TRACKS[] = {7, 3, 9};
+    static const uint32_t TRACKS[] = {7, 3, 9};
     UpNext up_next = with_tracks(TRACKS, 3);
     CHECK_EQUAL(3, up_next.count);
     CHECK_EQUAL(7, up_next.tracks[0]);
@@ -34,10 +34,10 @@ static void added_songs_keep_their_order(void)
 
 static void play_next_goes_to_the_front(void)
 {
-    static const uint16_t TRACKS[] = {7, 3};
+    static const uint32_t TRACKS[] = {7, 3};
     UpNext up_next = with_tracks(TRACKS, 2);
     CHECK(up_next_play_next(&up_next, 11));
-    uint16_t track = 0;
+    uint32_t track = 0;
     CHECK(up_next_first(&up_next, &track));
     CHECK_EQUAL(11, track);
     CHECK_EQUAL(3, up_next.count);
@@ -50,7 +50,7 @@ static void a_full_list_refuses_more(void)
     UpNext up_next;
     up_next_clear(&up_next);
     for (int index = 0; index < UP_NEXT_CAPACITY; index++) {
-        CHECK(up_next_add(&up_next, (uint16_t)index));
+        CHECK(up_next_add(&up_next, (uint32_t)index));
     }
     CHECK(!up_next_add(&up_next, 500));
     CHECK(!up_next_play_next(&up_next, 500));
@@ -60,7 +60,7 @@ static void a_full_list_refuses_more(void)
 
 static void dropping_removes_from_the_front(void)
 {
-    static const uint16_t TRACKS[] = {7, 3, 9, 4};
+    static const uint32_t TRACKS[] = {7, 3, 9, 4};
     UpNext up_next = with_tracks(TRACKS, 4);
     up_next_drop(&up_next, 2);
     CHECK_EQUAL(2, up_next.count);
@@ -72,7 +72,7 @@ static void dropping_removes_from_the_front(void)
 
 static void a_list_survives_a_round_trip(void)
 {
-    static const uint16_t TRACKS[] = {7, 3, 1200};
+    static const uint32_t TRACKS[] = {7, 3, 1200};
     UpNext saved = with_tracks(TRACKS, 3);
     uint8_t bytes[UP_NEXT_STATE_SIZE];
     up_next_encode(&saved, FINGERPRINT, bytes);
@@ -86,7 +86,7 @@ static void a_list_survives_a_round_trip(void)
 
 static void another_library_is_rejected(void)
 {
-    static const uint16_t TRACKS[] = {7};
+    static const uint32_t TRACKS[] = {7};
     UpNext saved = with_tracks(TRACKS, 1);
     uint8_t bytes[UP_NEXT_STATE_SIZE];
     up_next_encode(&saved, FINGERPRINT, bytes);
@@ -96,7 +96,7 @@ static void another_library_is_rejected(void)
 
 static void a_corrupted_or_blank_file_is_rejected(void)
 {
-    static const uint16_t TRACKS[] = {7, 3};
+    static const uint32_t TRACKS[] = {7, 3};
     UpNext saved = with_tracks(TRACKS, 2);
     uint8_t bytes[UP_NEXT_STATE_SIZE];
     up_next_encode(&saved, FINGERPRINT, bytes);

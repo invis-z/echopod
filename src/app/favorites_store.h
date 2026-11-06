@@ -26,6 +26,6 @@ typedef struct FavoritesStore {
 } FavoritesStore;
 
 void favorites_store_load(FavoritesStore *store, const Library *library);
-bool favorites_store_contains_album(const FavoritesStore *store, uint16_t album);
-FavoriteResult favorites_store_toggle_album(FavoritesStore *store, uint16_t album);
+bool favorites_store_contains_album(const FavoritesStore *store, uint32_t album);
+FavoriteResult favorites_store_toggle_album(FavoritesStore *store, uint32_t album);
 const char *favorites_store_message(FavoriteResult result);
