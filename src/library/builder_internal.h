@@ -25,7 +25,8 @@ enum {
     BUILDER_TEXT_CAPACITY = 1024,
     BUILDER_MAX_RECORD = 2 * BUILDER_TEXT_CAPACITY + 64,
     BUILDER_MAX_PLAYLISTS = 1024,
-    BUILDER_ALIGNMENT = 8
+    BUILDER_ALIGNMENT = 8,
+    BUILDER_PAIR_SIZE = 8
 };
 
 typedef struct Arena {
@@ -236,6 +237,8 @@ bool cache_init(Cache *cache, Store *store, Arena *arena, uint32_t block_size, u
 bool cache_read(Cache *cache, uint32_t offset, void *bytes, uint32_t length);
 
 bool sort_records(const SortJob *job, Region *output);
+bool builder_put_pair(Out *out, uint32_t index, uint32_t value);
+bool builder_scatter(BuilderState *state, Region pairs, Region column, uint32_t count);
 
 void builder_row_decode(const uint8_t *bytes, TrackRow *row);
 void builder_row_encode(const TrackRow *row, uint8_t *bytes);
