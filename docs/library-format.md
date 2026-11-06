@@ -48,6 +48,10 @@ Field notes:
 - A playlist's links are track indices in playlist order. Its name is the file name without `.m3u` or `.m3u8`.
 - A folder's items are `links[first_link ..]`: first `subfolder_count` folder indices (sorted by name), then `track_count` track indices (sorted by disc, number, file name).
 
+## Segment store
+
+`library/segment_store` holds Rippl's library and covers. Data lives in streams: chains of fixed-size segment files, 1 MiB in `/.rippl/library/` (up to 512) and 4 MiB in `/.rippl/covers/` (up to 256), reserved when first needed and reused after that, never deleted. `/.rippl/manifest.bin` holds two 4 KB copies of the manifest: a sequence number, each stream's pool, first segment, segment count and length, 16 regions (stream, offset, length), 8 values, the next-segment table and an FNV-1a checksum. The newer valid copy wins when the store opens. A change is a transaction: `segment_store_begin`, then appends (to a stream, or to one `segment_store_start` emptied) and writes that never touch bytes the committed manifest uses, then `segment_store_commit` writes the other manifest copy. New data only goes to segments no committed stream uses or past a committed stream's end, so power lost at any point leaves the old state or the new one; segments a commit no longer uses are free for the next one. `test_segment_store` cuts the power at every write, with torn writes, and checks both.
+
 ## Spoken word
 
 A track is spoken word when its first folder is `Audiobooks`, `Audiobook`, `Podcasts` or `Podcast` (ASCII case-insensitive; `library/spoken_path`, `spoken_of` in the indexer). Tracks on internal storage have `:internal` as their first folder, so they are always music. Spoken word is kept out of the Music lists and lives on the Audiobooks and Podcasts shelves, which browse its folders.
