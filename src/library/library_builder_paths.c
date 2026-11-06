@@ -185,16 +185,6 @@ static bool emit_index_entries(BuilderState *state, Prepared *prepared, Out *exa
     return true;
 }
 
-static bool sort_index(BuilderState *state, Region input, Region *sorted)
-{
-    SortJob job = {.store = &state->store,
-                   .arena = &state->arena,
-                   .input = input,
-                   .compare = by_hash_then_position,
-                   .context = NULL};
-    return sort_records(&job, sorted);
-}
-
 bool builder_index_paths(BuilderState *state, Prepared *prepared)
 {
     uint32_t count = state->track_count;
@@ -222,8 +212,9 @@ bool builder_index_paths(BuilderState *state, Prepared *prepared)
     exact_input.size = exact.written;
     name_input.size = names.written;
     state->arena.used = prepared->index_mark;
-    bool sorted = emitted && sort_index(state, exact_input, &prepared->exact) &&
-                  sort_index(state, name_input, &prepared->by_name);
+    bool sorted = emitted &&
+                  builder_sort(state, exact_input, by_hash_then_position, &prepared->exact) &&
+                  builder_sort(state, name_input, by_hash_then_position, &prepared->by_name);
     state->arena.used = prepared->index_mark;
     return sorted && !state->store.io_failed;
 }
