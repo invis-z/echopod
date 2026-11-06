@@ -160,8 +160,9 @@ static bool collect_runs(BuilderState *state, Prepared *prepared, int field, Reg
 }
 
 typedef struct RankTarget {
-    uint16_t *rank_of_run;
-    uint16_t *spelling_of_run;
+    Out rank_pairs;
+    Out spelling_pairs;
+    bool spellings;
     Region display;
     uint32_t ranks;
     uint32_t music_ranks;
@@ -225,41 +226,68 @@ static bool assign_ranks(BuilderState *state, Region sorted, RankTarget *target)
             }
             have_previous = true;
         }
-        target->rank_of_run[run] = (uint16_t)(ranks - 1);
-        if (target->spelling_of_run != NULL) {
-            target->spelling_of_run[run] = (uint16_t)(spellings - 1);
+        if (!builder_put_pair(&target->rank_pairs, run, ranks - 1) ||
+            (target->spellings && !builder_put_pair(&target->spelling_pairs, run, spellings - 1))) {
+            return false;
         }
     }
     if (have_previous && !put_display(&out, target->display, best_text, best_length)) {
         return false;
     }
     target->ranks = ranks;
-    return out_close(&out);
+    return out_close(&out) && out_close(&target->rank_pairs) &&
+           (!target->spellings || out_close(&target->spelling_pairs));
 }
 
-static bool write_rank_column(BuilderState *state, int field, const uint16_t *rank_of_run,
+static bool write_rank_column(BuilderState *state, int field, Region rank_of_run, uint32_t runs,
                               Region column)
 {
     Arena *arena = &state->arena;
     uint32_t mark = arena->used;
     uint8_t *buffer = arena_take(arena, STREAM_BUFFER);
-    uint16_t *ranks = arena_take(arena, state->track_count * 2 + 2);
+    uint8_t *run_buffer = arena_take(arena, STREAM_BUFFER);
+    uint8_t *out_buffer = arena_take(arena, STREAM_BUFFER);
     if (arena->failed) {
         return false;
     }
     RunReader reader;
     open_rows(state, &reader, buffer);
+    In run_ranks;
+    in_open(&run_ranks, &state->store, rank_of_run.offset, rank_of_run.offset + runs * 2,
+            run_buffer, STREAM_BUFFER);
+    Out out;
+    out_open(&out, &state->store, column, out_buffer, STREAM_BUFFER);
+    uint8_t rank[2] = {0, 0};
     for (uint32_t track = 0; track < state->track_count; track++) {
         TrackRow row;
         bool new_run = false;
-        if (!next_row(&reader, field, &row, &new_run)) {
+        if (!next_row(&reader, field, &row, &new_run) ||
+            (new_run && !in_get(&run_ranks, rank, sizeof rank)) ||
+            !out_put(&out, rank, sizeof rank)) {
             return false;
         }
-        ranks[track] = rank_of_run[reader.run];
     }
-    bool written = builder_write_column(state, column, ranks, state->track_count);
+    bool written = out_close(&out);
     arena->used = mark;
     return written;
+}
+
+static bool open_pairs(BuilderState *state, Out *out, Region *pairs, uint32_t count)
+{
+    *pairs = store_take(&state->store, count * BUILDER_PAIR_SIZE);
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (state->store.failed || buffer == NULL) {
+        return false;
+    }
+    out_open(out, &state->store, *pairs, buffer, STREAM_BUFFER);
+    return true;
+}
+
+static bool run_column(BuilderState *state, Region pairs, uint32_t runs, Region *column)
+{
+    *column = store_take(&state->store, runs * 2 + 2);
+    pairs.size = runs * BUILDER_PAIR_SIZE;
+    return !state->store.failed && builder_scatter(state, pairs, *column, runs);
 }
 
 static GroupTable *group_of_field(Prepared *prepared, int field)
@@ -309,13 +337,22 @@ static bool rank_field(BuilderState *state, Prepared *prepared, int field)
     if (!sort_records(&job, &sorted)) {
         return false;
     }
-    target.rank_of_run = arena_take(&state->arena, runs * 2 + 2);
-    target.spelling_of_run =
-        field == BUILDER_GENRE ? arena_take(&state->arena, runs * 2 + 2) : NULL;
-    if (state->arena.failed || !assign_ranks(state, sorted, &target) ||
-        !write_rank_column(state, field, target.rank_of_run, prepared->columns[field]) ||
-        (field == BUILDER_GENRE &&
-         !write_rank_column(state, field, target.spelling_of_run, prepared->genre_spelling))) {
+    target.spellings = field == BUILDER_GENRE;
+    Region rank_pairs;
+    Region spelling_pairs = {.offset = 0, .size = 0};
+    Region rank_of_run;
+    Region spelling_of_run;
+    if (!open_pairs(state, &target.rank_pairs, &rank_pairs, runs) ||
+        (target.spellings && !open_pairs(state, &target.spelling_pairs, &spelling_pairs, runs)) ||
+        !assign_ranks(state, sorted, &target)) {
+        return false;
+    }
+    state->arena.used = arena_mark;
+    if (!run_column(state, rank_pairs, runs, &rank_of_run) ||
+        !write_rank_column(state, field, rank_of_run, runs, prepared->columns[field]) ||
+        (target.spellings &&
+         (!run_column(state, spelling_pairs, runs, &spelling_of_run) ||
+          !write_rank_column(state, field, spelling_of_run, runs, prepared->genre_spelling)))) {
         return false;
     }
     prepared->rank_count[field] = target.ranks;
@@ -408,14 +445,15 @@ static bool rank_folders(BuilderState *state, Prepared *prepared)
     if (!sort_records(&job, &sorted)) {
         return false;
     }
-    uint16_t *order = arena_take(&state->arena, count * 2 + 2);
+    Out order;
+    Region pairs;
     uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
     uint8_t *record = arena_take(&state->arena, BUILDER_MAX_RECORD);
     uint8_t *previous = arena_take(&state->arena, BUILDER_MAX_RECORD);
-    if (state->arena.failed) {
+    if (state->arena.failed || !open_pairs(state, &order, &pairs, count) ||
+        !builder_put_pair(&order, 0, 0)) {
         return false;
     }
-    order[0] = 0;
     In in;
     in_open(&in, &state->store, sorted.offset, sorted.offset + sorted.size, buffer, STREAM_BUFFER);
     uint32_t ranks = 0;
@@ -431,11 +469,14 @@ static bool rank_folders(BuilderState *state, Prepared *prepared)
             }
             have_previous = true;
         }
-        order[builder_get16(record + 2)] = (uint16_t)ranks;
+        if (!builder_put_pair(&order, builder_get16(record + 2), ranks)) {
+            return false;
+        }
     }
     prepared->folder_rank_count = ranks + 1;
-    bool written = builder_write_column(state, prepared->folder_order, order, count);
+    bool closed = out_close(&order);
     state->arena.used = arena_mark;
+    bool written = closed && builder_scatter(state, pairs, prepared->folder_order, count);
     state->store.end = store_mark;
     return written;
 }
