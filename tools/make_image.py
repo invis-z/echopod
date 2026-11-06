@@ -51,11 +51,22 @@ CORE1_AAC_CAPACITY = GLYPH_TABLE_OFFSET - CORE1_AAC_OFFSET - CORE1_MODULE_HEADER
 GLYPH_TABLE_SIZE = 512
 GLYPH_FACE_LIMIT = (GLYPH_TABLE_SIZE - 8) // 8
 GLYPH_PAYLOAD_LIMIT = 0x30000
-GLYPH_REGIONS = (
-    (GLYPH_PAYLOAD_LIMIT, OVERLAY_OFFSET),
-    (GLYPH_TABLE_OFFSET + GLYPH_TABLE_SIZE, USB_OVERLAY_OFFSET),
-    (CORE1_MP3_OFFSET + CORE1_MODULE_HEADER_SIZE + CORE1_MODULE_CAPACITY, CORE1_FLAC_OFFSET),
-)
+LARGE_IMAGE_SIZE = 0x800004
+LARGE_FW_SIZE = 0x74C000
+
+
+def glyph_regions(fw_size):
+    regions = [
+        (GLYPH_PAYLOAD_LIMIT, OVERLAY_OFFSET),
+        (GLYPH_TABLE_OFFSET + GLYPH_TABLE_SIZE, USB_OVERLAY_OFFSET),
+        (CORE1_MP3_OFFSET + CORE1_MODULE_HEADER_SIZE + CORE1_MODULE_CAPACITY, CORE1_FLAC_OFFSET),
+    ]
+    if fw_size > FW_SIZE:
+        regions.append((FW_SIZE, fw_size))
+    return tuple(regions)
+
+
+GLYPH_REGIONS = glyph_regions(FW_SIZE)
 TABLE_CAPACITY = 91
 TABLE_OFFSET = 0x208
 ROW = struct.Struct("<4I")
@@ -102,6 +113,15 @@ FIRMWARE_SECTIONS = (".code", ".data", ".bss", ".resident", ".np_faces")
 
 class ImageError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class Shape:
+    image_size: int
+    fw_size: int
+
+
+SHAPES = {5: Shape(IMAGE_SIZE, FW_SIZE), 8: Shape(LARGE_IMAGE_SIZE, LARGE_FW_SIZE)}
 
 
 @dataclass(frozen=True)
@@ -202,22 +222,23 @@ def word(data, offset):
     return struct.unpack_from("<I", data, offset)[0]
 
 
-def assemble(parts):
+def assemble(parts, shape=SHAPES[5]):
     if len(parts.header) != OUTER_HEADER_SIZE or len(parts.marker) != MARKER_SIZE:
         raise ImageError("header or marker has the wrong size")
     if len(parts.rows) != TABLE_CAPACITY:
         raise ImageError(f"the scatter table needs {TABLE_CAPACITY} rows")
-    if PAYLOAD_OFFSET + len(parts.payload) > FW_SIZE:
+    if PAYLOAD_OFFSET + len(parts.payload) > shape.fw_size:
         raise ImageError("the payload overlaps the header copy")
-    image = bytearray(IMAGE_SIZE)
+    image = bytearray(shape.image_size)
     image[:OUTER_HEADER_SIZE] = parts.header
     image[MAGIC_OFFSET:MAGIC_OFFSET + len(MAGIC)] = MAGIC
     struct.pack_into("<II", image, MAGIC_OFFSET + len(MAGIC), CODE_BASE, TABLE_CAPACITY)
     for index, row in enumerate(parts.rows):
         ROW.pack_into(image, TABLE_OFFSET + index * ROW.size, *row)
     image[PAYLOAD_OFFSET:PAYLOAD_OFFSET + len(parts.payload)] = parts.payload
-    image[FW_SIZE:FW_SIZE + HEADER_SIZE] = image[:HEADER_SIZE]
-    image[MARKER_OFFSET:MARKER_OFFSET + MARKER_SIZE] = parts.marker
+    image[shape.fw_size:shape.fw_size + HEADER_SIZE] = image[:HEADER_SIZE]
+    marker = shape.fw_size + HEADER_SIZE
+    image[marker:marker + MARKER_SIZE] = parts.marker
     place_overlay(image, parts, parts.overlay, OVERLAY_OFFSET, OVERLAY_CAPACITY, OVERLAY_MAGIC)
     place_overlay(image, parts, parts.usb_overlay, USB_OVERLAY_OFFSET, USB_OVERLAY_CAPACITY,
                   USB_OVERLAY_MAGIC)
@@ -227,8 +248,8 @@ def assemble(parts):
     place_core1_module(image, parts.core1_flac, CORE1_FLAC_OFFSET)
     place_core1_module(image, parts.core1_aac, CORE1_AAC_OFFSET, CORE1_AAC_CAPACITY)
     place_core1_module(image, parts.core1_opus, CORE1_OPUS_OFFSET)
-    place_glyph_faces(image, parts)
-    end = fw_end(FW_SIZE)
+    place_glyph_faces(image, parts, glyph_regions(shape.fw_size))
+    end = fw_end(shape.fw_size)
     struct.pack_into("<I", image, end, crc32(image[:end]))
     return bytes(image)
 
@@ -282,9 +303,9 @@ def place_core1_module(image, program, offset, capacity=CORE1_MODULE_CAPACITY):
     image[start:start + len(program)] = program
 
 
-def glyph_face_offsets(sizes):
+def glyph_face_offsets(sizes, regions=GLYPH_REGIONS):
     """Image offsets for faces of these sizes: largest first, first fit, 512-byte aligned."""
-    free = [list(region) for region in GLYPH_REGIONS]
+    free = [list(region) for region in regions]
     offsets = [0] * len(sizes)
     for index in sorted(range(len(sizes)), key=lambda item: -sizes[item]):
         if sizes[index] == 0:
@@ -299,7 +320,7 @@ def glyph_face_offsets(sizes):
     return offsets
 
 
-def place_glyph_faces(image, parts):
+def place_glyph_faces(image, parts, regions=GLYPH_REGIONS):
     faces = parts.glyph_faces
     if not faces:
         return
@@ -307,7 +328,7 @@ def place_glyph_faces(image, parts):
         raise ImageError(f"the glyph table holds at most {GLYPH_FACE_LIMIT} faces")
     if PAYLOAD_OFFSET + len(parts.payload) > GLYPH_PAYLOAD_LIMIT:
         raise ImageError("the payload reaches the glyph packs")
-    offsets = glyph_face_offsets([len(face) for face in faces])
+    offsets = glyph_face_offsets([len(face) for face in faces], regions)
     table = bytearray(GLYPH_TABLE_SIZE)
     struct.pack_into("<4sI", table, 0, GLYPH_TABLE_MAGIC, len(faces))
     for index, (face, offset) in enumerate(zip(faces, offsets)):
@@ -329,9 +350,10 @@ def glyph_faces_in(image):
 def split_image(image):
     rows = tuple(ROW.unpack_from(image, TABLE_OFFSET + index * ROW.size)
                  for index in range(TABLE_CAPACITY))
+    fw_size = word(image, FW_SIZE_OFFSET)
     return ImageParts(header=image[:OUTER_HEADER_SIZE], rows=rows,
-                      payload=image[PAYLOAD_OFFSET:FW_SIZE],
-                      marker=image[MARKER_OFFSET:MARKER_OFFSET + MARKER_SIZE])
+                      payload=image[PAYLOAD_OFFSET:fw_size],
+                      marker=image[fw_size + HEADER_SIZE:fw_size + HEADER_SIZE + MARKER_SIZE])
 
 
 def thumb_branch_target(address, first, second):
@@ -468,7 +490,7 @@ def check_version(version):
         raise ImageError("the version must be major.minor.patch with parts up to 255, 255, 65535")
 
 
-def generated_header(version):
+def generated_header(version, fw_size=FW_SIZE):
     check_version(version)
     major, minor, patch = version
     header = bytearray(OUTER_HEADER_SIZE)
@@ -476,16 +498,16 @@ def generated_header(version):
                      HEADER_MAGIC)
     struct.pack_into("<8I", header, SECTOR_FIELDS_OFFSET, *SECTOR_FIELDS)
     struct.pack_into("<I", header, FIELD_19C_OFFSET, FIELD_19C)
-    struct.pack_into("<I", header, FW_SIZE_OFFSET, FW_SIZE)
+    struct.pack_into("<I", header, FW_SIZE_OFFSET, fw_size)
     return header
 
 
 def build_image(firmware, brand, build_tag, date, overlay=b"", core1_mp3=b"", core1_flac=b"",
                 version=DEFAULT_VERSION, glyph_faces=(), core1_aac=b"", core1_opus=b"",
-                usb_overlay=b""):
+                usb_overlay=b"", shape=SHAPES[5]):
     check_firmware(firmware)
     code_size, data_size = len(firmware.code), len(firmware.data)
-    header = generated_header(version)
+    header = generated_header(version, shape.fw_size)
     struct.pack_into("<I", header, DATE_OFFSET, bcd_date(date))
     header[BRAND_OFFSET:BRAND_OFFSET + TEXT_FIELD_SIZE] = text_field(brand, "brand")
     header[BUILD_TAG_OFFSET:BUILD_TAG_OFFSET + TEXT_FIELD_SIZE] = text_field(build_tag, "build tag")
@@ -499,7 +521,7 @@ def build_image(firmware, brand, build_tag, date, overlay=b"", core1_mp3=b"", co
     rows += [(0, 0, 0, 0)] * (TABLE_CAPACITY - len(rows))
     return assemble(ImageParts(bytes(header), tuple(rows), payload, bytes(MARKER_SIZE), overlay,
                                core1_mp3, core1_flac, tuple(glyph_faces), core1_aac, core1_opus,
-                               firmware.resident, usb_overlay, firmware.np_faces))
+                               firmware.resident, usb_overlay, firmware.np_faces), shape)
 
 
 def validate_image(image):
@@ -732,7 +754,7 @@ def parse_version(text):
 
 
 def parse_arguments(argv):
-    parser = argparse.ArgumentParser(description="Pack a device build into a 5 MiB fw1 image")
+    parser = argparse.ArgumentParser(description="Pack a device build into a 5 or 8 MiB fw1 image")
     parser.add_argument("--version", type=parse_version, default=DEFAULT_VERSION,
                         help="major.minor.patch written to the header")
     parser.add_argument("--elf", type=Path, required=True,
@@ -751,6 +773,8 @@ def parse_arguments(argv):
     parser.add_argument("--core1-opus", type=Path, help="core 1 Opus program, a raw binary")
     parser.add_argument("--glyph-face", type=Path, action="append", default=[],
                         help="glyph pack face, in face order; a missing file is an empty face")
+    parser.add_argument("--image-mib", type=int, choices=sorted(SHAPES), default=5,
+                        help="image size: 5 MiB (fw size 0x44C000) or 8 MiB (fw size 0x74C000)")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args(argv)
 
@@ -785,9 +809,10 @@ def main(argv=None):
         core1_opus = arguments.core1_opus.read_bytes() if arguments.core1_opus else b""
         glyph_faces = [path.read_bytes() if path.exists() else b""
                        for path in arguments.glyph_face]
+        shape = SHAPES[arguments.image_mib]
         image = build_image(firmware, arguments.brand, build_tag, date, overlay, core1_mp3,
                             core1_flac, arguments.version, glyph_faces, core1_aac, core1_opus,
-                            usb_overlay)
+                            usb_overlay, shape)
     except ImageError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
@@ -806,7 +831,7 @@ def main(argv=None):
           f"core 1 FLAC {len(core1_flac):,} bytes, core 1 AAC {len(core1_aac):,} bytes, core 1 Opus {len(core1_opus):,} bytes, "
           f"glyph faces {sum(len(face) for face in glyph_faces):,} bytes, "
           f".data {len(firmware.data)} bytes, .bss {firmware.bss_size:,} bytes, "
-          f"crc {word(image, fw_end(FW_SIZE)):#010x}")
+          f"{arguments.image_mib} MiB, crc {word(image, fw_end(shape.fw_size)):#010x}")
     return 0
 
 

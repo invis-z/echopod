@@ -7,7 +7,7 @@
 #include "gfx/font.h"
 
 enum {
-    FONT_PACK_FACES = 5,
+    FONT_PACK_FACES = 7,
     FONT_PACK_HEADER_BYTES = 32,
     FONT_PACK_ENTRY_BYTES = 12,
     FONT_PACK_ENTRIES_PER_SECTOR = 42,

@@ -1,6 +1,6 @@
 # Noto Sans CJK SC
 
-The Chinese, Japanese and Korean glyph packs (`src/fonts/packs/cjk_16.bin` and `cjk_12.bin`) are rendered from Noto Sans CJK SC Regular, version 2.004, by `tools/glyph_pack.py`. The font is licensed under the SIL Open Font License 1.1 (`OFL.txt`), and so are the packs made from it.
+The Chinese, Japanese and Korean glyph packs (`src/fonts/packs/cjk_16.bin`, `cjk_12.bin`, and the extensions `cjk_ext_16.bin` and `cjk_ext_12.bin`) are rendered from Noto Sans CJK SC Regular, version 2.004, by `tools/glyph_pack.py`. The font is licensed under the SIL Open Font License 1.1 (`OFL.txt`), and so are the packs made from it.
 
 The font file is 16 MB, so it isn't in the repository: the packs are. To rebuild them, download it here first:
 
@@ -14,4 +14,4 @@ curl -L -o assets/fonts/noto-cjk/NotoSansCJKsc-Regular.otf \
 .venv/bin/python tools/glyph_pack.py --config assets/fonts/glyph_pack.json --output src/fonts/packs
 ```
 
-Without the font, `glyph_pack.py` skips the two CJK faces and leaves the committed packs as they are.
+Without the font, `glyph_pack.py` skips the four CJK faces and leaves the committed packs as they are.

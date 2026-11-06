@@ -18,6 +18,10 @@ enum {
     STOCK_FW_SIZE = 0x01FC4000,
     STOCK_V4_FW_SIZE = 0x01FCC000,
     STOCK_FW_END = 0x2000000,
+    LARGE_IMAGE_SIZE = 0x800004,
+    LARGE_FW_SIZE = 0x74C000,
+    LARGE_FW_END = 0x800000,
+    LARGE_DATA_AT = 0x600000,
     MARKER_AT = 0x54000,
     MARKER_LENGTH = 11,
     READ_CHUNK = 8192,
@@ -514,6 +518,59 @@ static void installing_a_stock_image_fills_both_slots_slot_2_first(void)
     CHECK_EQUAL(2u * (STOCK_FW_END / (CHUNK_SECTORS * 512)), last_done);
 }
 
+static uint8_t *large_image(uint8_t seed, uint32_t fw_size)
+{
+    uint8_t *small = valid_image(seed);
+    uint8_t *image = calloc(LARGE_IMAGE_SIZE, 1);
+    memcpy(image, small, FW_SIZE);
+    free(small);
+    put_le32(image + 0x1F4, fw_size);
+    image[LARGE_DATA_AT] = (uint8_t)(seed + 1);
+    memcpy(image + LARGE_FW_SIZE, image, 512);
+    put_le32(image + LARGE_FW_END, image_crc_update(0, image, LARGE_FW_END));
+    return image;
+}
+
+static void an_8_mib_image_passes_the_check_and_fills_both_slots(void)
+{
+    uint8_t *image = large_image(3, LARGE_FW_SIZE);
+    reset(image, LARGE_IMAGE_SIZE);
+    UpdateStorage storage_target = stock_target();
+    UpdateFile update = source();
+    CHECK_EQUAL(UPDATE_VALID, updater_check(&update, &storage_target));
+    CHECK(updater_install(&update, &storage_target, progress()));
+    CHECK(memcmp(storage.sectors + (size_t)SLOT_1 * 512, image, LARGE_FW_END) == 0);
+    CHECK(memcmp(storage.sectors + (size_t)STOCK_SLOT_2 * 512, image, LARGE_FW_END) == 0);
+}
+
+static void an_installed_8_mib_image_is_recognised(void)
+{
+    uint8_t *image = large_image(4, LARGE_FW_SIZE);
+    reset(image, LARGE_IMAGE_SIZE);
+    memcpy(storage.sectors + (size_t)SLOT_1 * 512, image, LARGE_FW_END);
+    memcpy(storage.sectors + (size_t)STOCK_SLOT_2 * 512, image, LARGE_FW_END);
+    UpdateStorage storage_target = stock_target();
+    UpdateFile update = source();
+    CHECK_EQUAL(UPDATE_ALREADY_INSTALLED, updater_check(&update, &storage_target));
+}
+
+static void an_8_mib_image_needs_a_slot_it_fits(void)
+{
+    reset(large_image(3, LARGE_FW_SIZE), LARGE_IMAGE_SIZE);
+    UpdateStorage small = target();
+    UpdateFile update = source();
+    CHECK_EQUAL(UPDATE_INVALID, updater_check(&update, &small));
+    CHECK_EQUAL(UPDATE_REFUSED_ROOM, updater_refusal());
+}
+
+static void an_8_mib_file_with_the_5_mib_fw_size_is_invalid(void)
+{
+    reset(large_image(3, FW_SIZE), LARGE_IMAGE_SIZE);
+    UpdateStorage storage_target = stock_target();
+    UpdateFile update = source();
+    CHECK_EQUAL(UPDATE_INVALID, updater_check(&update, &storage_target));
+}
+
 static void a_half_installed_image_is_installed_again(void)
 {
     uint8_t *image = valid_image(1);
@@ -549,6 +606,10 @@ int main(void)
         TEST_CASE(a_stock_image_needs_a_slot_it_fits),
         TEST_CASE(a_refused_image_says_why),
         TEST_CASE(installing_a_stock_image_fills_both_slots_slot_2_first),
+        TEST_CASE(an_8_mib_image_passes_the_check_and_fills_both_slots),
+        TEST_CASE(an_installed_8_mib_image_is_recognised),
+        TEST_CASE(an_8_mib_image_needs_a_slot_it_fits),
+        TEST_CASE(an_8_mib_file_with_the_5_mib_fw_size_is_invalid),
     };
     int result = test_run_all(cases, TEST_CASE_COUNT(cases));
     free(storage.sectors);

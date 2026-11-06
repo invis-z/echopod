@@ -61,7 +61,7 @@ class CharacterSetTest(unittest.TestCase):
 
     def test_the_inter_faces_hold_latin_greek_cyrillic_and_vietnamese_letters(self):
         config = json.loads((ASSETS_DIRECTORY / "glyph_pack.json").read_text())
-        for face in config["faces"][2:]:
+        for face in [face for face in config["faces"] if face["name"].startswith("inter_")]:
             wanted = glyph_pack.face_characters(config, face)
             self.assertTrue(set(range(160, 256)) <= wanted)
             for character in "ĄęŁőŞğÇșțƠưЖжЯёΩλẠệ‧●„†‰′‹":
@@ -72,7 +72,8 @@ class CharacterSetTest(unittest.TestCase):
         config = json.loads((ASSETS_DIRECTORY / "glyph_pack.json").read_text())
         packs = TOOLS_DIRECTORY.parent / "src" / "fonts" / "packs"
         sizes = [(packs / f"{face['name']}.bin").stat().st_size for face in config["faces"]]
-        self.assertEqual(len(sizes), len(make_image.glyph_face_offsets(sizes)))
+        regions = make_image.glyph_regions(make_image.SHAPES[8].fw_size)
+        self.assertEqual(len(sizes), len(make_image.glyph_face_offsets(sizes, regions)))
 
     def test_faces_are_numbered_from_one_in_config_order(self):
         config = {"faces": [{"name": "a"}, {"name": "b"}]}
