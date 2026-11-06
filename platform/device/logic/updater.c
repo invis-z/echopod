@@ -24,7 +24,8 @@ enum {
     FW1_END_OFFSET = 0x80,
     FW_SIZE = 0x44C000,
     FW_END = 0x500000,
-    CHUNK_COUNT = FW_END / UPDATER_CHUNK_BYTES,
+    LARGE_FW_SIZE = 0x74C000,
+    LARGE_FW_END = 0x800000,
     BRAND_OFFSET = 0x10,
     STOCK_FW_END = 0x2000000,
     MARKER_LENGTH = 11,
@@ -44,6 +45,17 @@ static const uint8_t EIGHT_GB_MARKER[MARKER_LENGTH] = {'H', 'I', 'F', 'I', 'E', 
 static const uint8_t SMALL_MODEL_MARKER[MARKER_LENGTH] = {'M', 'I', 'N', 'I', 'V', '1',
                                                           '0', '0', 'I', 'M', 'G'};
 static const uint32_t ROW_2[4] = {0x03078CD0u, 0x03079DCCu, 4, 0};
+
+typedef struct ImageShape {
+    uint32_t file_size;
+    uint32_t fw_size;
+    uint32_t fw_end;
+} ImageShape;
+
+static const ImageShape SHAPES[] = {
+    {UPDATER_IMAGE_SIZE, FW_SIZE, FW_END},
+    {UPDATER_LARGE_IMAGE_SIZE, LARGE_FW_SIZE, LARGE_FW_END},
+};
 
 typedef struct ModelScan {
     uint8_t carry[MARKER_CARRY];
@@ -125,11 +137,23 @@ static bool has_text(const uint8_t *bytes, const uint8_t *text, size_t length)
     return true;
 }
 
-static bool header_is_valid(const uint8_t *header, const UpdateStorage *storage)
+static const ImageShape *shape_of(uint32_t file_size)
+{
+    for (size_t index = 0; index < sizeof SHAPES / sizeof SHAPES[0]; index++) {
+        if (SHAPES[index].file_size == file_size) {
+            return &SHAPES[index];
+        }
+    }
+    return NULL;
+}
+
+static bool header_is_valid(const uint8_t *header, const UpdateStorage *storage,
+                            const ImageShape *shape)
 {
     return has_text(header + MAGIC_OFFSET, MAGIC, sizeof MAGIC) &&
-           le32(header + FW_SIZE_OFFSET) == FW_SIZE && le32(header + FW1_END_OFFSET) <= FW_SIZE &&
-           FW_END / SECTOR_BYTES <= storage->slot_sectors &&
+           le32(header + FW_SIZE_OFFSET) == shape->fw_size &&
+           le32(header + FW1_END_OFFSET) <= shape->fw_size &&
+           shape->fw_end / SECTOR_BYTES <= storage->slot_sectors &&
            le32(header + CONTAINER_BASE_OFFSET) == CODE_BASE &&
            le32(header + CONTAINER_CAPACITY_OFFSET) == TABLE_ROWS;
 }
@@ -211,7 +235,7 @@ static bool chunk_matches_slot(const UpdateFile *file, const UpdateStorage *stor
 }
 
 static bool matches_installed(const UpdateFile *file, const UpdateStorage *storage,
-                              uint32_t fw1_end)
+                              uint32_t fw1_end, const ImageShape *shape)
 {
     uint32_t used_chunks = (fw1_end + UPDATER_CHUNK_BYTES - 1) / UPDATER_CHUNK_BYTES;
     for (uint32_t chunk = 0; chunk < used_chunks; chunk++) {
@@ -219,7 +243,8 @@ static bool matches_installed(const UpdateFile *file, const UpdateStorage *stora
             return false;
         }
     }
-    return chunk_matches_slot(file, storage, storage->slot_1, FW_SIZE / UPDATER_CHUNK_BYTES) &&
+    return chunk_matches_slot(file, storage, storage->slot_1,
+                              shape->fw_size / UPDATER_CHUNK_BYTES) &&
            chunk_matches_slot(file, storage, storage->slot_2, 0);
 }
 
@@ -301,8 +326,9 @@ static UpdateCheck stock_check(const UpdateFile *file, const UpdateStorage *stor
 UpdateCheck updater_check(const UpdateFile *file, const UpdateStorage *storage)
 {
     bool stock = file->size == UPDATER_STOCK_IMAGE_SIZE;
+    const ImageShape *shape = shape_of(file->size);
     refusal = UPDATE_REFUSED_NONE;
-    if (source_chunk == NULL || (file->size != UPDATER_IMAGE_SIZE && !stock) ||
+    if (source_chunk == NULL || (shape == NULL && !stock) ||
         !file->read(file->context, 0, prefix, PREFIX_BYTES)) {
         refusal = UPDATE_REFUSED_SIZE;
         return UPDATE_INVALID;
@@ -311,19 +337,19 @@ UpdateCheck updater_check(const UpdateFile *file, const UpdateStorage *storage)
         return stock_check(file, storage, prefix);
     }
     const uint8_t *bytes = (const uint8_t *)prefix;
-    if (!header_is_valid(bytes, storage)) {
-        refusal = FW_END / SECTOR_BYTES <= storage->slot_sectors ? UPDATE_REFUSED_HEADER
-                                                                 : UPDATE_REFUSED_ROOM;
+    if (!header_is_valid(bytes, storage, shape)) {
+        refusal = shape->fw_end / SECTOR_BYTES <= storage->slot_sectors ? UPDATE_REFUSED_HEADER
+                                                                        : UPDATE_REFUSED_ROOM;
         return UPDATE_INVALID;
     }
-    if (!header_copy_matches(file, prefix, FW_SIZE) || !layout_is_bootable(file, bytes)) {
+    if (!header_copy_matches(file, prefix, shape->fw_size) || !layout_is_bootable(file, bytes)) {
         refusal = UPDATE_REFUSED_LAYOUT;
         return UPDATE_INVALID;
     }
-    if (matches_installed(file, storage, le32(bytes + FW1_END_OFFSET))) {
+    if (matches_installed(file, storage, le32(bytes + FW1_END_OFFSET), shape)) {
         return UPDATE_ALREADY_INSTALLED;
     }
-    if (!crc_is_valid(file, FW_END, NULL)) {
+    if (!crc_is_valid(file, shape->fw_end, NULL)) {
         refusal = UPDATE_REFUSED_CRC;
         return UPDATE_INVALID;
     }

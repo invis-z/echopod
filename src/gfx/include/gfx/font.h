@@ -19,7 +19,7 @@ typedef struct Font {
     uint16_t bitmap_size;
     uint8_t ascent;
     uint8_t descent;
-    uint8_t pack_faces[2];
+    uint8_t pack_faces[3];
 } Font;
 
 enum {

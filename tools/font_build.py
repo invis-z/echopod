@@ -135,7 +135,7 @@ def font_source(font):
         f"    .bitmap_size = {len(bitmap)},",
         f"    .ascent = {font.ascent},",
         f"    .descent = {font.descent},",
-        *([f"    .pack_faces = {{{font.pack_faces[0]}, {font.pack_faces[1]}}},"]
+        *([f"    .pack_faces = {{{', '.join(str(face) for face in font.pack_faces)}}},"]
           if any(font.pack_faces) else []),
         "};",
         "",

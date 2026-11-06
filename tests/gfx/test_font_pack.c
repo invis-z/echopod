@@ -261,6 +261,17 @@ static void characters_below_cjk_use_the_other_face(void)
     CHECK(pack.reads > reads);
 }
 
+static void a_character_missing_from_its_face_comes_from_the_extension(void)
+{
+    attach();
+    PACKED_FONT.pack_faces[1] = 2;
+    const Glyph *missing = font_find_glyph(&PACKED_FONT, codepoint_of(2));
+    CHECK(missing != NULL && missing->codepoint == FONT_FALLBACK_CODEPOINT);
+    PACKED_FONT.pack_faces[2] = 1;
+    const Glyph *glyph = font_find_glyph(&PACKED_FONT, codepoint_of(3));
+    CHECK(glyph != NULL && glyph->codepoint == codepoint_of(3));
+}
+
 static void a_font_without_a_pack_face_ignores_packs(void)
 {
     attach();
@@ -287,6 +298,7 @@ int main(void)
         TEST_CASE(a_character_in_neither_falls_back_to_the_question_mark),
         TEST_CASE(without_packs_a_font_uses_the_question_mark),
         TEST_CASE(characters_below_cjk_use_the_other_face),
+        TEST_CASE(a_character_missing_from_its_face_comes_from_the_extension),
         TEST_CASE(a_font_without_a_pack_face_ignores_packs),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

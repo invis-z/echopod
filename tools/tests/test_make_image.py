@@ -118,6 +118,37 @@ class FwEndTest(unittest.TestCase):
         self.assertEqual(0x2000000, make_image.fw_end(0x01FC4000))
 
 
+class LargeLayoutTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.image = build(shape=make_image.SHAPES[8])
+
+    def test_the_large_fw_size_ends_at_8_mib(self):
+        self.assertEqual(0x800000, make_image.fw_end(0x74C000))
+
+    def test_the_image_is_8_mib_plus_the_trailer(self):
+        self.assertEqual(0x800004, len(self.image))
+
+    def test_the_fw_size_word_is_the_header_copy_offset(self):
+        self.assertEqual(0x74C000, word(self.image, 0x1F4))
+        self.assertEqual(self.image[:0x200], self.image[0x74C000:0x74C200])
+
+    def test_the_trailer_is_the_crc_of_everything_before_it(self):
+        self.assertEqual(make_image.crc32(self.image[:0x800000]), word(self.image, 0x800000))
+        self.assertEqual([], make_image.validate_image(self.image))
+
+    def test_the_payload_splits_back_out_of_a_large_image(self):
+        parts = make_image.split_image(self.image)
+        self.assertEqual(self.image, make_image.assemble(parts, make_image.SHAPES[8]))
+
+    def test_faces_too_big_for_5_mib_fit_8_mib(self):
+        sizes = [1_700_000, 1_700_000, 1_050_000, 1_050_000]
+        with self.assertRaises(make_image.ImageError):
+            make_image.glyph_face_offsets(sizes)
+        offsets = make_image.glyph_face_offsets(sizes, make_image.glyph_regions(0x74C000))
+        self.assertTrue(all(offset + size <= 0x74C000 for offset, size in zip(offsets, sizes)))
+
+
 class LayoutTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
