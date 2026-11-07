@@ -40,7 +40,7 @@ add_library(rippl_app STATIC
 )
 target_include_directories(rippl_app PUBLIC include PRIVATE .)
 if(CMAKE_CROSSCOMPILING)
-    target_compile_definitions(rippl_app PRIVATE RIPPL_RESIDENT_TABLES RIPPL_EQ_FILES_HIDDEN)
+    target_compile_definitions(rippl_app PRIVATE RIPPL_RESIDENT_TABLES)
 endif()
 target_link_libraries(rippl_app
     PUBLIC rippl_core rippl_gfx rippl_ui rippl_fonts rippl_library rippl_playback rippl_settings rippl_sound rippl_hal

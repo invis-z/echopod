@@ -36,6 +36,7 @@ static uint32_t accel_classes;
 static HalCore1Accel run_accel_test(void);
 static Core1Program streaming_program;
 static uint32_t streaming_divider;
+static uint32_t streaming_rate;
 static EqualizerCurve equalizer_curve;
 static uint32_t equalizer_version;
 
@@ -151,7 +152,8 @@ static bool equalizer_moved(void)
 
 static bool equalizing(Core1Program program, uint32_t rate)
 {
-    return program == CORE1_PROGRAM_FLAC && rate <= EQUALIZER_MAX_RATE && equalizer_moved();
+    (void)program;
+    return rate <= EQUALIZER_MAX_RATE && equalizer_moved();
 }
 
 static bool hi_res(Core1Program program, uint32_t rate)
@@ -179,8 +181,8 @@ static void share_equalizer(bool enabled)
 void board_core1_set_equalizer(const EqualizerCurve *curve)
 {
     equalizer_curve = *curve;
-    if (streaming && streaming_program == CORE1_PROGRAM_FLAC) {
-        share_equalizer(streaming_divider == 1);
+    if (streaming) {
+        share_equalizer(equalizing(streaming_program, streaming_rate) && streaming_divider == 1);
     }
 }
 
@@ -209,6 +211,7 @@ bool board_core1_start_stream(Core1Program program, uint32_t rate)
         return true;
     }
     board_core1_stop();
+    core1_region().control->generation = 0;
     if (program == CORE1_PROGRAM_FLAC && !accel_known && hal_system_clock_mhz() >= LOWEST_PLL_MHZ) {
         (void)run_accel_test();
     }
@@ -237,6 +240,7 @@ bool board_core1_start_stream(Core1Program program, uint32_t rate)
     streaming = true;
     streaming_program = program;
     streaming_divider = divider;
+    streaming_rate = rate;
     return true;
 }
 

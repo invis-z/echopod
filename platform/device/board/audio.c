@@ -125,6 +125,8 @@ static uint32_t rest_position_ms;
 static uint32_t paused_since_ms;
 static uint32_t lead_frames;
 
+static void clear_ring(void);
+
 static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
     const HalFile *open = context;
@@ -264,6 +266,7 @@ static Core1Program program_for(SourceKind kind)
     }
     return kind == SOURCE_AAC ? CORE1_PROGRAM_AAC : CORE1_PROGRAM_FLAC;
 }
+
 
 static AudioSource chosen_source(void)
 {
@@ -498,6 +501,7 @@ static bool start_output(bool audible)
     if (!ensure_path(rate)) {
         return false;
     }
+    clear_ring();
     bool from_start = audio_engine_status(&engine).position_ms == 0;
     uint32_t lead = frames_in(cold ? COLD_LEAD_MS : WARM_LEAD_MS);
     audio_engine_lead_in(&engine, lead, frames_in(from_start ? START_RAMP_MS : RESUME_RAMP_MS));
@@ -603,6 +607,7 @@ bool hal_audio_play(const char *path, uint32_t start_ms, uint32_t token)
     stop_tone();
     stop_transfer();
     choose_clock(path);
+    core1_source_reset_equalizer(&core1_source);
     if (!audio_engine_play(&engine, path, start_ms, token)) {
         return false;
     }
@@ -672,6 +677,7 @@ static void seek_to(uint32_t position_ms, bool paused, bool choose)
     if (choose) {
         choose_clock(audio_engine_current_path(&engine));
     }
+    core1_source_reset_equalizer(&core1_source);
     if (!audio_engine_seek(&engine, position_ms) || !start_output(!paused)) {
         audio_engine_stop(&engine);
         return;
