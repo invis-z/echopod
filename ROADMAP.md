@@ -22,7 +22,7 @@ Version 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in pl
 | M3U and M3U8 playlists | device | Including MusicBee's Windows paths |
 | Album favorites | device | Hold Play on an album |
 | Audiobooks and podcasts | device | `Audiobooks` and `Podcasts` folders on Home, kept out of Music; a bookmark per book and episode, in-order play, hold vol± jumps 30 s / 15 s (shelves checked on the player, bookmarks and jumps in the simulator) |
-| Library and covers built on a computer | device | rippl-sync, one file for Windows, macOS and Linux, writes `library.db`, `covers.bin` and the scan fingerprint so the player doesn't rescan; 1,563 tracks in 2 min on Windows (macOS and Linux untested on a card) |
+| Library and covers built on a computer | tests | Tide, one file for Windows, macOS and Linux, writes the player's segment files, scan records and the scan fingerprint so the player doesn't rescan and its next rescan reads only new files; checked against the player's own build in the host tests, not yet on a card |
 | Screen-off controls | device | Pause, volume and track skip with the screen off |
 | Portrait mode | device | Settings → Orientation: Portrait or Portrait, flipped, with portrait layouts for Home, Now Playing, Cover Flow, the Custom EQ and lists; the volume rocker turns with the screen |
 | Languages | installed once; not checked screen by screen | Settings → Language, 16 languages in packs loaded at start; no native speaker has reviewed the translations yet (the Chinese starts from a contributor's text); Cyrillic, Greek and extended Latin letters in track names draw |
@@ -44,7 +44,7 @@ Version 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in pl
 | Check the post-0.1.0 fixes and audiobook bookmarks on hardware | in progress |
 | Faster cover decoding on the player (about 0.5 s per album) | todo |
 | Browse while covers are built | todo |
-| rippl-sync on a Mac and on Linux with a real card | todo |
+| Tide on Windows, a Mac and Linux with a real card | todo |
 | Firmware images in GitHub releases | todo |
 | Playback speed for audiobooks and podcasts | todo |
 | Installing from a Mac through FiiO's updater | todo |

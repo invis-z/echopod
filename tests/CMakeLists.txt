@@ -386,7 +386,7 @@ if(RIPPL_BUILD_SIM)
     )
     add_executable(cover_build_tool library/cover_build_tool.c)
     target_link_libraries(cover_build_tool PRIVATE rippl_library_scan rippl_sim_storage
-        rippl_options)
+        rippl_library_checks rippl_options)
     if(EXISTS ${PROJECT_SOURCE_DIR}/.venv/bin/python)
         add_test(NAME cover_build_matches_reference
             COMMAND ${PROJECT_SOURCE_DIR}/.venv/bin/python
