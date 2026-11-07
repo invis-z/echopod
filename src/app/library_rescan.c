@@ -78,6 +78,7 @@ static bool next_entry(void *context, ScanEntry *entry)
         return false;
     }
     entry->directory = files->entry.directory;
+    entry->size = files->entry.size;
     entry->modified = files->entry.modified;
     for (size_t index = 0; index < sizeof entry->name; index++) {
         entry->name[index] = files->entry.name[index];
