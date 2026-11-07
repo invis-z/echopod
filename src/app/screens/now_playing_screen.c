@@ -9,6 +9,7 @@
 #include "hal/audio.h"
 #include "hal/storage.h"
 #include "hal/system.h"
+#include "screens/equalizer_screen.h"
 #include "settings/settings.h"
 #include "ui/header.h"
 #include "ui/icons.h"
@@ -361,7 +362,7 @@ static ScreenAction run_command(NowPlayingScreen *now_playing, NowPlayingCommand
                                                    : screen_action_none();
     case NOW_PLAYING_EQUALIZER:
         return now_playing->config.equalizer != NULL
-                   ? screen_action_push(now_playing->config.equalizer)
+                   ? equalizer_screen_open(now_playing->config.equalizer->context)
                    : screen_action_none();
     case NOW_PLAYING_HOME:
         now_playing->scrubbing = false;
