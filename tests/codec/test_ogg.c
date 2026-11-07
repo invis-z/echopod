@@ -32,7 +32,7 @@ static Packets part;
 static Buffer load(const char *name)
 {
     char path[512];
-    snprintf(path, sizeof path, "%s/opus/%s.opus", ECHO_FIXTURE_DIR, name);
+    snprintf(path, sizeof path, "%s/opus/%s.opus", RIPPL_FIXTURE_DIR, name);
     Buffer buffer = {NULL, 0};
     FILE *file = fopen(path, "rb");
     if (file == NULL) {

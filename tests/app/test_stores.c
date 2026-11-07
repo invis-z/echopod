@@ -178,7 +178,7 @@ static void an_empty_favorites_list_answers_without_reading_the_library(void)
     CHECK_EQUAL(0, fixture.memory.reads);
 }
 
-static const char COVERS_PATH[] = "/.echo/covers.bin";
+static const char COVERS_PATH[] = "/.rippl/covers.bin";
 
 enum {
     COVER_SLOT = 8 + 4 + COVER_BUILD_RECORD_BYTES,

@@ -32,7 +32,7 @@ static int reference_channels;
 static void load(const char *name)
 {
     char path[512];
-    snprintf(path, sizeof path, "%s/mp3/%s.mp3", ECHO_FIXTURE_DIR, name);
+    snprintf(path, sizeof path, "%s/mp3/%s.mp3", RIPPL_FIXTURE_DIR, name);
     free(fixture.bytes);
     fixture = (Fixture){NULL, 0};
     FILE *file = fopen(path, "rb");

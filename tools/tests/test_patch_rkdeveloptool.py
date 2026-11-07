@@ -42,14 +42,14 @@ class PatchTest(unittest.TestCase):
             patch_rkdeveloptool.patch(root)
             self.assertIn("#define DEFAULT_RW_LBA 32\n", (root / "main.cpp").read_text())
 
-    def test_the_echo_mini_maskrom_id_is_a_known_rknano_device(self):
+    def test_the_rippl_mini_maskrom_id_is_a_known_rknano_device(self):
         with tempfile.TemporaryDirectory() as directory:
             root = make_tree(directory)
             patch_rkdeveloptool.patch(root)
             scan = (root / "RKScan.cpp").read_text()
             self.assertIn("config.usPid = 0x262D;\n\tconfig.usVid = 0x2207;", scan)
 
-    def test_the_echo_mini_is_classified_by_bcd_device(self):
+    def test_the_rippl_mini_is_classified_by_bcd_device(self):
         with tempfile.TemporaryDirectory() as directory:
             root = make_tree(directory)
             patch_rkdeveloptool.patch(root)

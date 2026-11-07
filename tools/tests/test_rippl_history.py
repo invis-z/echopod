@@ -10,8 +10,8 @@ TOOLS_DIRECTORY = Path(__file__).resolve().parents[1]
 SHARED_DIRECTORY = TOOLS_DIRECTORY.parent / "tests" / "fixtures" / "history"
 sys.path.insert(0, str(TOOLS_DIRECTORY))
 
-import echo_history
-from echo_history import COMPUTER, PLAY, Record
+import rippl_history
+from rippl_history import COMPUTER, PLAY, Record
 
 NOW = 1_700_000_000
 MINUTE_MS = 60_000
@@ -64,24 +64,24 @@ def shared_records():
 
 
 def ring(records, slots=16):
-    data = bytearray(slots * echo_history.SLOT_BYTES)
+    data = bytearray(slots * rippl_history.SLOT_BYTES)
     for record in records:
-        at = (record.sequence - 1) % slots * echo_history.SLOT_BYTES
-        data[at:at + echo_history.SLOT_BYTES] = echo_history.pack_slot(record)
+        at = (record.sequence - 1) % slots * rippl_history.SLOT_BYTES
+        data[at:at + rippl_history.SLOT_BYTES] = rippl_history.pack_slot(record)
     return bytes(data)
 
 
 class HistoryTest(unittest.TestCase):
     def make_card(self, directory, records, slots=16):
         root = Path(directory)
-        (root / ".echo").mkdir(exist_ok=True)
-        (root / ".echo" / "history.bin").write_bytes(ring(records, slots))
+        (root / ".rippl").mkdir(exist_ok=True)
+        (root / ".rippl" / "history.bin").write_bytes(ring(records, slots))
         return root
 
     def run_tool(self, root, *options):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            self.assertEqual(0, echo_history.main([str(root), "--now", str(NOW), *options]))
+            self.assertEqual(0, rippl_history.main([str(root), "--now", str(NOW), *options]))
         return output.getvalue()
 
     def log_lines(self, root):
@@ -89,7 +89,7 @@ class HistoryTest(unittest.TestCase):
 
     def test_a_slot_matches_the_players_layout(self):
         record = play(9, 3, 1000, 200_000, number=4, title="Ünïcode")
-        slot = echo_history.pack_slot(record)
+        slot = rippl_history.pack_slot(record)
         self.assertEqual(512, len(slot))
         self.assertEqual(b"EHST", slot[:4])
         self.assertEqual(9, slot[4])
@@ -97,21 +97,21 @@ class HistoryTest(unittest.TestCase):
         self.assertEqual(PLAY, slot[12])
         self.assertEqual(4, slot[13])
         self.assertEqual(b"Artist\0Album\0\xc3\x9cn\xc3\xafcode\0", slot[44:44 + 23])
-        self.assertEqual(record, echo_history.unpack_slot(slot))
+        self.assertEqual(record, rippl_history.unpack_slot(slot))
 
     def test_damaged_and_misplaced_records_are_skipped(self):
         records = [play(1, 1, 0, 200_000), play(2, 1, 300_000, 200_000)]
         data = bytearray(ring(records))
         data[512 + 100] ^= 1
-        self.assertEqual([1], [record.sequence for record in echo_history.read_history(data)])
+        self.assertEqual([1], [record.sequence for record in rippl_history.read_history(data)])
         stray = ring([play(7, 1, 0, 1000)])
         moved = stray[6 * 512:7 * 512] + bytes(15 * 512)
-        self.assertEqual([], echo_history.read_history(moved))
+        self.assertEqual([], rippl_history.read_history(moved))
 
     def test_only_the_newest_lap_of_the_ring_is_read(self):
         records = [play(sequence, 1, sequence * MINUTE_MS, 1000) for sequence in range(1, 7)]
         data = ring(records, slots=4)
-        found = echo_history.read_history(data)
+        found = rippl_history.read_history(data)
         self.assertEqual([3, 4, 5, 6], [record.sequence for record in found])
 
     def test_the_log_lines_are_rockbox_format(self):
@@ -124,21 +124,21 @@ class HistoryTest(unittest.TestCase):
             root = self.make_card(directory, records)
             self.run_tool(root, "--include-skipped")
             lines = self.log_lines(root)
-        version = echo_history.firmware_version()
+        version = rippl_history.firmware_version()
         self.assertEqual(["#AUDIOSCROBBLER/1.1\n", "#TZ/UTC\n",
-                          f"#CLIENT/EchoPod {version}\n".replace(" \n", "\n"),
+                          f"#CLIENT/Rippl {version}\n".replace(" \n", "\n"),
                           f"AC/DC\tBack In Black\tHells Bells\t1\t312\tL\t{NOW - 290}\t\n",
                           f"AC/DC\tBack In Black\tShoot to Thrill\t2\t317\tS\t{NOW - 80}\t\n"],
                          lines)
 
     def test_the_listening_rule_is_last_fms(self):
-        self.assertTrue(echo_history.listened(240_000, 120_000))
-        self.assertFalse(echo_history.listened(240_000, 119_999))
-        self.assertTrue(echo_history.listened(600_000, 240_000))
-        self.assertFalse(echo_history.listened(600_000, 239_999))
-        self.assertFalse(echo_history.listened(30_000, 30_000))
-        self.assertTrue(echo_history.listened(31_000, 15_500))
-        self.assertFalse(echo_history.listened(0, 500_000))
+        self.assertTrue(rippl_history.listened(240_000, 120_000))
+        self.assertFalse(rippl_history.listened(240_000, 119_999))
+        self.assertTrue(rippl_history.listened(600_000, 240_000))
+        self.assertFalse(rippl_history.listened(600_000, 239_999))
+        self.assertFalse(rippl_history.listened(30_000, 30_000))
+        self.assertTrue(rippl_history.listened(31_000, 15_500))
+        self.assertFalse(rippl_history.listened(0, 500_000))
 
     def test_skipped_plays_are_left_out_unless_asked_for(self):
         records = [play(1, 1, 0, 10_000, title="Skipped"), play(2, 1, 20_000, 200_000)]
@@ -155,7 +155,7 @@ class HistoryTest(unittest.TestCase):
                    play(2, 1, 300_000, 200_000, title="Second"),
                    play(3, 2, 30_000, 200_000, title="Third"),
                    mark(4, 2, 600_000)]
-        plays = echo_history.plays_of(records, NOW * 1000)
+        plays = rippl_history.plays_of(records, NOW * 1000)
         third_boot = NOW * 1000 - 600_000
         self.assertEqual((third_boot + 30_000) // 1000, plays[2].timestamp)
         first_boot = third_boot - 500_000
@@ -165,7 +165,7 @@ class HistoryTest(unittest.TestCase):
     def test_a_clock_time_dates_its_session_exactly(self):
         records = [play(1, 1, 50_000, 200_000, title="Clocked", unix_time=1_600_000_250),
                    play(2, 2, 10_000, 200_000, title="Later")]
-        plays = echo_history.plays_of(records, NOW * 1000)
+        plays = rippl_history.plays_of(records, NOW * 1000)
         self.assertEqual(1_600_000_050, plays[0].timestamp)
         self.assertEqual(NOW - 200, plays[1].timestamp)
 
@@ -175,7 +175,7 @@ class HistoryTest(unittest.TestCase):
                    play(3, 1, 400_000, 200_000, title="After sync", unix_time=1_600_000_600),
                    play(4, 2, 10_000, 200_000, title="Next boot")]
         records[1] = mark(2, 1, 300_000)
-        plays = echo_history.plays_of(records, NOW * 1000)
+        plays = rippl_history.plays_of(records, NOW * 1000)
         self.assertEqual(1_600_000_600 - 600 + 50, plays[0].timestamp)
         self.assertEqual(1_600_000_600 - 600 + 400, plays[1].timestamp)
         self.assertEqual(NOW - 200, plays[2].timestamp)
@@ -184,7 +184,7 @@ class HistoryTest(unittest.TestCase):
         records = [play(1, 1, 0, 100_000, start_at=0, end_at=100_000),
                    play(2, 2, 5_000, 100_000, start_at=100_500, end_at=200_000),
                    play(3, 2, 200_000, 100_000, start_at=0, end_at=100_000)]
-        plays = echo_history.plays_of(records, NOW * 1000)
+        plays = rippl_history.plays_of(records, NOW * 1000)
         self.assertEqual(["L", "S"], [entry.rating for entry in plays])
         self.assertEqual(2, plays[0].sequence)
         self.assertEqual(200_000, plays[0].played_ms)
@@ -193,7 +193,7 @@ class HistoryTest(unittest.TestCase):
     def test_a_resumed_play_after_a_listened_one_is_not_scrobbled_twice(self):
         records = [play(1, 1, 0, 150_000, start_at=0, end_at=150_000),
                    play(2, 1, 400_000, 50_000, start_at=150_000, end_at=200_000)]
-        plays = echo_history.plays_of(records, NOW * 1000)
+        plays = rippl_history.plays_of(records, NOW * 1000)
         self.assertEqual([("L", 1)], [(entry.rating, entry.sequence) for entry in plays])
 
     def test_running_twice_adds_only_new_plays(self):
@@ -208,7 +208,7 @@ class HistoryTest(unittest.TestCase):
             summary = self.run_tool(root)
             lines = self.log_lines(root)
             self.assertEqual(b"0000000004\n",
-                             (root / ".echo" / "history-exported.txt").read_bytes())
+                             (root / ".rippl" / "history-exported.txt").read_bytes())
         self.assertEqual(5, len(lines))
         self.assertEqual(1, sum(line.startswith("#AUDIOSCROBBLER") for line in lines))
         self.assertIn("\tTwo\t", lines[4])
@@ -227,7 +227,7 @@ class HistoryTest(unittest.TestCase):
     def test_a_recreated_history_file_starts_counting_again(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self.make_card(directory, [play(1, 1, 0, 200_000)])
-            (root / ".echo" / "history-exported.txt").write_text("900\n")
+            (root / ".rippl" / "history-exported.txt").write_text("900\n")
             self.run_tool(root)
             self.assertEqual(4, len(self.log_lines(root)))
 
@@ -236,24 +236,24 @@ class HistoryTest(unittest.TestCase):
             root = self.make_card(directory, [play(1, 1, 0, 200_000, title="Elsewhere")])
             listing = json.loads(self.run_tool(root, "--json"))
             self.assertEqual("Elsewhere", listing[0]["title"])
-            self.assertFalse((root / ".echo" / "history-exported.txt").exists())
+            self.assertFalse((root / ".rippl" / "history-exported.txt").exists())
             target = Path(directory) / "out.log"
             self.run_tool(root, "--output", str(target))
             self.assertTrue(target.is_file())
             self.assertFalse((root / ".scrobbler.log").exists())
 
     def test_tabs_in_names_do_not_break_the_columns(self):
-        line = echo_history.log_line(echo_history.Play(1, "A\tB", "C", "D\nE", 0, 200, "L", 7,
+        line = rippl_history.log_line(rippl_history.Play(1, "A\tB", "C", "D\nE", 0, 200, "L", 7,
                                                        200_000))
         self.assertEqual("A B\tC\tD E\t\t200\tL\t7\t\n", line)
 
     def shared_export(self, directory, marker=None, existing=None):
         root = self.make_card(directory, shared_records())
         if marker is not None:
-            (root / ".echo" / "history-exported.txt").write_bytes(marker)
+            (root / ".rippl" / "history-exported.txt").write_bytes(marker)
         if existing is not None:
             (root / ".scrobbler.log").write_bytes(existing.encode("utf-8"))
-        echo_history.export(root, now_ms=NOW * 1000, include_skipped=True, version="test")
+        rippl_history.export(root, now_ms=NOW * 1000, include_skipped=True, version="test")
         return root
 
     def test_the_shared_fixture_is_the_one_the_player_reads(self):
@@ -265,7 +265,7 @@ class HistoryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self.shared_export(directory)
             written = (root / ".scrobbler.log").read_bytes()
-            marker = (root / ".echo" / "history-exported.txt").read_bytes()
+            marker = (root / ".rippl" / "history-exported.txt").read_bytes()
         self.assertEqual((SHARED_DIRECTORY / "all.log").read_bytes(), written)
         self.assertEqual(b"0000000011\n", marker)
 
@@ -279,7 +279,7 @@ class HistoryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self.make_card(directory, [play(1, 1, 0, 200_000, title="Old"),
                                               play(2, 1, 300_000, 200_000, title="New")])
-            marker = root / ".echo" / "history-exported.txt"
+            marker = root / ".rippl" / "history-exported.txt"
             for text in (b"0000000001\n", b"1\r\n", b"0000000001\n\n"):
                 marker.write_bytes(text)
                 (root / ".scrobbler.log").unlink(missing_ok=True)
@@ -293,7 +293,7 @@ class HistoryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             errors = io.StringIO()
             with contextlib.redirect_stderr(errors):
-                self.assertEqual(1, echo_history.main([directory]))
+                self.assertEqual(1, rippl_history.main([directory]))
         self.assertIn("no listen history", errors.getvalue())
 
 

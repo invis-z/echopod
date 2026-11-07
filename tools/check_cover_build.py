@@ -175,7 +175,7 @@ def simulator_describe(path):
     return path.name.encode("utf-8"), path.stat().st_mtime_ns // NANOSECONDS
 
 
-def export_like_echo_sync(music, output):
+def export_like_rippl_sync(music, output):
     sources = cover_export.album_sources_from_library((output / "library.db").read_bytes())
     covers = cover_export.collect_covers(music, sources, cover_export.cover_record,
                                          simulator_describe)
@@ -193,14 +193,14 @@ def run_tool(tool, music, output):
 
 
 def reuse_failures(tool, music, output):
-    exported = export_like_echo_sync(music, output)
+    exported = export_like_rippl_sync(music, output)
     result = run_tool(tool, music, output)
     counts = TOOL_COUNTS.search(result.stdout)
     if result.returncode != 0 or counts is None:
-        return ["the player side couldn't read echo-sync's covers"]
+        return ["the player side couldn't read rippl-sync's covers"]
     covers, reused = int(counts.group(1)), int(counts.group(2))
     if (covers, reused) != (exported, exported):
-        return [f"echo-sync wrote {exported} covers, the player kept {reused} of {covers}"]
+        return [f"rippl-sync wrote {exported} covers, the player kept {reused} of {covers}"]
     return []
 
 

@@ -9,71 +9,71 @@ import size_report
 
 MAP = """Archive member included to satisfy reference by file (symbol)
 
-src/app/libecho_app.a(app.c.obj)
-                              platform/device/CMakeFiles/echo_device.dir/board/main.c.obj (app_start)
+src/app/librippl_app.a(app.c.obj)
+                              platform/device/CMakeFiles/rippl_device.dir/board/main.c.obj (app_start)
 
 Linker script and memory map
 
-LOAD platform/device/CMakeFiles/echo_device.dir/board/audio.c.obj
+LOAD platform/device/CMakeFiles/rippl_device.dir/board/audio.c.obj
 
 .code           0x03050000     0x1000
  *(.code_vectors)
- .code_vectors  0x03050000       0x40 platform/device/CMakeFiles/echo_device.dir/board/startup.c.obj
+ .code_vectors  0x03050000       0x40 platform/device/CMakeFiles/rippl_device.dir/board/startup.c.obj
  *(.text .text.*)
- .text.pump     0x03050040       0x8c platform/device/CMakeFiles/echo_device.dir/board/audio.c.obj
+ .text.pump     0x03050040       0x8c platform/device/CMakeFiles/rippl_device.dir/board/audio.c.obj
  .text.hal_audio_play
-                0x030500cc       0x40 platform/device/CMakeFiles/echo_device.dir/board/audio.c.obj
+                0x030500cc       0x40 platform/device/CMakeFiles/rippl_device.dir/board/audio.c.obj
                 0x030500cc                hal_audio_play
  *fill*         0x0305010c        0x4
  .text.app_step
                 0x03050110      0x200 C:\\Users\\x\\Temp\\ccfpNjjI.ltrans0.ltrans.o
  .text.list_view_draw
-                0x03050310      0x100 src/ui/libecho_ui.a(list_view.c.obj)
+                0x03050310      0x100 src/ui/librippl_ui.a(list_view.c.obj)
  *(.rodata .rodata.*)
  .rodata.INTER_REGULAR_12_BITMAP
-                0x03050410      0x300 src/fonts/libecho_fonts.a(fonts.c.obj)
+                0x03050410      0x300 src/fonts/librippl_fonts.a(fonts.c.obj)
  .text          0x03050710      0x2ba C:/msys64/clang64/lib/gcc/arm-none-eabi/16.2.0/thumb/v7-m/nofp\\libgcc.a(_udivmoddi4.o)
 
 .data           0x03004000        0x8 load address 0x03051000
  *(.entry_vector)
- .entry_vector  0x03004000        0x8 platform/device/CMakeFiles/echo_device.dir/board/startup.c.obj
+ .entry_vector  0x03004000        0x8 platform/device/CMakeFiles/rippl_device.dir/board/startup.c.obj
 
 .bss            0x03004008    0x20000 load address 0x03051008
  *(.bss .bss.*)
  .bss.music_ring
-                0x03004008    0x1b580 platform/device/CMakeFiles/echo_device.dir/board/audio.c.obj
+                0x03004008    0x1b580 platform/device/CMakeFiles/rippl_device.dir/board/audio.c.obj
  .bss.app       0x0301f588     0x4a78 C:\\Users\\x\\Temp\\ccfpNjjI.ltrans0.ltrans.o
 
 .noinit         0x03024008       0x30
- .noinit.record 0x03024008       0x30 platform/device/CMakeFiles/echo_device.dir/board/start_info.c.obj
+ .noinit.record 0x03024008       0x30 platform/device/CMakeFiles/rippl_device.dir/board/start_info.c.obj
 
 .high_ram       0x0307a000    0x12050
  .high_ram.decoding
-                0x0307a000     0xa050 platform/device/CMakeFiles/echo_device.dir/board/audio.c.obj
+                0x0307a000     0xa050 platform/device/CMakeFiles/rippl_device.dir/board/audio.c.obj
 
 .resident       0x0309b000     0x3b30
- .resident      0x0309b010     0x3b20 src/fonts/libecho_fonts.a(fonts.c.obj)
+ .resident      0x0309b010     0x3b20 src/fonts/librippl_fonts.a(fonts.c.obj)
 """
 
 OVERLAY_MAP = """Linker script and memory map
 
 .overlay        0x0307a000    0x14000
- .text.scan     0x0307a010     0x1000 src/library/libecho_library_scan.a(library_scan.c.obj)
+ .text.scan     0x0307a010     0x1000 src/library/librippl_library_scan.a(library_scan.c.obj)
 """
 
 USB_OVERLAY_MAP = """Linker script and memory map
 
 .overlay        0x0307a000     0x3000
- .text.usb_poll 0x0307a010      0x400 platform/device/CMakeFiles/echo_usb_overlay.dir/board/usb_port.c.obj
+ .text.usb_poll 0x0307a010      0x400 platform/device/CMakeFiles/rippl_usb_overlay.dir/board/usb_port.c.obj
 
 .bss            0x0307d000     0x9000
  .bss.write_buffer
-                0x0307d000     0x8000 platform/device/CMakeFiles/echo_usb_overlay.dir/board/usb_session.c.obj
+                0x0307d000     0x8000 platform/device/CMakeFiles/rippl_usb_overlay.dir/board/usb_session.c.obj
 """
 
-NM = """03050110 00000200 T app_step\tD:/Projects/echopod/src/app/app.c:200
-0301f588 00004a78 b app\tD:/Projects/echopod/src/app/app.c:133
-030500cc 00000040 T hal_audio_play\tD:/Projects/echopod/platform/device/board/audio.c:50
+NM = """03050110 00000200 T app_step\tD:/Projects/rippl/src/app/app.c:200
+0301f588 00004a78 b app\tD:/Projects/rippl/src/app/app.c:133
+030500cc 00000040 T hal_audio_play\tD:/Projects/rippl/platform/device/board/audio.c:50
 03050710 000002ba t __udivmoddi4
 """
 
@@ -100,17 +100,17 @@ class ParseMapTest(unittest.TestCase):
 
 class NamingTest(unittest.TestCase):
     def test_archive_members_become_library_and_source(self):
-        self.assertEqual(size_report.object_name("src/app/libecho_app.a(app.c.obj)"), "app/app.c")
-        self.assertEqual(size_report.object_name("src/library/libecho_library.a(library.c.obj)"),
+        self.assertEqual(size_report.object_name("src/app/librippl_app.a(app.c.obj)"), "app/app.c")
+        self.assertEqual(size_report.object_name("src/library/librippl_library.a(library.c.obj)"),
                          "library/library.c")
         self.assertEqual(
-            size_report.object_name("platform/device/logic/libecho_device_logic.a(msc.c.obj)"),
+            size_report.object_name("platform/device/logic/librippl_device_logic.a(msc.c.obj)"),
             "device_logic/msc.c")
 
     def test_plain_objects_keep_their_source_path(self):
         self.assertEqual(
             size_report.object_name(
-                "platform/device/CMakeFiles/echo_device.dir/board/audio.c.obj"),
+                "platform/device/CMakeFiles/rippl_device.dir/board/audio.c.obj"),
             "board/audio.c")
 
     def test_libgcc_members_are_grouped_under_gcc(self):

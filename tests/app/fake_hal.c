@@ -1261,7 +1261,7 @@ static uint8_t *store_for(FakeFile *file)
             return stores[slot];
         }
     }
-    if (file->size > STORE_CAPACITY && strcmp(file->path, "/.echo/build.tmp") == 0) {
+    if (file->size > STORE_CAPACITY && strcmp(file->path, "/.rippl/build.tmp") == 0) {
         return large_store_for(file);
     }
     for (int slot = 0; slot < STORE_SLOTS; slot++) {
@@ -1291,8 +1291,8 @@ bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uin
     if (store != NULL && offset + length <= file->stored) {
         memcpy(store + offset, bytes, length);
     }
-    fake.library_writes += strcmp(path, "/.echo/library.db") == 0;
-    fake.covers_writes += strcmp(path, "/.echo/covers.bin") == 0;
+    fake.library_writes += strcmp(path, "/.rippl/library.db") == 0;
+    fake.covers_writes += strcmp(path, "/.rippl/covers.bin") == 0;
     return true;
 }
 

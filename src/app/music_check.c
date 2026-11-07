@@ -7,7 +7,7 @@
 #include "hal/storage.h"
 #include "hal/system.h"
 
-const char MUSIC_CHECK_PATH[] = "/.echo/scan.bin";
+const char MUSIC_CHECK_PATH[] = "/.rippl/scan.bin";
 
 enum {
     PRINT_BYTES = 16,

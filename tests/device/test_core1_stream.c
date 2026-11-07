@@ -74,15 +74,15 @@ static Fixture load(const char *name, const char *extension)
     char path[512];
     if (strncmp(name, "opus/", 5) == 0) {
         const char *suffix = strcmp(extension, "flac") == 0 ? "opus" : extension;
-        snprintf(path, sizeof path, "%s/%s.%s", ECHO_FIXTURE_DIR, name, suffix);
+        snprintf(path, sizeof path, "%s/%s.%s", RIPPL_FIXTURE_DIR, name, suffix);
     } else if (strncmp(name, "mp3/", 4) == 0) {
-        snprintf(path, sizeof path, "%s/%s.mp3", ECHO_FIXTURE_DIR, name);
+        snprintf(path, sizeof path, "%s/%s.mp3", RIPPL_FIXTURE_DIR, name);
     } else if (strncmp(name, "alac/", 5) == 0 || strncmp(name, "tags/", 5) == 0 ||
                strncmp(name, "aac/", 4) == 0) {
         const char *suffix = strcmp(extension, "flac") == 0 ? "m4a" : extension;
-        snprintf(path, sizeof path, "%s/%s.%s", ECHO_FIXTURE_DIR, name, suffix);
+        snprintf(path, sizeof path, "%s/%s.%s", RIPPL_FIXTURE_DIR, name, suffix);
     } else {
-        snprintf(path, sizeof path, "%s/flac/%s.%s", ECHO_FIXTURE_DIR, name, extension);
+        snprintf(path, sizeof path, "%s/flac/%s.%s", RIPPL_FIXTURE_DIR, name, extension);
     }
     Fixture fixture = {NULL, 0};
     FILE *file = fopen(path, "rb");

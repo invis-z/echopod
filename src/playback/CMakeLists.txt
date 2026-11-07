@@ -1,4 +1,4 @@
-add_library(echo_playback STATIC
+add_library(rippl_playback STATIC
     bookmarks.c
     lyrics.c
     play_queue.c
@@ -6,8 +6,8 @@ add_library(echo_playback STATIC
     spoken.c
     up_next.c
 )
-target_include_directories(echo_playback PUBLIC include)
-target_link_libraries(echo_playback
-    PUBLIC echo_core echo_library
-    PRIVATE echo_options echo_compact echo_lto
+target_include_directories(rippl_playback PUBLIC include)
+target_link_libraries(rippl_playback
+    PUBLIC rippl_core rippl_library
+    PRIVATE rippl_options rippl_compact rippl_lto
 )

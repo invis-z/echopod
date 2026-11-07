@@ -13,8 +13,8 @@
 #include "library_store.h"
 
 static const char MUSIC_ROOT[] = "/";
-const char LIBRARY_SCRATCH_PATH[] = "/.echo/build.tmp";
-const char RESCAN_TIMES_PATH[] = "/.echo/rescan_times.bin";
+const char LIBRARY_SCRATCH_PATH[] = "/.rippl/build.tmp";
+const char RESCAN_TIMES_PATH[] = "/.rippl/rescan_times.bin";
 
 enum {
     NUMBER_CAPACITY = 12

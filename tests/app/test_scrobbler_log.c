@@ -27,7 +27,7 @@ static WallClock clock;
 static uint32_t read_fixture(const char *name, void *buffer, uint32_t capacity)
 {
     char path[512];
-    snprintf(path, sizeof path, "%s/history/%s", ECHO_FIXTURE_DIR, name);
+    snprintf(path, sizeof path, "%s/history/%s", RIPPL_FIXTURE_DIR, name);
     FILE *file = fopen(path, "rb");
     CHECK(file != NULL);
     size_t length = fread(buffer, 1, capacity, file);
@@ -166,7 +166,7 @@ static void a_deleted_log_comes_back_with_only_the_new_plays(void)
     put_record(13, 4, HISTORY_COMPUTER, 170000, 0, 1790200170u, "");
     history.sequence = 14;
     CHECK_EQUAL(1, scrobbler_log_write(&history, "0.11.0"));
-    static const char LOG[] = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/EchoPod 0.11.0\n"
+    static const char LOG[] = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/Rippl 0.11.0\n"
                               "Artist\tAlbum\tNew Song\t5\t200\tL\t1790200010\t\n";
     CHECK(file_is(SCROBBLER_LOG_PATH, LOG, sizeof LOG - 1));
     CHECK(mark_is("0000000013\n"));
@@ -186,7 +186,7 @@ static void plays_without_a_clock_wait_until_a_later_session_has_one(void)
     put_record(15, 5, HISTORY_COMPUTER, 110000, 0, 1790300110u, "");
     history.sequence = 16;
     CHECK_EQUAL(2, scrobbler_log_write(&history, "test"));
-    static const char LOG[] = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/EchoPod test\n"
+    static const char LOG[] = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/Rippl test\n"
                               "Artist\tAlbum\tUndated\t5\t200\tL\t1790299810\t\n"
                               "Artist\tAlbum\tDated\t5\t200\tS\t1790300005\t\n";
     CHECK(file_is(SCROBBLER_LOG_PATH, LOG, sizeof LOG - 1));

@@ -5,7 +5,7 @@
 #include "core/string_builder.h"
 #include "hal/storage.h"
 
-const char SPOKEN_STORE_PATH[] = "/.echo/bookmarks.bin";
+const char SPOKEN_STORE_PATH[] = "/.rippl/bookmarks.bin";
 
 enum {
     TIME_CAPACITY = 16

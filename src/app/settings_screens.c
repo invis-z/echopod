@@ -331,7 +331,7 @@ static void choose_slot(void *context, int index)
 #define OPTION_CHOICE(title, options, option)                                                      \
     {title, options, NULL, (int)(sizeof options / sizeof options[0]), NULL, NULL, NULL, option + 1}
 
-ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
+RIPPL_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     {STR_SETTINGS_SHUFFLE, SHUFFLE_OPTIONS, NULL, SHUFFLE_MODE_COUNT, current_shuffle,
      choose_shuffle, NULL, 0},
     {STR_SETTINGS_REPEAT, REPEAT_OPTIONS, NULL, REPEAT_MODE_COUNT, current_repeat, choose_repeat,
@@ -480,7 +480,7 @@ typedef struct SettingsGroupRows {
     uint8_t count;
 } SettingsGroupRows;
 
-ECHO_RESIDENT static const SettingsLink LINKS[ROW_GROUP - ROW_BLUETOOTH] = {
+RIPPL_RESIDENT static const SettingsLink LINKS[ROW_GROUP - ROW_BLUETOOTH] = {
     {STR_BT_TITLE, bluetooth_screen_open, bluetooth_screen_summary},
     {STR_SETTINGS_EQUALIZER, equalizer_screen_open, equalizer_screen_summary},
     {STR_SETTINGS_DATE_TIME, date_time_screen_open, date_time_screen_summary},
@@ -488,7 +488,7 @@ ECHO_RESIDENT static const SettingsLink LINKS[ROW_GROUP - ROW_BLUETOOTH] = {
     {STR_SETTINGS_RESCAN, request_rescan, NULL},
 };
 
-ECHO_RESIDENT static const uint8_t ROWS[] = {
+RIPPL_RESIDENT static const uint8_t ROWS[] = {
     CHOICE_SHUFFLE,     CHOICE_REPEAT,      ROW_BLUETOOTH,
     ROW_EQUALIZER,      CHOICE_SLEEP,       ROW_GROUP,
     ROW_GROUP + 1,      ROW_GROUP + 2,      ROW_GROUP + 3,
@@ -505,7 +505,7 @@ ECHO_RESIDENT static const uint8_t ROWS[] = {
     ROW_DATE_TIME,      CHOICE_AUTO_OFF,    CHOICE_USB_MODE,
     CHOICE_USB_PROMPT};
 
-ECHO_RESIDENT static const SettingsGroupRows GROUPS[SETTINGS_GROUP_COUNT] = {
+RIPPL_RESIDENT static const SettingsGroupRows GROUPS[SETTINGS_GROUP_COUNT] = {
     {STR_SETTINGS_SOUND, 10, 5},
     {STR_SETTINGS_DISPLAY, 15, 10},
     {STR_SETTINGS_LIBRARY, 25, 9},

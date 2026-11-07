@@ -77,7 +77,7 @@ static const uint8_t DEVICE_QUALIFIER[] = {10, 6, 0x00, 0x02, 0x00, 0x00, 0x00, 
                                            1,  0};
 
 static const uint8_t LANGUAGES[] = {4, 3, 0x09, 0x04};
-static const uint8_t PRODUCT[] = {16, 3, 'E', 0, 'c', 0, 'h', 0, 'o', 0, 'P', 0, 'o', 0, 'd', 0};
+static const uint8_t PRODUCT[] = {12, 3, 'R', 0, 'i', 0, 'p', 0, 'p', 0, 'l', 0};
 
 UsbSetup usb_setup_parse(const uint8_t packet[8])
 {

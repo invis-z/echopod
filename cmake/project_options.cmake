@@ -1,6 +1,6 @@
-add_library(echo_options INTERFACE)
+add_library(rippl_options INTERFACE)
 
-target_compile_options(echo_options INTERFACE
+target_compile_options(rippl_options INTERFACE
     -Wall
     -Wextra
     -Wpedantic
@@ -19,26 +19,26 @@ target_compile_options(echo_options INTERFACE
     -Wformat=2
 )
 
-add_library(echo_compact INTERFACE)
+add_library(rippl_compact INTERFACE)
 if(CMAKE_CROSSCOMPILING)
-    target_compile_options(echo_compact INTERFACE -Os)
+    target_compile_options(rippl_compact INTERFACE -Os)
 endif()
 
-if(ECHO_SANITIZE)
-    target_compile_options(echo_options INTERFACE
+if(RIPPL_SANITIZE)
+    target_compile_options(rippl_options INTERFACE
         -fsanitize=undefined
         -fno-sanitize-recover=all
         -fno-omit-frame-pointer
     )
-    target_link_options(echo_options INTERFACE -fsanitize=undefined)
+    target_link_options(rippl_options INTERFACE -fsanitize=undefined)
 endif()
 
-if(ECHO_ADDRESS_SANITIZER)
-    target_compile_options(echo_options INTERFACE -fsanitize=address)
-    target_link_options(echo_options INTERFACE -fsanitize=address)
+if(RIPPL_ADDRESS_SANITIZER)
+    target_compile_options(rippl_options INTERFACE -fsanitize=address)
+    target_link_options(rippl_options INTERFACE -fsanitize=address)
 endif()
 
-add_library(echo_lto INTERFACE)
+add_library(rippl_lto INTERFACE)
 if(CMAKE_CROSSCOMPILING)
-    target_compile_options(echo_lto INTERFACE -flto -ffat-lto-objects -g)
+    target_compile_options(rippl_lto INTERFACE -flto -ffat-lto-objects -g)
 endif()

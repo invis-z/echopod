@@ -180,7 +180,7 @@ static const FadeTiming SPLASH_TIMING = {.fade_ms = 300, .hold_ms = 200, .rising
 static const uint32_t SCREEN_ON_CLOCK_MHZ = 200;
 static const uint32_t IDLE_CLOCK_MHZ = 96;
 static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
-static const char SPLASH_TEXT[] = "EchoPod";
+static const char SPLASH_TEXT[] = "Rippl";
 static const char GOODBYE_TEXT[] = "Goodbye";
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
 static uint32_t row_hashes[HAL_DISPLAY_LONG_SIDE];
@@ -874,7 +874,7 @@ static void report_card_files(CardFilesReport files, uint32_t now_ms)
 
 static void show_card_setup(void)
 {
-    app_show_notice("EchoPod", i18n_text(STR_BOOT_CARD_SETUP));
+    app_show_notice("Rippl", i18n_text(STR_BOOT_CARD_SETUP));
 }
 
 static void apply_language(Language language)

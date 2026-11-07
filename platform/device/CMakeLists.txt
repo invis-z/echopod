@@ -1,4 +1,4 @@
-add_executable(echo_device
+add_executable(rippl_device
     board/audio.c
     board/bluetooth.c
     board/clock.c
@@ -36,111 +36,111 @@ add_executable(echo_device
     board/usb_listen.c
     board/usb_report.c
 )
-set(ECHO_CORE1_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/core1/core1.ld)
-add_executable(echo_core1
+set(RIPPL_CORE1_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/core1/core1.ld)
+add_executable(rippl_core1
     core1/main.c
     core1/startup.c
     board/libc.c
     board/loop_bench.c
 )
-set_target_properties(echo_core1 PROPERTIES
+set_target_properties(rippl_core1 PROPERTIES
     SUFFIX .elf
-    LINK_DEPENDS ${ECHO_CORE1_LINKER_SCRIPT}
+    LINK_DEPENDS ${RIPPL_CORE1_LINKER_SCRIPT}
 )
-target_include_directories(echo_core1 PRIVATE board)
-target_link_libraries(echo_core1 PRIVATE echo_codec_plain echo_device_logic_plain echo_options)
-target_link_options(echo_core1 PRIVATE
+target_include_directories(rippl_core1 PRIVATE board)
+target_link_libraries(rippl_core1 PRIVATE rippl_codec_plain rippl_device_logic_plain rippl_options)
+target_link_options(rippl_core1 PRIVATE
     -fno-lto
-    -T${ECHO_CORE1_LINKER_SCRIPT}
-    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1.map
+    -T${RIPPL_CORE1_LINKER_SCRIPT}
+    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/rippl_core1.map
 )
-add_executable(echo_core1_mp3
+add_executable(rippl_core1_mp3
     core1/mp3_main.c
     core1/startup.c
     core1/no_heap.c
     board/libc.c
 )
-set(ECHO_CORE1_MP3_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/core1/core1_mp3.ld)
-set_target_properties(echo_core1_mp3 PROPERTIES
+set(RIPPL_CORE1_MP3_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/core1/core1_mp3.ld)
+set_target_properties(rippl_core1_mp3 PROPERTIES
     SUFFIX .elf
-    LINK_DEPENDS ${ECHO_CORE1_MP3_LINKER_SCRIPT}
+    LINK_DEPENDS ${RIPPL_CORE1_MP3_LINKER_SCRIPT}
 )
-target_include_directories(echo_core1_mp3 PRIVATE board)
-target_link_libraries(echo_core1_mp3 PRIVATE echo_device_logic_plain echo_libmad echo_options gcc)
-target_link_options(echo_core1_mp3 PRIVATE
+target_include_directories(rippl_core1_mp3 PRIVATE board)
+target_link_libraries(rippl_core1_mp3 PRIVATE rippl_device_logic_plain rippl_libmad rippl_options gcc)
+target_link_options(rippl_core1_mp3 PRIVATE
     -fno-lto
-    -T${ECHO_CORE1_MP3_LINKER_SCRIPT}
-    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1_mp3.map
+    -T${RIPPL_CORE1_MP3_LINKER_SCRIPT}
+    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/rippl_core1_mp3.map
 )
-set(ECHO_CORE1_MP3_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1_mp3.bin)
+set(RIPPL_CORE1_MP3_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1_mp3.bin)
 add_custom_command(
-    OUTPUT ${ECHO_CORE1_MP3_BINARY}
-    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:echo_core1_mp3> core1_mp3.bin
-    DEPENDS echo_core1_mp3
+    OUTPUT ${RIPPL_CORE1_MP3_BINARY}
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:rippl_core1_mp3> core1_mp3.bin
+    DEPENDS rippl_core1_mp3
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     VERBATIM
 )
-add_executable(echo_core1_aac
+add_executable(rippl_core1_aac
     core1/aac_main.c
     core1/startup.c
     board/libc.c
 )
-set(ECHO_CORE1_AAC_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/core1/core1_aac.ld)
-set_target_properties(echo_core1_aac PROPERTIES
+set(RIPPL_CORE1_AAC_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/core1/core1_aac.ld)
+set_target_properties(rippl_core1_aac PROPERTIES
     SUFFIX .elf
-    LINK_DEPENDS ${ECHO_CORE1_AAC_LINKER_SCRIPT}
+    LINK_DEPENDS ${RIPPL_CORE1_AAC_LINKER_SCRIPT}
 )
-target_include_directories(echo_core1_aac PRIVATE board)
-target_link_libraries(echo_core1_aac PRIVATE echo_device_logic_plain echo_faad2 echo_options gcc)
-target_link_options(echo_core1_aac PRIVATE
+target_include_directories(rippl_core1_aac PRIVATE board)
+target_link_libraries(rippl_core1_aac PRIVATE rippl_device_logic_plain rippl_faad2 rippl_options gcc)
+target_link_options(rippl_core1_aac PRIVATE
     -fno-lto
-    -T${ECHO_CORE1_AAC_LINKER_SCRIPT}
-    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1_aac.map
+    -T${RIPPL_CORE1_AAC_LINKER_SCRIPT}
+    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/rippl_core1_aac.map
 )
-set(ECHO_CORE1_AAC_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1_aac.bin)
+set(RIPPL_CORE1_AAC_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1_aac.bin)
 add_custom_command(
-    OUTPUT ${ECHO_CORE1_AAC_BINARY}
-    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:echo_core1_aac> core1_aac.bin
-    DEPENDS echo_core1_aac
+    OUTPUT ${RIPPL_CORE1_AAC_BINARY}
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:rippl_core1_aac> core1_aac.bin
+    DEPENDS rippl_core1_aac
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     VERBATIM
 )
-add_executable(echo_core1_opus
+add_executable(rippl_core1_opus
     core1/opus_main.c
     core1/startup.c
     core1/no_heap.c
     board/libc.c
 )
-set(ECHO_CORE1_OPUS_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/core1/core1_opus.ld)
-set_target_properties(echo_core1_opus PROPERTIES
+set(RIPPL_CORE1_OPUS_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/core1/core1_opus.ld)
+set_target_properties(rippl_core1_opus PROPERTIES
     SUFFIX .elf
-    LINK_DEPENDS ${ECHO_CORE1_OPUS_LINKER_SCRIPT}
+    LINK_DEPENDS ${RIPPL_CORE1_OPUS_LINKER_SCRIPT}
 )
-target_include_directories(echo_core1_opus PRIVATE board)
-target_link_libraries(echo_core1_opus PRIVATE echo_device_logic_plain echo_opus echo_options gcc)
-target_link_options(echo_core1_opus PRIVATE
+target_include_directories(rippl_core1_opus PRIVATE board)
+target_link_libraries(rippl_core1_opus PRIVATE rippl_device_logic_plain rippl_opus rippl_options gcc)
+target_link_options(rippl_core1_opus PRIVATE
     -fno-lto
-    -T${ECHO_CORE1_OPUS_LINKER_SCRIPT}
-    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_core1_opus.map
+    -T${RIPPL_CORE1_OPUS_LINKER_SCRIPT}
+    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/rippl_core1_opus.map
 )
-set(ECHO_CORE1_OPUS_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1_opus.bin)
+set(RIPPL_CORE1_OPUS_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1_opus.bin)
 add_custom_command(
-    OUTPUT ${ECHO_CORE1_OPUS_BINARY}
-    COMMAND ${CMAKE_OBJCOPY} -O binary -j .text $<TARGET_FILE:echo_core1_opus> core1_opus.bin
-    DEPENDS echo_core1_opus
+    OUTPUT ${RIPPL_CORE1_OPUS_BINARY}
+    COMMAND ${CMAKE_OBJCOPY} -O binary -j .text $<TARGET_FILE:rippl_core1_opus> core1_opus.bin
+    DEPENDS rippl_core1_opus
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     VERBATIM
 )
-set(ECHO_CORE1_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1.bin)
+set(RIPPL_CORE1_BINARY ${CMAKE_CURRENT_BINARY_DIR}/core1.bin)
 add_custom_command(
-    OUTPUT ${ECHO_CORE1_BINARY}
-    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:echo_core1> core1.bin
-    DEPENDS echo_core1
+    OUTPUT ${RIPPL_CORE1_BINARY}
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:rippl_core1> core1.bin
+    DEPENDS rippl_core1
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     VERBATIM
 )
 
-set(ECHO_OVERLAY_IMPORTS
+set(RIPPL_OVERLAY_IMPORTS
     app_dac_keys_start
     app_dac_keys_stop
     app_dac_next_key
@@ -205,10 +205,10 @@ set(ECHO_OVERLAY_IMPORTS
     utf8_next
     volume_is_internal_name
 )
-set(ECHO_DEVICE_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/board/echo_device.ld)
-set_target_properties(echo_device PROPERTIES
+set(RIPPL_DEVICE_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/board/rippl_device.ld)
+set_target_properties(rippl_device PROPERTIES
     SUFFIX .elf
-    LINK_DEPENDS ${ECHO_DEVICE_LINKER_SCRIPT}
+    LINK_DEPENDS ${RIPPL_DEVICE_LINKER_SCRIPT}
 )
 set_source_files_properties(board/libc.c board/startup.c PROPERTIES
     COMPILE_OPTIONS "-fno-builtin;-fno-tree-loop-distribute-patterns;-fno-lto"
@@ -248,94 +248,94 @@ if(CMAKE_CROSSCOMPILING)
         PROPERTIES COMPILE_OPTIONS -Os
     )
 endif()
-target_link_libraries(echo_device PRIVATE echo_app echo_device_logic echo_options echo_lto)
-list(TRANSFORM ECHO_OVERLAY_IMPORTS PREPEND "-Wl,--require-defined=" OUTPUT_VARIABLE
-    ECHO_OVERLAY_IMPORT_OPTIONS)
-target_link_options(echo_device PRIVATE
+target_link_libraries(rippl_device PRIVATE rippl_app rippl_device_logic rippl_options rippl_lto)
+list(TRANSFORM RIPPL_OVERLAY_IMPORTS PREPEND "-Wl,--require-defined=" OUTPUT_VARIABLE
+    RIPPL_OVERLAY_IMPORT_OPTIONS)
+target_link_options(rippl_device PRIVATE
     -flto -flto-partition=one
-    ${ECHO_OVERLAY_IMPORT_OPTIONS}
-    -T${ECHO_DEVICE_LINKER_SCRIPT}
-    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_device.map
+    ${RIPPL_OVERLAY_IMPORT_OPTIONS}
+    -T${RIPPL_DEVICE_LINKER_SCRIPT}
+    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/rippl_device.map
 )
 
-set(ECHO_OVERLAY_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/overlay/rescan_overlay.ld)
-add_executable(echo_rescan_overlay overlay/rescan_overlay.c)
-set_target_properties(echo_rescan_overlay PROPERTIES
+set(RIPPL_OVERLAY_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/overlay/rescan_overlay.ld)
+add_executable(rippl_rescan_overlay overlay/rescan_overlay.c)
+set_target_properties(rippl_rescan_overlay PROPERTIES
     SUFFIX .elf
-    LINK_DEPENDS "${ECHO_OVERLAY_LINKER_SCRIPT};$<TARGET_FILE:echo_device>"
+    LINK_DEPENDS "${RIPPL_OVERLAY_LINKER_SCRIPT};$<TARGET_FILE:rippl_device>"
 )
-add_dependencies(echo_rescan_overlay echo_device)
-target_link_libraries(echo_rescan_overlay PRIVATE echo_library_scan echo_options gcc)
-target_link_options(echo_rescan_overlay PRIVATE
+add_dependencies(rippl_rescan_overlay rippl_device)
+target_link_libraries(rippl_rescan_overlay PRIVATE rippl_library_scan rippl_options gcc)
+target_link_options(rippl_rescan_overlay PRIVATE
     -fno-lto
-    -T${ECHO_OVERLAY_LINKER_SCRIPT}
-    -Wl,--just-symbols=$<TARGET_FILE:echo_device>
+    -T${RIPPL_OVERLAY_LINKER_SCRIPT}
+    -Wl,--just-symbols=$<TARGET_FILE:rippl_device>
     -Wl,--allow-multiple-definition
-    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_rescan_overlay.map
+    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/rippl_rescan_overlay.map
 )
 
-set(ECHO_USB_OVERLAY_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/overlay/usb_overlay.ld)
-add_executable(echo_usb_overlay
+set(RIPPL_USB_OVERLAY_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/overlay/usb_overlay.ld)
+add_executable(rippl_usb_overlay
     overlay/usb_overlay.c
     board/update.c
     board/usb_dac_session.c
     board/usb_port.c
     board/usb_session.c
 )
-set_target_properties(echo_usb_overlay PROPERTIES
+set_target_properties(rippl_usb_overlay PROPERTIES
     SUFFIX .elf
-    LINK_DEPENDS "${ECHO_USB_OVERLAY_LINKER_SCRIPT};$<TARGET_FILE:echo_device>"
+    LINK_DEPENDS "${RIPPL_USB_OVERLAY_LINKER_SCRIPT};$<TARGET_FILE:rippl_device>"
 )
-add_dependencies(echo_usb_overlay echo_device)
-target_include_directories(echo_usb_overlay PRIVATE
+add_dependencies(rippl_usb_overlay rippl_device)
+target_include_directories(rippl_usb_overlay PRIVATE
     board
-    $<TARGET_PROPERTY:echo_app,INTERFACE_INCLUDE_DIRECTORIES>
-    $<TARGET_PROPERTY:echo_settings,INTERFACE_INCLUDE_DIRECTORIES>
-    $<TARGET_PROPERTY:echo_playback,INTERFACE_INCLUDE_DIRECTORIES>
-    $<TARGET_PROPERTY:echo_library,INTERFACE_INCLUDE_DIRECTORIES>
+    $<TARGET_PROPERTY:rippl_app,INTERFACE_INCLUDE_DIRECTORIES>
+    $<TARGET_PROPERTY:rippl_settings,INTERFACE_INCLUDE_DIRECTORIES>
+    $<TARGET_PROPERTY:rippl_playback,INTERFACE_INCLUDE_DIRECTORIES>
+    $<TARGET_PROPERTY:rippl_library,INTERFACE_INCLUDE_DIRECTORIES>
 )
-target_link_libraries(echo_usb_overlay PRIVATE echo_device_logic_plain echo_options gcc)
-target_link_options(echo_usb_overlay PRIVATE
+target_link_libraries(rippl_usb_overlay PRIVATE rippl_device_logic_plain rippl_options gcc)
+target_link_options(rippl_usb_overlay PRIVATE
     -fno-lto
-    -T${ECHO_USB_OVERLAY_LINKER_SCRIPT}
-    -Wl,--just-symbols=$<TARGET_FILE:echo_device>
+    -T${RIPPL_USB_OVERLAY_LINKER_SCRIPT}
+    -Wl,--just-symbols=$<TARGET_FILE:rippl_device>
     -Wl,--allow-multiple-definition
-    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/echo_usb_overlay.map
+    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/rippl_usb_overlay.map
 )
 
-set(ECHO_FIRMWARE_VERSION "0.11.0" CACHE STRING "major.minor.patch written to the image header")
+set(RIPPL_FIRMWARE_VERSION "0.11.0" CACHE STRING "major.minor.patch written to the image header")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-set(ECHO_DEVICE_IMAGE ${CMAKE_BINARY_DIR}/HIFIEC90.IMG)
-set(ECHO_GLYPH_FACE_ARGUMENTS "")
-foreach(face_file ${ECHO_GLYPH_FACE_FILES} ${ECHO_LANGUAGE_PACK_FILES})
-    list(APPEND ECHO_GLYPH_FACE_ARGUMENTS --glyph-face ${face_file})
+set(RIPPL_DEVICE_IMAGE ${CMAKE_BINARY_DIR}/HIFIEC90.IMG)
+set(RIPPL_GLYPH_FACE_ARGUMENTS "")
+foreach(face_file ${RIPPL_GLYPH_FACE_FILES} ${RIPPL_LANGUAGE_PACK_FILES})
+    list(APPEND RIPPL_GLYPH_FACE_ARGUMENTS --glyph-face ${face_file})
 endforeach()
 
-add_custom_target(echo_device_image ALL
+add_custom_target(rippl_device_image ALL
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/make_image.py
-        --version ${ECHO_FIRMWARE_VERSION}
-        --elf $<TARGET_FILE:echo_device>
-        --overlay $<TARGET_FILE:echo_rescan_overlay>
-        --usb-overlay $<TARGET_FILE:echo_usb_overlay>
-        --core1-mp3 ${ECHO_CORE1_MP3_BINARY}
-        --core1-flac ${ECHO_CORE1_BINARY}
-        --core1-aac ${ECHO_CORE1_AAC_BINARY}
-        --core1-opus ${ECHO_CORE1_OPUS_BINARY}
-        ${ECHO_GLYPH_FACE_ARGUMENTS}
-        --output ${ECHO_DEVICE_IMAGE}
+        --version ${RIPPL_FIRMWARE_VERSION}
+        --elf $<TARGET_FILE:rippl_device>
+        --overlay $<TARGET_FILE:rippl_rescan_overlay>
+        --usb-overlay $<TARGET_FILE:rippl_usb_overlay>
+        --core1-mp3 ${RIPPL_CORE1_MP3_BINARY}
+        --core1-flac ${RIPPL_CORE1_BINARY}
+        --core1-aac ${RIPPL_CORE1_AAC_BINARY}
+        --core1-opus ${RIPPL_CORE1_OPUS_BINARY}
+        ${RIPPL_GLYPH_FACE_ARGUMENTS}
+        --output ${RIPPL_DEVICE_IMAGE}
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/size_report.py
         --build ${CMAKE_BINARY_DIR} --summary --nm ${CMAKE_NM}
-    BYPRODUCTS ${ECHO_DEVICE_IMAGE}
-    DEPENDS echo_device echo_rescan_overlay echo_usb_overlay ${ECHO_CORE1_MP3_BINARY} ${ECHO_CORE1_BINARY}
-        ${ECHO_CORE1_AAC_BINARY} ${ECHO_CORE1_OPUS_BINARY}
+    BYPRODUCTS ${RIPPL_DEVICE_IMAGE}
+    DEPENDS rippl_device rippl_rescan_overlay rippl_usb_overlay ${RIPPL_CORE1_MP3_BINARY} ${RIPPL_CORE1_BINARY}
+        ${RIPPL_CORE1_AAC_BINARY} ${RIPPL_CORE1_OPUS_BINARY}
         ${PROJECT_SOURCE_DIR}/tools/make_image.py
     VERBATIM
 )
 
-add_custom_target(echo_size_report
+add_custom_target(rippl_size_report
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/size_report.py
         --build ${CMAKE_BINARY_DIR} --nm ${CMAKE_NM}
-    DEPENDS echo_device echo_rescan_overlay echo_usb_overlay
+    DEPENDS rippl_device rippl_rescan_overlay rippl_usb_overlay
     VERBATIM
     USES_TERMINAL
 )

@@ -44,7 +44,7 @@ typedef struct Fixture {
 static bool load(Fixture *fixture, const char *name)
 {
     char path[512];
-    snprintf(path, sizeof path, "%s/tags/%s", ECHO_FIXTURE_DIR, name);
+    snprintf(path, sizeof path, "%s/tags/%s", RIPPL_FIXTURE_DIR, name);
     FILE *file = fopen(path, "rb");
     if (file == NULL) {
         return false;

@@ -5,7 +5,7 @@
 #include "hal/storage.h"
 #include "hal/system.h"
 
-const char SETTINGS_STORE_PATH[] = "/.echo/settings.bin";
+const char SETTINGS_STORE_PATH[] = "/.rippl/settings.bin";
 
 static const HalAudioGain HAL_GAINS[GAIN_LEVEL_COUNT] = {HAL_AUDIO_GAIN_LOW, HAL_AUDIO_GAIN_HIGH};
 static const HalAudioOutput HAL_OUTPUTS[OUTPUT_JACK_COUNT] = {

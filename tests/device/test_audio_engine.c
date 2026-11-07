@@ -27,7 +27,7 @@ static Fixture opened;
 static Fixture load(const char *name, const char *extension)
 {
     char path[512];
-    snprintf(path, sizeof path, "%s/flac/%s.%s", ECHO_FIXTURE_DIR, name, extension);
+    snprintf(path, sizeof path, "%s/flac/%s.%s", RIPPL_FIXTURE_DIR, name, extension);
     Fixture fixture = {NULL, 0};
     FILE *file = fopen(path, "rb");
     if (file == NULL) {

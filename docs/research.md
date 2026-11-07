@@ -6,22 +6,22 @@ Open questions behind feature requests, with what the code and the other docs sh
 
 What is known:
 
-- The Bluetooth module runs its own stack. EchoPod drives it over UART1 at 115,200 baud with short ASCII frames (`docs/hardware.md`, `platform/device/logic/bt_module.c`): `CS00` to scan, `CL06` + address to connect, `CH06` and `CT00` after timeouts, `CQ00` to poll the link, `CP00` to stop a scan, `CY0` + a level byte to start and stop the stream, and stock's `C 86`/`C 87` play notices.
-- From the module EchoPod understands `CV` (ready), `CS` (scan results up to `CSEN`), `CQ` (link status), `CL`/`CH` (connect results), `CT` (disconnected), `CP`/`CC` (pause/play from the headphones) and `CA`/`CB` (previous/next). The parser also sizes a 4-byte `CK` frame but does nothing with it; what it means isn't known.
-- Every frame from the module except `CS` scan results and repeated `CQ` answers, including frames EchoPod doesn't recognise (shown as `C` + the next two characters), goes into the 12-entry log on Diagnostics → Bluetooth, with the seconds between entries.
-- Pairing has only been tried with headphones that pair without a PIN (OnePlus Buds 3). EchoPod sends nothing that answers a PIN or a passkey, and the code has no frame for one.
+- The Bluetooth module runs its own stack. Rippl drives it over UART1 at 115,200 baud with short ASCII frames (`docs/hardware.md`, `platform/device/logic/bt_module.c`): `CS00` to scan, `CL06` + address to connect, `CH06` and `CT00` after timeouts, `CQ00` to poll the link, `CP00` to stop a scan, `CY0` + a level byte to start and stop the stream, and stock's `C 86`/`C 87` play notices.
+- From the module Rippl understands `CV` (ready), `CS` (scan results up to `CSEN`), `CQ` (link status), `CL`/`CH` (connect results), `CT` (disconnected), `CP`/`CC` (pause/play from the headphones) and `CA`/`CB` (previous/next). The parser also sizes a 4-byte `CK` frame but does nothing with it; what it means isn't known.
+- Every frame from the module except `CS` scan results and repeated `CQ` answers, including frames Rippl doesn't recognise (shown as `C` + the next two characters), goes into the 12-entry log on Diagnostics → Bluetooth, with the seconds between entries.
+- Pairing has only been tried with headphones that pair without a PIN (OnePlus Buds 3). Rippl sends nothing that answers a PIN or a passkey, and the code has no frame for one.
 
 Unknown:
 
 - Whether the module supports legacy PIN pairing or Secure Simple Pairing with numeric comparison or passkey entry at all, and if so whether it reports the request over the UART or answers it itself (for example with a fixed `0000`). Pairing this player with stock firmware to a device that asks for a PIN would show whether stock can do it at all.
-- What to try next: pair such a device under EchoPod and photograph Diagnostics → Bluetooth right after the attempt. A frame EchoPod doesn't know shows up in the log. Better still, a capture of UART1's two lines (the module's TX and RX, 115,200 8N1) while stock pairs a PIN device would show the frames stock exchanges: the request the module sends, what stock answers, and in what format the PIN or the six-digit number travels. With that, EchoPod could show the number or a PIN prompt and send the answer.
+- What to try next: pair such a device under Rippl and photograph Diagnostics → Bluetooth right after the attempt. A frame Rippl doesn't know shows up in the log. Better still, a capture of UART1's two lines (the module's TX and RX, 115,200 8N1) while stock pairs a PIN device would show the frames stock exchanges: the request the module sends, what stock answers, and in what format the PIN or the six-digit number travels. With that, Rippl could show the number or a PIN prompt and send the answer.
 
 ## LDAC and higher SBC bitrates
 
 What is known:
 
 - The module takes the DAC's analogue output, not digital audio (`docs/architecture.md`, Bluetooth: Settings → Bluetooth level picks the DAC volume table for it; `docs/hardware.md`: GPIO2.0 and GPIO2.14 switch the analogue path). The module samples and encodes that signal itself.
-- EchoPod's only control over the stream is `CY0` followed by one level byte (stock sends `1E` to start, `00` to stop). What the `1E` means is unknown; no other value has been tried.
+- Rippl's only control over the stream is `CY0` followed by one level byte (stock sends `1E` to start, `00` to stop). What the `1E` means is unknown; no other value has been tried.
 - No frame in `bt_module.c` selects a codec, a bitrate or a sample rate, and none reports one.
 
 Unknown:
@@ -34,14 +34,14 @@ Unknown:
 
 What is known:
 
-- The DAC is a pair of Cirrus Logic CS43131 chips (one per channel) set up over I2C0 and fed by I2S1 (`docs/hardware.md`, `platform/device/logic/dac_sequence.c`). The register sequence EchoPod writes is copied from stock and only sets up the PCM path: the serial port, the PCM filter (`0x090000`), the PCM volume (`0x090001`/`0x090002`) and the PCM path controls. Nothing in the code configures a DSD input or mode.
+- The DAC is a pair of Cirrus Logic CS43131 chips (one per channel) set up over I2C0 and fed by I2S1 (`docs/hardware.md`, `platform/device/logic/dac_sequence.c`). The register sequence Rippl writes is copied from stock and only sets up the PCM path: the serial port, the PCM filter (`0x090000`), the PCM volume (`0x090001`/`0x090002`) and the PCM path controls. Nothing in the code configures a DSD input or mode.
 - I2S1 runs at 44.1 to 192 kHz with 32-bit words (`platform/device/board/dac.c`); 176.4 kHz, the rate DSD64 over PCM (DoP) needs, is one of them.
 - The audio engine passes 24-bit samples through unchanged on the device when the equalizer is off: the software gain stays at unity, and the equalizer is already off at 176.4 and 192 kHz (`docs/known-issues.md`). So the bits a DoP stream needs would reach the DAC intact.
 
 Unknown:
 
 - Whether the CS43131 recognises DoP on its PCM serial port and switches to DSD by itself, or needs DSD mode set up through registers and its separate DSD inputs, and whether those inputs are wired on this board. Neither the code nor these docs say. The CS43131 datasheet and a register dump of stock while it plays a DSF file (Diagnostics doesn't read the DAC's registers yet; a dump over I2C would be the check) would answer it.
-- If DoP works, volume would have to come from the DAC's DSD path, since the PCM volume registers EchoPod uses wouldn't apply. Not tried.
+- If DoP works, volume would have to come from the DAC's DSD path, since the PCM volume registers Rippl uses wouldn't apply. Not tried.
 
 Converting to PCM instead (no DAC changes needed):
 

@@ -5,7 +5,7 @@
 
 #include "hal/storage.h"
 
-const char BLUETOOTH_STORE_PATH[] = "/.echo/bluetooth.bin";
+const char BLUETOOTH_STORE_PATH[] = "/.rippl/bluetooth.bin";
 
 enum {
     HEADER_SIZE = 3,

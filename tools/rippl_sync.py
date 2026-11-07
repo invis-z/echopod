@@ -12,10 +12,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import cover_export
-import echo_history
+import rippl_history
 import library_index
 
-ECHO_FOLDER = ".echo"
+RIPPL_FOLDER = ".rippl"
 MEBIBYTE = 1024 * 1024
 WRITE_CHUNK_BYTES = MEBIBYTE
 SCAN_MAGIC = b"MESC"
@@ -285,7 +285,7 @@ def clock_text(utc_seconds, offset_minutes):
     return f"{local:%Y-%m-%d %H:%M} UTC{sign}{hours:02d}:{minutes:02d}"
 
 
-def write_clock(echo, options, now=None, offset_minutes=None):
+def write_clock(rippl, options, now=None, offset_minutes=None):
     utc_seconds = int(time.time()) if now is None else int(now)
     offset_minutes = current_offset() // 60 if offset_minutes is None else offset_minutes
     local_year = (UNIX_EPOCH + timedelta(seconds=utc_seconds + offset_minutes * 60)).year
@@ -297,9 +297,9 @@ def write_clock(echo, options, now=None, offset_minutes=None):
         print(f"  would write {CLOCK_NAME}: {text}")
         return False
     try:
-        (echo / CLOCK_NAME).write_bytes(clock_record(utc_seconds, offset_minutes))
+        (rippl / CLOCK_NAME).write_bytes(clock_record(utc_seconds, offset_minutes))
     except OSError as error:
-        raise SyncError(f"couldn't write {echo / CLOCK_NAME}: {error.strerror or error}") from error
+        raise SyncError(f"couldn't write {rippl / CLOCK_NAME}: {error.strerror or error}") from error
     print(f"  {CLOCK_NAME:<11} {text}")
     return True
 
@@ -496,10 +496,10 @@ def player_internal_drives(card, roots):
             if (volume_label(root) or "").strip().upper() != INTERNAL_LABEL:
                 continue
             if root.resolve() != card:
-                found.append((root, (root / ECHO_FOLDER).is_dir()))
+                found.append((root, (root / RIPPL_FOLDER).is_dir()))
         except OSError:
             continue
-    plain = [root for root, has_echo in found if not has_echo]
+    plain = [root for root, has_rippl in found if not has_rippl]
     return plain or [root for root, _ in found]
 
 
@@ -507,7 +507,7 @@ def player_cards(roots):
     cards = []
     for root in roots:
         try:
-            if (root / ECHO_FOLDER).is_dir():
+            if (root / RIPPL_FOLDER).is_dir():
                 cards.append(root)
         except OSError:
             continue
@@ -528,7 +528,7 @@ def ask_for_card(cards, read=input):
         answer = typed_path(read(f"Card to sync [{cards[0]}]: "))
         return answer or str(cards[0])
     if cards:
-        print("Cards that have been in an EchoPod player: " +
+        print("Cards that have been in an Rippl player: " +
               ", ".join(str(card) for card in cards))
     answer = typed_path(read("Card drive or folder (for example E: or /Volumes/CARD; you can "
                              "drag it here): "))
@@ -537,10 +537,10 @@ def ask_for_card(cards, read=input):
     return answer
 
 
-def check_target(card, volume, echo_exists):
+def check_target(card, volume, rippl_exists):
     if not card.is_dir():
         raise SyncError(f"{card} isn't a folder or drive. Give the card's drive, for example E:\\")
-    if echo_exists:
+    if rippl_exists:
         return
     if not os.path.ismount(card):
         raise SyncError(f"{card} isn't the top of a memory card. The player reads music from the "
@@ -550,20 +550,20 @@ def check_target(card, volume, echo_exists):
         raise SyncError(f"{card} is {volume.file_system}, not a FAT32 or exFAT memory card.")
 
 
-def ensure_echo_folder(echo, options, assume_yes):
-    if echo.is_dir():
+def ensure_rippl_folder(rippl, options, assume_yes):
+    if rippl.is_dir():
         return
     if options.dry_run:
-        print(f"Would create {echo}")
+        print(f"Would create {rippl}")
         return
     if not assume_yes:
         if not sys.stdin.isatty():
-            raise SyncError(f"{echo} doesn't exist yet. Run again with --yes to create it.")
-        answer = input(f"{echo} doesn't exist yet (the player hasn't used this card). "
+            raise SyncError(f"{rippl} doesn't exist yet. Run again with --yes to create it.")
+        answer = input(f"{rippl} doesn't exist yet (the player hasn't used this card). "
                        "Create it? [y/N] ")
         if answer.strip().lower() not in ("y", "yes"):
             raise SyncError("Nothing was written.")
-    echo.mkdir()
+    rippl.mkdir()
 
 
 def require_dependencies():
@@ -644,7 +644,7 @@ def build_covers(card, sources, volume, options, internal=None):
     roots = library_index.MusicRoots(card, internal_root(internal))
     covers = cover_export.collect_covers(roots, sources, cover_export.cover_record,
                                          art_describer(volume, internal))
-    capacity = covers_capacity(card / ECHO_FOLDER / COVERS_FILE.name, len(covers.records))
+    capacity = covers_capacity(card / RIPPL_FOLDER / COVERS_FILE.name, len(covers.records))
     data = cover_export.encode_stamped(covers.records, covers.stamps, capacity)
     print(f"{plural(len(covers.records), 'cover')}, {len(covers.missing):,} without art")
     for album in covers.missing if options.verbose else ():
@@ -675,7 +675,7 @@ def write_or_report(path, data, card_file, options):
     print(f"  {card_file.name:<11} {human_size(len(data))} in a {human_size(size)} file")
 
 
-def record_fingerprint(echo, card, volume, before, options, internal=None,
+def record_fingerprint(rippl, card, volume, before, options, internal=None,
                        excluded=frozenset()):
     step("Checking the music again...")
     after = take_fingerprint(card, volume, internal, excluded)
@@ -689,15 +689,15 @@ def record_fingerprint(echo, card, volume, before, options, internal=None,
         print("  The music changed while this ran. The player will rescan it.")
         return False
     print(f"{after.entries:,} files and folders, unchanged")
-    path = echo / SCAN_FILE.name
+    path = rippl / SCAN_FILE.name
     record = scan_record(after, stored_version(read_prefix(path, SCAN_RECORD.size)))
     write_or_report(path, record, SCAN_FILE, options)
     return True
 
 
 def sync(card, volume, options, internal=None, internal_missing=False, excluded=frozenset()):
-    echo = card / ECHO_FOLDER
-    library_path = echo / LIBRARY_FILE.name
+    rippl = card / RIPPL_FOLDER
+    library_path = rippl / LIBRARY_FILE.name
     before = None
     if options.library and options.fingerprint and not internal_missing:
         step("Fingerprinting the music...")
@@ -711,16 +711,16 @@ def sync(card, volume, options, internal=None, internal_missing=False, excluded=
         covers_data = build_covers(card, sources, volume, options, internal)
     forget = before is not None or (internal_missing and options.library)
     if forget and not options.dry_run:
-        forget_fingerprint(echo / SCAN_FILE.name)
-    print(f"{'Planned for' if options.dry_run else 'Writing'} {echo}")
+        forget_fingerprint(rippl / SCAN_FILE.name)
+    print(f"{'Planned for' if options.dry_run else 'Writing'} {rippl}")
     if library_data is not None:
         write_or_report(library_path, library_data, LIBRARY_FILE, options)
     if covers_data is not None:
-        write_or_report(echo / COVERS_FILE.name, covers_data, COVERS_FILE, options)
-    recorded = before is not None and record_fingerprint(echo, card, volume, before, options,
+        write_or_report(rippl / COVERS_FILE.name, covers_data, COVERS_FILE, options)
+    recorded = before is not None and record_fingerprint(rippl, card, volume, before, options,
                                                          internal, excluded)
     if options.clock:
-        write_clock(echo, options)
+        write_clock(rippl, options)
     return recorded
 
 
@@ -746,12 +746,12 @@ def print_next_steps(options, recorded, volume, seconds):
 
 
 def export_history(card, dry_run):
-    if not (card / ECHO_FOLDER / echo_history.HISTORY_NAME).is_file():
+    if not (card / RIPPL_FOLDER / rippl_history.HISTORY_NAME).is_file():
         print("Listen history: none on this card yet.")
         return
-    result = echo_history.export(card, dry_run=dry_run)
+    result = rippl_history.export(card, dry_run=dry_run)
     listened = sum(play.rating == "L" for play in result.plays)
-    print(f"Listen history: {listened} new plays added to {card / echo_history.LOG_NAME}.")
+    print(f"Listen history: {listened} new plays added to {card / rippl_history.LOG_NAME}.")
 
 
 def run_check(card, volume, internal=None, excluded=frozenset()):
@@ -759,7 +759,7 @@ def run_check(card, volume, internal=None, excluded=frozenset()):
     if internal is not None:
         print(f"  with the internal storage {internal.root} ({internal.volume.file_system})")
     computed = take_fingerprint(card, volume, internal, excluded)
-    stored = stored_fingerprint(read_prefix(card / ECHO_FOLDER / SCAN_FILE.name,
+    stored = stored_fingerprint(read_prefix(card / RIPPL_FOLDER / SCAN_FILE.name,
                                             SCAN_RECORD.size))
     print(f"  this computer: {describe(computed)}")
     print(f"  the player's record: {describe(stored)}")
@@ -791,7 +791,7 @@ def options_from(arguments):
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser(
-        description="Build the EchoPod library and album covers for a memory card on this "
+        description="Build the Rippl library and album covers for a memory card on this "
                     "computer, so the player doesn't have to scan it.")
     parser.add_argument("card", nargs="?",
                         help="the card's drive or mount point, for example E:\\ or "
@@ -814,11 +814,11 @@ def parse_arguments(argv):
     parser.add_argument("--dry-run", action="store_true",
                         help="do everything except writing to the card")
     parser.add_argument("--yes", action="store_true",
-                        help="create the card's .echo folder without asking")
+                        help="create the card's .rippl folder without asking")
     parser.add_argument("--verbose", action="store_true", help="list the albums without art")
     parser.add_argument("--history", action="store_true",
                         help="also add the songs the player played to .scrobbler.log at the "
-                             "card's root, for Last.fm uploaders (see echo_history.py)")
+                             "card's root, for Last.fm uploaders (see rippl_history.py)")
     return parser.parse_args(argv)
 
 
@@ -886,10 +886,10 @@ def run(arguments):
     try:
         card = card_root(card_argument(arguments))
         volume = detect_volume(card)
-        echo = card / ECHO_FOLDER
-        check_target(card, volume, echo.is_dir())
+        rippl = card / RIPPL_FOLDER
+        check_target(card, volume, rippl.is_dir())
         internal = internal_drive(arguments, card)
-        excluded = library_index.read_excluded_folders(echo / library_index.FOLDERS_NAME)
+        excluded = library_index.read_excluded_folders(rippl / library_index.FOLDERS_NAME)
         if excluded:
             print(f"Leaving out {plural(len(excluded), 'top-level folder')} (Settings, Music "
                   "folders on the player).")
@@ -897,15 +897,15 @@ def run(arguments):
             return run_check(card, volume, internal, excluded)
         require_dependencies()
         options = options_from(arguments)
-        print(f"EchoPod sync: {card} ({volume.file_system})")
+        print(f"Rippl sync: {card} ({volume.file_system})")
         if internal is not None:
             print(f"  and the internal storage {internal.root} ({internal.volume.file_system})")
-        ensure_echo_folder(echo, options, arguments.yes)
+        ensure_rippl_folder(rippl, options, arguments.yes)
         recorded = sync(card, volume, options, internal, internal is None, excluded)
         if arguments.history:
             export_history(card, options.dry_run)
     except SyncError as error:
-        print(f"echo_sync: {error}", file=sys.stderr)
+        print(f"rippl_sync: {error}", file=sys.stderr)
         return 2
     print_next_steps(options, recorded, volume, time.monotonic() - started)
     return 0
