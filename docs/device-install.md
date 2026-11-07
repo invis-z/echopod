@@ -57,7 +57,7 @@ The updater takes the highest-numbered `HIFIECnn.IMG`. It checks the image's sha
 - **Keys:** Diagnostics → Key test.
 - **Power:** a tap turns the screen off and on. Holding it for 2 s switches the player off; with a cable in, it shows the charge screen instead, and holding Power again turns the player back on.
 - **USB:** "Computer found" appears and the drives mount within about 10 s.
-- **Card:** on the first start with a card, the player creates `/.rippl` with `settings.bin`, `resume.bin`, `favorites.bin`, `scan.bin`, `upnext.bin`, `bluetooth.bin`, `library.db` (4 MB), `covers.bin` (80 MB) and `build.tmp` (24 MB), then scans the card and builds the covers. If the card has no room it says "The card is full", and nothing is saved.
+- **Card:** on the first start with a card, the player creates `/.rippl` with `settings.bin`, `resume.bin`, `favorites.bin`, `scan.bin`, `upnext.bin`, `bluetooth.bin` and `covers.bin` (80 MB), then scans the card into `/.rippl/library` (1 MiB segment files and `/.rippl/manifest.bin`) and builds the covers. If the card has no room it says "The card is full", and nothing is saved.
 
 ## If something goes wrong
 

@@ -17,7 +17,7 @@
 
 enum {
     TRANSITION_CAPACITY = 16,
-    FILE_CAPACITY = 16,
+    FILE_CAPACITY = 64,
     DIR_CAPACITY = 48,
     WRITTEN_CAPACITY = 1100,
     PATH_CAPACITY = 260
@@ -73,8 +73,7 @@ enum {
 };
 
 static uint8_t stores[STORE_SLOTS][STORE_CAPACITY];
-static uint8_t *large_store;
-static uint32_t large_size;
+static uint8_t *owned_stores[FILE_CAPACITY];
 
 typedef struct FakeHal {
     const char *version;
@@ -160,6 +159,10 @@ static FakeHal fake;
 
 void fake_hal_reset(void)
 {
+    for (int index = 0; index < FILE_CAPACITY; index++) {
+        free(owned_stores[index]);
+        owned_stores[index] = NULL;
+    }
     fake = (FakeHal){0};
     fake.audio.jack = HAL_AUDIO_JACK_SINGLE_ENDED;
     fake.audio.status.idle = true;
@@ -1245,35 +1248,37 @@ static FakeFile *fake_file(const char *path)
     return NULL;
 }
 
-static uint8_t *large_store_for(FakeFile *file)
+static bool is_segment_path(const char *path)
 {
-    if (file->bytes != NULL && file->bytes == large_store) {
-        return large_store;
+    return strncmp(path, "/.rippl/library/", 16) == 0 || strcmp(path, "/.rippl/manifest.bin") == 0;
+}
+
+static uint8_t *owned_store_for(FakeFile *file)
+{
+    int index = (int)(file - fake.files);
+    if (owned_stores[index] == NULL) {
+        owned_stores[index] = calloc(1, file->size);
+        if (owned_stores[index] == NULL) {
+            return NULL;
+        }
+        if (file->bytes != NULL) {
+            memcpy(owned_stores[index], file->bytes, file->stored);
+        }
+        file->bytes = owned_stores[index];
+        file->stored = file->size;
     }
-    if (file->size > large_size) {
-        free(large_store);
-        large_store = malloc(file->size);
-        large_size = file->size;
-    }
-    if (large_store == NULL) {
-        large_size = 0;
-        return NULL;
-    }
-    memset(large_store, 0, file->size);
-    file->bytes = large_store;
-    file->stored = file->size;
-    return large_store;
+    return owned_stores[index];
 }
 
 static uint8_t *store_for(FakeFile *file)
 {
+    if (is_segment_path(file->path)) {
+        return owned_store_for(file);
+    }
     for (int slot = 0; slot < STORE_SLOTS; slot++) {
         if (file->bytes == stores[slot]) {
             return stores[slot];
         }
-    }
-    if (file->size > STORE_CAPACITY && strcmp(file->path, "/.rippl/build.tmp") == 0) {
-        return large_store_for(file);
     }
     for (int slot = 0; slot < STORE_SLOTS; slot++) {
         if (fake.store_used[slot] == NULL) {
@@ -1302,7 +1307,7 @@ bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uin
     if (store != NULL && offset + length <= file->stored) {
         memcpy(store + offset, bytes, length);
     }
-    fake.library_writes += strcmp(path, "/.rippl/library.db") == 0;
+    fake.library_writes += strncmp(path, "/.rippl/library/", 16) == 0;
     fake.covers_writes += strcmp(path, "/.rippl/covers.bin") == 0;
     return true;
 }
@@ -1319,6 +1324,17 @@ void fake_hal_set_reserve_result(HalReserveResult result)
 
 HalReserveResult hal_file_reserve(const char *path, uint32_t size)
 {
+    if (is_segment_path(path) && !fake.card_missing) {
+        if (fake_file(path) != NULL) {
+            return HAL_RESERVE_EXISTS;
+        }
+        if (fake.reserve_result == HAL_RESERVE_NO_SPACE ||
+            fake.reserve_result == HAL_RESERVE_FAILED) {
+            return fake.reserve_result;
+        }
+        fake_hal_add_file(path, NULL, size);
+        return HAL_RESERVE_CREATED;
+    }
     if (fake.reserve_count < FILE_CAPACITY) {
         fake.reserved_paths[fake.reserve_count] = path;
         fake.reserved_sizes[fake.reserve_count] = size;

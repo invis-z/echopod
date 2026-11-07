@@ -6,7 +6,7 @@
 #include "hal/storage.h"
 
 typedef struct CardFilesReport {
-    bool library_created;
+    bool created;
     bool card_full;
 } CardFilesReport;
 

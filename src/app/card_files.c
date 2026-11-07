@@ -21,9 +21,7 @@
 
 enum {
     SMALL_FILE_BYTES = 4096,
-    LIBRARY_FILE_BYTES = 4 * 1024 * 1024,
     COVERS_FILE_BYTES = 80 * 1024 * 1024,
-    SCRATCH_FILE_BYTES = 24 * 1024 * 1024,
     COVER_SLOT_BYTES = COVERS_ENTRY_SIZE + 4 + COVER_BUILD_RECORD_BYTES,
     COVER_SLOT_STEP = 256,
     COVER_SLOT_LIMIT = 8192
@@ -35,13 +33,12 @@ typedef struct CardFile {
 } CardFile;
 
 static const CardFile CARD_FILES[] = {
-    {SETTINGS_STORE_PATH, SMALL_FILE_BYTES},    {PLAYER_RESUME_PATH, SMALL_FILE_BYTES},
-    {FAVORITES_STORE_PATH, SMALL_FILE_BYTES},   {LIBRARY_STORE_PATH, LIBRARY_FILE_BYTES},
-    {COVER_CACHE_PATH, COVERS_FILE_BYTES},      {MUSIC_CHECK_PATH, SMALL_FILE_BYTES},
-    {PLAYER_UP_NEXT_PATH, SMALL_FILE_BYTES},    {SPOKEN_STORE_PATH, SMALL_FILE_BYTES},
-    {LIBRARY_SCRATCH_PATH, SCRATCH_FILE_BYTES}, {RESCAN_TIMES_PATH, SMALL_FILE_BYTES},
-    {BLUETOOTH_STORE_PATH, SMALL_FILE_BYTES},   {EQUALIZER_STORE_PATH, SMALL_FILE_BYTES},
-    {UPDATE_RECORD_PATH, SMALL_FILE_BYTES},     {FOLDERS_STORE_PATH, SMALL_FILE_BYTES},
+    {SETTINGS_STORE_PATH, SMALL_FILE_BYTES},  {PLAYER_RESUME_PATH, SMALL_FILE_BYTES},
+    {FAVORITES_STORE_PATH, SMALL_FILE_BYTES}, {COVER_CACHE_PATH, COVERS_FILE_BYTES},
+    {MUSIC_CHECK_PATH, SMALL_FILE_BYTES},     {PLAYER_UP_NEXT_PATH, SMALL_FILE_BYTES},
+    {SPOKEN_STORE_PATH, SMALL_FILE_BYTES},    {RESCAN_TIMES_PATH, SMALL_FILE_BYTES},
+    {BLUETOOTH_STORE_PATH, SMALL_FILE_BYTES}, {EQUALIZER_STORE_PATH, SMALL_FILE_BYTES},
+    {UPDATE_RECORD_PATH, SMALL_FILE_BYTES},   {FOLDERS_STORE_PATH, SMALL_FILE_BYTES},
 };
 
 static uint32_t slots_for(uint32_t albums)
@@ -84,7 +81,7 @@ HalReserveResult card_files_reserve(const char *path)
 
 CardFilesReport card_files_prepare(void (*creating)(void))
 {
-    CardFilesReport report = {.library_created = false, .card_full = false};
+    CardFilesReport report = {.created = false, .card_full = false};
     for (size_t index = 0; index < sizeof CARD_FILES / sizeof CARD_FILES[0]; index++) {
         HalReserveResult result = hal_file_reserve(CARD_FILES[index].path, CARD_FILES[index].size);
         if (result == HAL_RESERVE_CREATED && creating != NULL) {
@@ -92,8 +89,7 @@ CardFilesReport card_files_prepare(void (*creating)(void))
             creating = NULL;
         }
         report.card_full |= result == HAL_RESERVE_NO_SPACE;
-        report.library_created |=
-            result == HAL_RESERVE_CREATED && CARD_FILES[index].path == LIBRARY_STORE_PATH;
+        report.created |= result == HAL_RESERVE_CREATED;
     }
     return report;
 }

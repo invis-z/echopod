@@ -4,6 +4,7 @@
 
 #include "library/cover_build.h"
 #include "library/library_scan.h"
+#include "library_store.h"
 
 typedef struct RescanOutcome {
     ScanResult result;
@@ -17,8 +18,7 @@ typedef struct RescanProgress {
     void (*covers)(uint32_t done, uint32_t total);
 } RescanProgress;
 
-extern const char LIBRARY_SCRATCH_PATH[];
 extern const char RESCAN_TIMES_PATH[];
 
-RescanOutcome library_rescan_run(RescanProgress progress);
+RescanOutcome library_rescan_run(LibraryStore *store, RescanProgress progress);
 const char *library_rescan_message(RescanOutcome outcome, char *text, uint32_t capacity);

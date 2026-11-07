@@ -3,8 +3,10 @@
 #include <string.h>
 
 #include "check.h"
+#include "fake_card.h"
 #include "hal/storage.h"
 #include "library/library.h"
+#include "library/library_rebuild.h"
 #include "library/library_scan.h"
 #include "library/music_folders.h"
 #include "library_compare.h"
@@ -751,6 +753,78 @@ static void a_listing_at_an_odd_address_builds_the_same_library(void)
     CHECK(library_compare(aligned.bytes, aligned.length, odd.bytes, odd.length));
 }
 
+static FakeCard rebuild_card;
+static SegmentStore rebuild_store;
+
+static ScanResult rebuild(const char *folder, ScanStats *stats)
+{
+    static uint8_t memory[MEMORY_SIZE];
+    sim_storage_configure(folder, NULL);
+    cached_files.opens = 0;
+    segment_store_open(&rebuild_store, fake_card_files(&rebuild_card));
+    RebuildJob job = {
+        .scan =
+            {
+                .files = {open_dir, next_entry, close_dir, open_file, close_file, &cached_files},
+                .memory = memory,
+                .size = sizeof memory,
+            },
+        .store = &rebuild_store,
+    };
+    return library_rebuild(&job, stats);
+}
+
+static void check_committed(const char *fixture)
+{
+    static SegmentStore reopened;
+    segment_store_open(&reopened, fake_card_files(&rebuild_card));
+    SegmentRegion region = segment_store_region(&reopened, LIBRARY_REGION_INDEX);
+    CHECK_EQUAL(LIBRARY_STREAM_INDEX, region.stream);
+    CHECK(region.length <= OUTPUT_CAPACITY);
+    CHECK(segment_store_read(&reopened, region.stream, 0, cached_output.bytes, region.length));
+    uint32_t expected_size = 0;
+    uint8_t *expected = read_fixture(fixture, &expected_size);
+    CHECK(library_compare(expected, expected_size, cached_output.bytes, region.length));
+    free(expected);
+}
+
+static void a_rebuild_commits_the_library_and_reuses_it_next_time(void)
+{
+    fake_card_init(&rebuild_card, UINT64_MAX);
+    ScanStats stats;
+    CHECK_EQUAL(SCAN_OK, rebuild(RIPPL_FIXTURE_DIR "/tags", &stats));
+    CHECK_EQUAL(13u, stats.tracks);
+    CHECK_EQUAL(0, stats.reused);
+    uint32_t first = segment_store_sequence(&rebuild_store);
+    check_committed("tags_library.db");
+    CHECK_EQUAL(SCAN_OK, rebuild(RIPPL_FIXTURE_DIR "/tags", &stats));
+    CHECK_EQUAL(13u, stats.tracks);
+    CHECK_EQUAL(stats.files, stats.reused);
+    CHECK_EQUAL(0, cached_files.opens);
+    CHECK_EQUAL(first + 1, segment_store_sequence(&rebuild_store));
+    check_committed("tags_library.db");
+    CHECK_EQUAL(SCAN_OK, rebuild(RIPPL_FIXTURE_DIR "/scan_music", &stats));
+    CHECK_EQUAL(8u, stats.tracks);
+    check_committed("scan_music.db");
+    CHECK_EQUAL(0, segment_store_length(&rebuild_store, LIBRARY_STREAM_SCRATCH));
+    fake_card_free(&rebuild_card);
+}
+
+static void a_rebuild_without_room_keeps_the_old_library(void)
+{
+    fake_card_init(&rebuild_card, UINT64_MAX);
+    ScanStats stats;
+    CHECK_EQUAL(SCAN_OK, rebuild(RIPPL_FIXTURE_DIR "/tags", &stats));
+    uint32_t first = segment_store_sequence(&rebuild_store);
+    rebuild_card.free_bytes = 0;
+    CHECK_EQUAL(SCAN_NO_ROOM, rebuild(RIPPL_FIXTURE_DIR "/scan_music", &stats));
+    static SegmentStore reopened;
+    segment_store_open(&reopened, fake_card_files(&rebuild_card));
+    CHECK_EQUAL(first, segment_store_sequence(&reopened));
+    check_committed("tags_library.db");
+    fake_card_free(&rebuild_card);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -764,6 +838,8 @@ int main(void)
         TEST_CASE(a_second_scan_reads_no_unchanged_file),
         TEST_CASE(a_changed_file_is_read_again),
         TEST_CASE(removed_and_added_files_are_handled),
+        TEST_CASE(a_rebuild_commits_the_library_and_reuses_it_next_time),
+        TEST_CASE(a_rebuild_without_room_keeps_the_old_library),
         TEST_CASE(a_damaged_cache_is_ignored),
         TEST_CASE(a_folder_bigger_than_the_listing_is_read_in_batches),
         TEST_CASE(many_sibling_folders_fit_a_small_listing),

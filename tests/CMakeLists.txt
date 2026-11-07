@@ -374,7 +374,7 @@ if(RIPPL_BUILD_SIM)
         RIPPL_TEST_OUTPUT_DIR="${CMAKE_CURRENT_BINARY_DIR}"
     )
     rippl_add_unit_test(NAME test_library_scan
-        SOURCES library/test_library_scan.c
+        SOURCES library/test_library_scan.c library/fake_card.c
         LIBRARIES rippl_library_scan rippl_sim_storage rippl_library_checks
     )
     target_compile_definitions(test_library_scan PRIVATE

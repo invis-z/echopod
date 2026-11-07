@@ -41,7 +41,7 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 - Album covers come from art inside one of each album's first four tracks (Ogg and Opus pictures included), or from a `cover`, `folder`, `front` or `albumart` JPEG or PNG next to the tracks.
 - `.m3u` and `.m3u8` playlists anywhere on the card appear under Music → Playlists.
 - Libraries of many thousands of tracks work; `docs/known-issues.md` lists the sizes tested so far.
-- Rippl keeps its own files in a hidden `/.rippl` folder on the card, about 110 MB of them. Don't delete it unless you want the library rebuilt.
+- Rippl keeps its own files in a hidden `/.rippl` folder on the card: about 90 MB for a small library, growing in 1 MiB steps with a large one. Don't delete it unless you want the library rebuilt.
 - A card is needed: the library, your settings, favorites and resume points are all saved there. Without one, Home shows "No microSD card" and a changed setting isn't kept ("Insert a microSD card to save settings"). Put a card in and restart the player.
 - Music can also go on the player's internal storage (the drive called ECHO MINI, about 8 GB on the 8 GB model). The library always holds the music of both: albums, artists, genres, songs and playlists mix the two, and under Folders the internal storage is one more folder, **Internal storage**, next to the card's own folders. Firmware images (`HIFIECnn.IMG`) and other files that aren't music or playlists are ignored. An SD card is still needed, because the library and Rippl's other files stay in `/.rippl` on the card; the player never writes to internal storage. To leave internal storage's music out, untick its folders in Settings → Library → Music folders (below). Audiobooks and podcasts on internal storage play as music: the Audiobooks and Podcasts shelves only read the card's top-level `Audiobooks` and `Podcasts` folders.
 - If the same album is on the card and on internal storage, both copies are in the library, and with the same album and album artist they show as one album with every track twice. Untick one copy's folder in Settings → Library → Music folders to keep only the other.
@@ -91,7 +91,7 @@ The player accepts 16 or 24-bit at 44.1 and 48 kHz; the computer picks one (on W
 
 ## Build the library on a computer
 
-Rebuilding on the player takes a minute or two (1,563 tracks and 144 albums take about 1 minute 45 seconds). A computer can build the same library and album covers instead, straight onto the card, and tell the player that the card has already been scanned.
+For now the player doesn't use what rippl-sync writes: it scans the card itself after a sync (`docs/known-issues.md`). Rebuilding on the player takes a minute or two (1,563 tracks and 144 albums take about 1 minute 45 seconds). A computer can build the same library and album covers instead, straight onto the card, and tell the player that the card has already been scanned.
 
 The tool is called **rippl-sync**. Download it from the release page, under Assets; it's one file, with nothing to install:
 

@@ -15,7 +15,9 @@
 #include "hal/system.h"
 #include "library/cover_build.h"
 #include "library/covers.h"
+#include "library/library_rebuild.h"
 #include "library_rescan.h"
+#include "library_store.h"
 #include "music_check.h"
 #include "settings/rocker.h"
 #include "settings/settings.h"
@@ -99,6 +101,19 @@ static void start_app(void)
     app_start();
 }
 
+static void install_library(const uint8_t *bytes, uint32_t size)
+{
+    static SegmentStore store;
+    segment_store_open(&store, library_store_files());
+    segment_store_begin(&store);
+    segment_store_start(&store, LIBRARY_STREAM_INDEX, SEGMENT_POOL_LIBRARY);
+    CHECK_EQUAL(SEGMENT_OK, segment_store_append(&store, LIBRARY_STREAM_INDEX, bytes, size));
+    segment_store_set_region(
+        &store, LIBRARY_REGION_INDEX,
+        (SegmentRegion){.stream = LIBRARY_STREAM_INDEX, .offset = 0, .length = size});
+    CHECK_EQUAL(SEGMENT_OK, segment_store_commit(&store));
+}
+
 static void start_app_with_library(void)
 {
     uint32_t size = 0;
@@ -106,9 +121,8 @@ static void start_app_with_library(void)
     const uint8_t *bytes = fixture_bytes(&size);
     const uint8_t *covers = fixture_covers_bytes(&covers_size);
     fake_hal_reset();
-    fake_hal_add_file("/.rippl/library.db", bytes, size);
+    install_library(bytes, size);
     fake_hal_add_file("/.rippl/covers.bin", covers, covers_size);
-    fake_hal_add_file("/.rippl/build.tmp", NULL, 16 * 1024 * 1024);
     now_ms = START_MS;
     fake_hal_set_milliseconds(now_ms);
     app_start();
@@ -1243,14 +1257,14 @@ static void toggling_music_folders_again_and_again_keeps_rescanning(void)
     }
 }
 
-static void a_library_file_that_cannot_be_opened_is_not_called_a_full_card(void)
+static void a_library_segment_that_cannot_be_made_is_not_called_a_full_card(void)
 {
-    start_app_with_library();
+    start_app();
     fake_hal_set_empty_card(true);
-    fake_hal_set_open_file_limit(fake_hal_open_files());
+    fake_hal_set_reserve_result(HAL_RESERVE_FAILED);
     app_request_rescan();
     step();
-    CHECK(toast_is("Couldn't read the card"));
+    CHECK(toast_is("Could not write the library"));
 }
 
 static void a_missing_library_file_on_a_full_card_says_there_is_no_room(void)
@@ -1301,7 +1315,6 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/settings.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/resume.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/favorites.bin"));
-    CHECK_EQUAL(4 * 1024 * 1024, fake_hal_reserved_size("/.rippl/library.db"));
     uint32_t covers_size = fake_hal_reserved_size("/.rippl/covers.bin");
     CHECK_EQUAL(80 * 1024 * 1024, covers_size);
     CHECK((covers_size - COVERS_HEADER_SIZE) / (COVERS_ENTRY_SIZE + COVER_BUILD_RECORD_BYTES) >=
@@ -1319,7 +1332,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(14, fake_hal_reserve_count());
+    CHECK_EQUAL(12, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
@@ -1398,7 +1411,12 @@ static void a_new_firmware_rebuilds_a_library_it_cannot_read(void)
     start_on_a_fresh_card(HAL_RESERVE_CREATED);
     step();
     static const uint8_t OLD_VERSION[2] = {2, 0};
-    CHECK(hal_file_write_at("/.rippl/library.db", 4, OLD_VERSION, sizeof OLD_VERSION));
+    static SegmentStore store;
+    segment_store_open(&store, library_store_files());
+    char path[SEGMENT_PATH_CAPACITY];
+    segment_store_path(SEGMENT_POOL_LIBRARY, store.committed.streams[LIBRARY_STREAM_INDEX].head,
+                       path);
+    CHECK(hal_file_write_at(path, 4, OLD_VERSION, sizeof OLD_VERSION));
     fake_hal_set_version("newer");
     restart_app();
     step();
@@ -1437,12 +1455,13 @@ static void a_full_card_says_it_is_full(void)
 static void a_rescan_after_an_installed_update_asks_for_a_restart(void)
 {
     start_app_with_library();
+    int writes = fake_hal_library_writes();
     fake_hal_set_empty_card(true);
     fake_hal_set_restart_pending(true);
     app_request_rescan();
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
-    CHECK_EQUAL(0, fake_hal_library_writes());
+    CHECK_EQUAL(writes, fake_hal_library_writes());
     CHECK(toast_is("Restart the player to finish the update"));
 }
 
@@ -2758,7 +2777,7 @@ int main(void)
         TEST_CASE(a_refused_track_says_why_it_was_skipped),
         TEST_CASE(music_folders_leaves_an_unticked_folder_out_of_the_rescan),
         TEST_CASE(toggling_music_folders_again_and_again_keeps_rescanning),
-        TEST_CASE(a_library_file_that_cannot_be_opened_is_not_called_a_full_card),
+        TEST_CASE(a_library_segment_that_cannot_be_made_is_not_called_a_full_card),
         TEST_CASE(a_missing_library_file_on_a_full_card_says_there_is_no_room),
         TEST_CASE(rescanning_without_a_card_says_so),
         TEST_CASE(a_rescan_of_an_empty_card_writes_an_empty_library),
