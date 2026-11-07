@@ -122,6 +122,11 @@ static void a_quarter_million_tracks_build_in_the_players_memory(void)
         CHECK(library_read_track(&opened, index, &track));
         CHECK(library_read_string(&opened, track.path, text, sizeof text));
         CHECK(known_path(paths, TRACKS, text));
+        uint64_t id = 0;
+        uint32_t found = LIBRARY_NONE;
+        CHECK(library_track_id(&opened, index, &id));
+        CHECK(library_find_track(&opened, id, &found));
+        CHECK_EQUAL(index, found);
     }
     CHECK_EQUAL(0, segment_store_length(&reopened, SCRATCH_STREAM));
     free(paths);
