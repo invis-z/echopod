@@ -57,16 +57,7 @@ def write_opus(path, album, number, pictures=()):
     audio.save()
 
 
-class AlbumKeyTest(unittest.TestCase):
-    def test_keys_hash_the_album_artist_a_separator_and_the_title(self):
-        expected = cover_export.fnv1a(b"\x1fB", cover_export.fnv1a(b"A"))
-        self.assertEqual(expected, cover_export.album_key("A", "B"))
-
-    def test_keys_use_at_most_255_bytes_of_each_name(self):
-        long_name = "x" * 300
-        self.assertEqual(cover_export.album_key("x" * 255, "t"),
-                         cover_export.album_key(long_name, "t"))
-
+class HashTest(unittest.TestCase):
     def test_the_empty_hash_is_the_fnv_offset_basis(self):
         self.assertEqual(2166136261, cover_export.fnv1a(b""))
 
@@ -147,13 +138,13 @@ class ArtSearchTest(unittest.TestCase):
             write_silent_flac(self.album / name, 1)
             if color is not None:
                 add_picture(self.album / name, image_bytes(color), 3)
-        sources = [cover_export.AlbumSource(key, title, "Tester",
-                                            [f"Artist/Album/{name}" for name in names])
-                   for key, title, names in ((1, "A", ["a1.flac", "a2.flac"]), (2, "B", ["b1.flac"]),
-                                             (3, "C", ["c1.flac"]))]
-        covers = cover_export.collect_covers(self.root, sources)
-        colors = {key: image.convert("RGB").getpixel((0, 0)) for key, image in covers.records.items()}
-        self.assertEqual({1: (255, 0, 0), 2: (0, 255, 0), 3: (0, 0, 255)}, colors)
+        albums = {"A": ["a1.flac", "a2.flac"], "B": ["b1.flac"], "C": ["c1.flac"]}
+        colors = {}
+        for title, names in albums.items():
+            art = cover_export.locate_art(self.root, [f"Artist/Album/{name}" for name in names])
+            image = cover_export.converted(art, cover_export.unchanged)
+            colors[title] = image.convert("RGB").getpixel((0, 0))
+        self.assertEqual({"A": (255, 0, 0), "B": (0, 255, 0), "C": (0, 0, 255)}, colors)
 
     def test_an_empty_embedded_picture_counts_as_none(self):
         add_picture(self.track, b"", 3)
@@ -213,24 +204,6 @@ class FormatPictureTest(unittest.TestCase):
         self.assertIsNone(cover_export.asf_picture(struct.pack("<BI", 3, 99) + mime + b"\x00\x00"))
 
 
-class EncodeCoversTest(unittest.TestCase):
-    def test_the_header_and_index_describe_sorted_records(self):
-        red = Image.new("RGB", (8, 8), (255, 0, 0))
-        blue = Image.new("RGB", (8, 8), (0, 0, 255))
-        data = cover_export.encode_covers({900: red, 100: blue})
-        magic, version, count, full, half, reserved = HEADER.unpack_from(data, 0)
-        self.assertEqual((b"EMCV", 1, 2, 112, 56, 0), (magic, version, count, full, half, reserved))
-        first_key, first_offset = ENTRY.unpack_from(data, HEADER.size)
-        second_key, second_offset = ENTRY.unpack_from(data, HEADER.size + ENTRY.size)
-        self.assertEqual((100, 900), (first_key, second_key))
-        record = 112 * 112 * 2 + 56 * 56 * 2
-        self.assertEqual(record, second_offset - first_offset)
-        self.assertEqual(len(data), second_offset + record)
-        self.assertEqual(0x001F, struct.unpack_from("<H", data, first_offset)[0])
-        half_start = second_offset + 112 * 112 * 2
-        self.assertEqual(0xF800, struct.unpack_from("<H", data, half_start)[0])
-
-
 class ArtStampTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -287,34 +260,6 @@ class ArtStampTest(unittest.TestCase):
         self.assertEqual(cover_export.UNKNOWN_STAMP, cover_export.stamp_for(art, lambda path: None))
 
 
-class EncodeStampedTest(unittest.TestCase):
-    def test_records_sit_in_the_players_slots_with_a_stamp_each(self):
-        record = (bytes(range(256)) * 123)[:cover_export.RECORD_BYTES]
-        capacity = cover_export.HEADER.size + 5 * cover_export.SLOT_BYTES + 100
-        data = cover_export.encode_stamped({900: record, 100: record}, {900: 9, 100: 1}, capacity)
-        slots, stamps_start, records_start = cover_export.stamped_layout(capacity)
-        self.assertEqual(5, slots)
-        self.assertEqual((b"EMCV", 1, 2, 112, 56, stamps_start), HEADER.unpack_from(data, 0))
-        self.assertEqual((100, records_start), ENTRY.unpack_from(data, HEADER.size))
-        self.assertEqual((900, records_start + cover_export.RECORD_BYTES),
-                         ENTRY.unpack_from(data, HEADER.size + ENTRY.size))
-        self.assertEqual((1, 9), struct.unpack_from("<II", data, stamps_start))
-        self.assertEqual(records_start + 2 * cover_export.RECORD_BYTES, len(data))
-        self.assertEqual(record, data[records_start:records_start + cover_export.RECORD_BYTES])
-
-    def test_albums_past_the_last_slot_are_left_out(self):
-        record = bytes(cover_export.RECORD_BYTES)
-        capacity = cover_export.stamped_size(1)
-        data = cover_export.encode_stamped({1: record, 2: record}, {}, capacity)
-        self.assertEqual(1, HEADER.unpack_from(data, 0)[2])
-        self.assertEqual(capacity, len(data))
-        self.assertEqual(0, struct.unpack_from("<I", data, cover_export.stamped_layout(capacity)[1])[0])
-
-    def test_a_record_of_the_wrong_size_is_refused(self):
-        with self.assertRaises(ValueError):
-            cover_export.encode_stamped({1: b"short"}, {}, cover_export.stamped_size(1))
-
-
 class AlbumCoversTest(unittest.TestCase):
     def test_every_album_gets_its_key_from_the_library_names(self):
         model = library_index.build_library(FIXTURE_TRACKS)
@@ -322,38 +267,7 @@ class AlbumCoversTest(unittest.TestCase):
         self.assertEqual(len(model.albums), len(albums))
         first = model.albums[0]
         artist = model.album_artists[first.album_artist].name
-        self.assertEqual(cover_export.album_key(artist, first.title), albums[0].key)
+        self.assertEqual((first.title, artist), (albums[0].title, albums[0].artist))
         self.assertIn("AC DC/Back In Black/1-01 - Hells Bells.flac", albums[0].paths)
 
 
-class LibraryFileSourcesTest(unittest.TestCase):
-    def test_sources_read_from_a_library_file_match_the_scanned_ones(self):
-        model = library_index.build_library(FIXTURE_TRACKS)
-        data = library_index.encode_library(model)
-        self.assertEqual(cover_export.album_sources(model),
-                         cover_export.album_sources_from_library(data))
-
-    def test_a_file_that_is_not_a_library_is_refused(self):
-        with self.assertRaises(ValueError):
-            cover_export.album_sources_from_library(b"NOPE" + bytes(200))
-
-    def test_the_command_uses_the_library_file_instead_of_scanning(self):
-        model = library_index.build_library(FIXTURE_TRACKS)
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            library = root / "library.db"
-            library.write_bytes(library_index.encode_library(model))
-            output = root / "covers.bin"
-            original = library_index.scan
-            library_index.scan = lambda *_: self.fail("scanned the music again")
-            try:
-                status = cover_export.main(["--music", str(root), "--library", str(library),
-                                            "--output", str(output)])
-            finally:
-                library_index.scan = original
-            self.assertEqual(0, status)
-            self.assertEqual(b"EMCV", output.read_bytes()[:4])
-
-
-if __name__ == "__main__":
-    unittest.main()

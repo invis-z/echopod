@@ -1,5 +1,6 @@
 import argparse
 import base64
+import contextlib
 import io
 import re
 import shutil
@@ -7,6 +8,7 @@ import struct
 import subprocess
 import sys
 from pathlib import Path
+from unittest import mock
 
 from mutagen import id3
 from mutagen.flac import FLAC, Picture
@@ -15,9 +17,11 @@ from mutagen.oggopus import OggOpus
 
 import check_cover_decode
 import cover_export
+from tide import sync as tide_sync
 
 RECORD_BYTES = check_cover_decode.RECORD_BYTES
-TOOL_COUNTS = re.compile(r"(\d+) covers, (\d+) reused")
+TOOL_COUNTS = re.compile(r"(\d+) covers, (\d+) reused, \d+ missing, (\d+) of (\d+) files kept")
+NANOSECONDS = 1_000_000_000
 
 
 def image(width, height, seed):
@@ -191,6 +195,42 @@ def reuse_failures(tool, music, output):
     return []
 
 
+def simulator_stamp(stat, volume):
+    return stat.st_mtime_ns // NANOSECONDS & 0xFFFFFFFF
+
+
+def sync_like_the_simulator(card):
+    volume = tide_sync.CardVolume("simulator", True, False, 0, "")
+    with mock.patch.object(tide_sync, "card_stamp", simulator_stamp), \
+            mock.patch.object(tide_sync, "detect_volume", lambda root: volume), \
+            contextlib.redirect_stdout(io.StringIO()) as output:
+        status = tide_sync.main([str(card), "--yes", "--no-clock", "--no-fingerprint"])
+    if status != 0:
+        print(output.getvalue(), file=sys.stderr)
+    return status
+
+
+def tide_failures(tool, music, output, work):
+    card = work / "tide"
+    shutil.copytree(music, card)
+    (card / ".rippl").mkdir()
+    if sync_like_the_simulator(card) != 0:
+        return ["tide sync failed"]
+    compared = subprocess.run([str(tool), "--compare", str(output), str(card)],
+                              capture_output=True, text=True)
+    print(f"tide: {compared.stdout.strip()}")
+    failures = [] if compared.returncode == 0 else ["Tide's library differs from the player's"]
+    result = run_tool(tool, card, card)
+    counts = TOOL_COUNTS.search(result.stdout)
+    if result.returncode != 0 or counts is None:
+        return failures + ["the player couldn't rebuild a card Tide synced"]
+    covers, reused, kept, files = (int(value) for value in counts.groups())
+    if covers != reused or kept != files:
+        failures.append(f"after Tide the player kept {reused} of {covers} covers and "
+                        f"{kept} of {files} files")
+    return failures
+
+
 def parse_arguments(argv):
     parser = argparse.ArgumentParser(description="Check covers built on the device side")
     parser.add_argument("--tool", type=Path, required=True)
@@ -210,6 +250,7 @@ def main(argv=None):
         return 1
     failures = check(read_dump((output / "covers.dump").read_bytes()), expected)
     failures += reuse_failures(arguments.tool, music, output)
+    failures += tide_failures(arguments.tool, music, output, arguments.work)
     for failure in failures:
         print(f"FAIL {failure}", file=sys.stderr)
     return 1 if failures else 0

@@ -56,7 +56,7 @@ Settings → Library → **Music folders** lists the top-level folders of the ca
 - The internal storage's top-level folders follow the card's, as **Internal storage/**name. Music directly in the internal storage's root, like music in the card's root, isn't listed and stays in the library.
 - Up to 32 folders are listed (fewer if their names are very long: the screen keeps about 500 bytes of names). Folders beyond that aren't listed and stay in the library.
 - The choice is kept by folder name in `/.rippl/folders.bin` on the card, so a folder you add later is ticked, and a renamed folder counts as a new one. A folder that is gone keeps its choice for when it comes back.
-- rippl-sync reads the same file and leaves the same folders out (see Build the library on a computer).
+- Tide reads the same file and leaves the same folders out (see Build the library on a computer).
 
 ## Copying music over USB
 
@@ -91,43 +91,43 @@ The player accepts 16 or 24-bit at 44.1 and 48 kHz; the computer picks one (on W
 
 ## Build the library on a computer
 
-For now the player doesn't use what rippl-sync writes: it scans the card itself after a sync (`docs/known-issues.md`). Rebuilding on the player takes a minute or two (1,563 tracks and 144 albums take about 1 minute 45 seconds). A computer can build the same library and album covers instead, straight onto the card, and tell the player that the card has already been scanned.
+Rebuilding on the player takes a minute or two (1,563 tracks and 144 albums take about 1 minute 45 seconds). A computer can build the same library and album covers instead, straight onto the card, and tell the player that the card has already been scanned. The player then keeps them, and when you add music later it only reads the new files.
 
-The tool is called **rippl-sync**. Download it from the release page, under Assets; it's one file, with nothing to install:
+The tool is called **Tide**. Download it from the release page, under Assets; it's one file, with nothing to install:
 
 | Computer | File |
 |---|---|
-| Windows | `rippl-sync-windows-x64.exe` |
-| Mac with Apple silicon (M1 and later) | `rippl-sync-macos-arm64` |
-| Linux (x86-64) | `rippl-sync-linux-x64` |
+| Windows | `tide-windows-x64.exe` |
+| Mac with Apple silicon (M1 and later) | `tide-macos-arm64` |
+| Linux (x86-64) | `tide-linux-x64` |
 
 **Windows**
 
 1. Copy your music to the card, in the player over USB or in a card reader.
-2. Double-click `rippl-sync-windows-x64.exe`. Windows may say it "protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
+2. Double-click `tide-windows-x64.exe`. Windows may say it "protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 3. It finds a card the player has used and asks "Card to sync [E:\]": press Enter. For another card, type its drive letter (or drag the drive onto the window) and press Enter.
 4. When it says "Done", press Enter to close it, eject the card (in the player: both drives), and put it back in the player or unplug.
 
-From a command prompt, `rippl-sync-windows-x64.exe E:` does the same without asking.
+From a command prompt, `tide-windows-x64.exe sync E:` does the same without asking. `tide sync` is what runs when you give no command.
 
 **Mac**
 
 1. Copy your music to the card.
-2. In Terminal, allow the downloaded file to run once: `chmod +x ~/Downloads/rippl-sync-macos-arm64 && xattr -d com.apple.quarantine ~/Downloads/rippl-sync-macos-arm64`.
-3. Run `~/Downloads/rippl-sync-macos-arm64` and press Enter to use the card it finds, or drag the card from the desktop into the window first. You can also give it straight away: `~/Downloads/rippl-sync-macos-arm64 /Volumes/CARD`.
+2. In Terminal, allow the downloaded file to run once: `chmod +x ~/Downloads/tide-macos-arm64 && xattr -d com.apple.quarantine ~/Downloads/tide-macos-arm64`.
+3. Run `~/Downloads/tide-macos-arm64` and press Enter to use the card it finds, or drag the card from the desktop into the window first. You can also give it straight away: `~/Downloads/tide-macos-arm64 sync /Volumes/CARD`.
 4. Eject the card.
 
 **Linux**
 
-`chmod +x rippl-sync-linux-x64`, then `./rippl-sync-linux-x64 /media/you/CARD` (the card's mount point), then eject the card.
+`chmod +x tide-linux-x64`, then `./tide-linux-x64 sync /media/you/CARD` (the card's mount point), then eject the card.
 
-**Intel Macs, other computers, or from the source.** Install Python 3, then the tools' packages once with `python3 -m pip install -r tools/requirements.txt`, and run `python3 tools/rippl_sync.py /Volumes/CARD`. On Windows, `tools\rippl_sync.bat E:` finds Python for you.
+**Intel Macs, other computers, or from the source.** Install Python 3, then the tools' packages once with `python3 -m pip install -r tools/requirements.txt`, and run `python3 tools/tide sync /Volumes/CARD`. On Windows, `tools\tide.bat sync E:` finds Python for you (double-clicking it asks for the card).
 
-It reads the whole card, as the player does, and writes `library.db`, `covers.bin` and `scan.bin` into the card's `/.rippl` folder. If the player has never used the card, it asks before creating `/.rippl` (`--yes` creates it without asking). Files the player made are overwritten in place and keep their size; missing ones are made at the player's sizes (4 MB, 80 MB and 4 KB). It then prints what it found, for example "1,402 tracks, 120 albums, 3 playlists" and "115 covers, 5 without art".
+It reads the whole card, as the player does, and writes the library, the album covers and a record of every music file into the card's `/.rippl` folder, in the same segment files the player uses (`/.rippl/library`, `/.rippl/covers` and `manifest.bin`), plus `scan.bin`. If the player has never used the card, it asks before creating `/.rippl` (`--yes` creates it without asking). It writes only to segment files the player isn't using and switches over at the very end, so stopping it half-way leaves the player's own library as it was. Covers that are already on the card and whose art didn't change are kept without decoding. It then prints what it found, for example "1,402 tracks, 120 albums, 3 playlists" and "115 covers (110 kept), 5 without art".
 
-**Music folders.** rippl-sync reads Settings → Library → Music folders from the card (`/.rippl/folders.bin`) and leaves the same top-level folders out of the library and the fingerprint, saying how many ("Leaving out 2 top-level folders"). Changes inside a left-out folder don't make the player rescan.
+**Music folders.** Tide reads Settings → Library → Music folders from the card (`/.rippl/folders.bin`) and leaves the same top-level folders out of the library and the fingerprint, saying how many ("Leaving out 2 top-level folders"). Changes inside a left-out folder don't make the player rescan.
 
-**Internal storage.** The player's library also holds the music on internal storage, so rippl-sync looks for it too: with the card in the connected player, it finds the internal storage by its drive name, ECHO MINI, and prints both drives it reads ("Rippl sync: E:\ (exFAT)" and "and the internal storage F:\ (FAT32)"). If you renamed that drive, give it with `--internal`: `rippl-sync-windows-x64.exe E: --internal F:` (on a Mac, for example `--internal "/Volumes/MY PLAYER"`). If it isn't found (for example with the card in a card reader), rippl-sync says so, builds the library from the card only, and the player rescans after the sync to add internal storage's music.
+**Internal storage.** The player's library also holds the music on internal storage, so Tide looks for it too: with the card in the connected player, it finds the internal storage by its drive name, RIPPL, and prints both drives it reads ("Tide sync: E:\ (exFAT)" and "and the internal storage F:\ (FAT32)"). The drive comes named ECHO MINI: rename it to RIPPL once on your computer (in Windows, right-click it and choose Rename; on a Mac, rename it in Finder), or give it each time with `--internal`: `tide-windows-x64.exe sync E: --internal F:` (on a Mac, for example `--internal "/Volumes/MY PLAYER"`). If it isn't found (for example with the card in a card reader), Tide says so, builds the library from the card only, and the player rescans after the sync to add internal storage's music.
 
 **Why the player doesn't rescan.** After a USB session the player checks for changes: it compares the names, sizes and modification times of the music, playlists and cover images on the card with a fingerprint it keeps in `scan.bin`. The computer writes the same fingerprint, so the check finds nothing new and the player keeps the computer's library. With a card reader there's no USB session, so the player uses the new library straight away.
 
@@ -139,17 +139,16 @@ It reads the whole card, as the player does, and writes `library.db`, `covers.bi
 - the card has folders more than 31 levels deep or paths longer than 1,023 bytes (the player can't fingerprint those);
 - a name was saved decomposed (for example by Linux) and read on a Mac, or only as an old DOS short name with accented letters.
 
-To see whether it works on your card, let the player scan it once, then run rippl-sync with `--check` without changing anything (for example `rippl-sync-windows-x64.exe E: --check`). "They match" means the player won't rescan after the next sync.
+To see whether it works on your card, let the player scan it once, then run Tide with `--check` without changing anything (for example `tide-windows-x64.exe sync E: --check`). "They match" means the player won't rescan after the next sync.
 
 **After a firmware update** the player checks the music once when it first starts ("Checking for changes"), and rescans only if the music changed, or if it can't read the library on the card (as after updating to 0.2.0, which changed the library format). `scan.bin` remembers the firmware version; the computer keeps it. A `scan.bin` the computer had to create has no version yet, so the player checks once on its next start too.
 
 | Option | Effect |
 |---|---|
 | `--dry-run` | Read everything and say what would be written, but write nothing |
-| `--no-covers` | Build the library only; `covers.bin` stays as it is, so new albums show without covers until the next rescan on the player |
-| `--covers-only` | Rebuild `covers.bin` from the card's `library.db` |
+| `--no-covers` | Build the library and keep the covers the card already has without looking for art, so new albums show without covers until the next rescan on the player |
 | `--no-fingerprint` | Leave `scan.bin` alone, so the player compares the music with its own last scan |
-| `--internal DRIVE` | The player's internal storage drive, when it isn't found by its name, ECHO MINI (see above) |
+| `--internal DRIVE` | The player's internal storage drive, when it isn't found by its name, RIPPL (see above) |
 | `--no-clock` | Don't write `clock.bin`, so the player keeps its own time (see Clock below) |
 | `--check` | Only compare the computer's fingerprint with the player's |
 | `--yes` | Create `/.rippl` without asking |
@@ -214,12 +213,12 @@ The file must be UTF-8 (with or without a BOM); other encodings, such as the GBK
 
 The player has a clock chip that keeps time while it's off. Rippl reads it when it starts and every ten minutes, and sets it in two ways:
 
-- **rippl-sync** writes the computer's time and time zone to the card (`/.rippl/clock.bin`) at the end of every sync, and the player takes it when the USB session ends (eject the card safely, or unplug): a toast says "Clock set from the computer". The clock then matches the computer's to within the seconds between the end of the sync and the eject. A card synced in a card reader doesn't set the clock, because the player can't tell how long ago that was; sync with the player plugged in, or set the time by hand. `--no-clock` leaves the clock alone.
+- **Tide** writes the computer's time and time zone to the card (`/.rippl/clock.bin`) at the end of every sync, and the player takes it when the USB session ends (eject the card safely, or unplug): a toast says "Clock set from the computer". The clock then matches the computer's to within the seconds between the end of the sync and the eject. A card synced in a card reader doesn't set the clock, because the player can't tell how long ago that was; sync with the player plugged in, or set the time by hand. `--no-clock` leaves the clock alone.
 - **Settings → System → Date & time** sets it by hand: vol± choose a row (year, month, day, hour, minute, time zone), ▶ starts changing it (vol± change the value, ▶ finishes), Back leaves and sets the clock. The clock shows the local time you set; the time zone is kept with it.
 
 **Settings → Display → Clock** (Off by default) shows the time, `HH:MM`, in the status bar next to the play icon. In portrait, when the time and the battery percentage don't both fit, the percentage is left out. Until the clock has been set, the status bar shows no time and Date & time says "Not set". A clock that says it's earlier than the day before the firmware was built counts as not set too, so a chip that was never set properly doesn't show a wrong time.
 
-**After installing a new firmware**, if the clock isn't set, the player asks once, after the start-up screen and the music check: "Set the date and time?" → **Set now** opens Date & time (starting from the date the firmware was built), **Later** (or Back) leaves it; it doesn't ask again until the next firmware. Syncing with rippl-sync with the player plugged in sets it too. Diagnostics → Clock shows what the chip itself holds, with ` VL` while it has never been set.
+**After installing a new firmware**, if the clock isn't set, the player asks once, after the start-up screen and the music check: "Set the date and time?" → **Set now** opens Date & time (starting from the date the firmware was built), **Later** (or Back) leaves it; it doesn't ask again until the next firmware. Syncing with Tide with the player plugged in sets it too. Diagnostics → Clock shows what the chip itself holds, with ` VL` while it has never been set.
 
 Whether the chip keeps time on every player hasn't been confirmed yet; if yours loses the time when switched off, set it again or sync.
 
@@ -294,7 +293,7 @@ Podcasts/
 - These folders still appear under Music (Albums, Artists, Folders and so on), as all tracks on the card do. Give them a genre such as "Audiobook" if you want to find them there.
 - An .m4b (or .m4a) with chapters shows "Chapter 3 of 13" on Now Playing, and the Menu button opens the chapter list with each chapter's start time: pick one to jump to it. Holding Vol+ and Vol− still jump 30 s and 15 s. The chapters are read from the file's chapter list (`chpl`); chapter names aren't shown.
 - Playback speed can't be changed yet.
-- To see on a computer which episodes and books you finished (for example to delete played podcasts in a sync script), run `python tools/rippl_bookmarks.py E:\ --finished` with the card's drive or mount folder. It prints one path per line. Without `--finished` it lists every bookmark with its position; `--json` prints them all as JSON.
+- To see on a computer which episodes and books you finished (for example to delete played podcasts in a sync script), run `tide bookmarks E:\ --finished` (or `python3 tools/tide bookmarks E:\ --finished` from the source) with the card's drive or mount folder. It prints one path per line. Without `--finished` it lists every bookmark with its position; `--json` prints them all as JSON.
 
 ## Updating Rippl
 

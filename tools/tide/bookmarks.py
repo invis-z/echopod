@@ -87,6 +87,7 @@ def clock(milliseconds):
 
 def main(arguments=None):
     parser = argparse.ArgumentParser(
+        prog="tide bookmarks",
         description="List the audiobook and podcast bookmarks Rippl keeps on a card.")
     parser.add_argument("card", help="the card's root folder, for example E:\\ or /media/card")
     parser.add_argument("--finished", action="store_true",
@@ -111,6 +112,3 @@ def main(arguments=None):
             print(f"{state:>9}  {row['track'] or row['path'] or '(not on this card)'}")
     return 0
 
-
-if __name__ == "__main__":
-    sys.exit(main())

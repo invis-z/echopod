@@ -10,6 +10,7 @@
 #include "library/covers.h"
 #include "library/library_rebuild.h"
 #include "library/segment_stream.h"
+#include "library_compare.h"
 #include "sim_storage.h"
 
 enum {
@@ -169,13 +170,47 @@ static bool dump_covers(SegmentStore *store)
     return dump != NULL && fclose(dump) == 0 && ok;
 }
 
+static uint8_t *committed_library(const char *card, uint32_t *length)
+{
+    static SegmentStore store;
+    output_folder = card;
+    segment_store_open(&store, (SegmentFiles){reserve, read_card, write_card, NULL});
+    SegmentRegion region = segment_store_region(&store, LIBRARY_REGION_INDEX);
+    uint8_t *bytes = malloc(region.length > 0 ? region.length : 1);
+    *length = region.length;
+    if (!segment_store_found(&store) ||
+        !segment_store_read(&store, region.stream, region.offset, bytes, region.length)) {
+        fprintf(stderr, "no library in %s\n", card);
+        free(bytes);
+        return NULL;
+    }
+    return bytes;
+}
+
+static int compare_cards(const char *expected, const char *actual)
+{
+    uint32_t expected_length = 0;
+    uint32_t actual_length = 0;
+    uint8_t *first = committed_library(expected, &expected_length);
+    uint8_t *second = committed_library(actual, &actual_length);
+    bool same = first != NULL && second != NULL &&
+                library_compare(first, expected_length, second, actual_length);
+    printf("%s\n", same ? "the libraries mean the same" : "the libraries differ");
+    free(first);
+    free(second);
+    return same ? 0 : 5;
+}
+
 int main(int argc, char **argv)
 {
+    if (argc == 4 && strcmp(argv[1], "--compare") == 0) {
+        return compare_cards(argv[2], argv[3]);
+    }
     static uint8_t memory[MEMORY_SIZE];
     static HostFiles files;
     static SegmentStore store;
     if (argc != 3) {
-        fprintf(stderr, "usage: cover_build_tool MUSIC OUTPUT_FOLDER\n");
+        fprintf(stderr, "usage: cover_build_tool MUSIC CARD, or --compare CARD CARD\n");
         return 1;
     }
     output_folder = argv[2];
@@ -193,7 +228,8 @@ int main(int argc, char **argv)
         fprintf(stderr, "rebuild failed: %d, covers %d\n", result, stats.cover_result);
         return 2;
     }
-    printf("%u tracks, %u albums, %u covers, %u reused, %u missing\n", stats.scan.tracks,
-           stats.covers.albums, stats.covers.covers, stats.covers.reused, stats.covers.missing);
+    printf("%u tracks, %u albums, %u covers, %u reused, %u missing, %u of %u files kept\n",
+           stats.scan.tracks, stats.covers.albums, stats.covers.covers, stats.covers.reused,
+           stats.covers.missing, stats.scan.reused, stats.scan.files);
     return dump_covers(&store) ? 0 : 4;
 }

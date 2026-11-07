@@ -13,6 +13,8 @@ from pathlib import Path
 
 import cover_export
 import library_index
+from tide import covers as tide_covers
+from tide import records, rippl_format, store
 
 RIPPL_FOLDER = ".rippl"
 MEBIBYTE = 1024 * 1024
@@ -39,7 +41,7 @@ ART_NAMES = frozenset(f"{stem}{suffix}".encode("ascii")
                       for suffix in cover_export.FOLDER_IMAGE_SUFFIXES)
 SYSTEM_FOLDER = b"system volume information"
 INTERNAL_NAME = library_index.INTERNAL_FOLDER.encode("ascii")
-INTERNAL_LABEL = "ECHO MINI"
+INTERNAL_LABEL = "RIPPL"
 UNIX_EPOCH = datetime(1970, 1, 1)
 DOS_FIRST_YEAR = 1980
 DOS_LAST_YEAR = 2107
@@ -65,8 +67,6 @@ class CardFile:
     header_size: int
 
 
-LIBRARY_FILE = CardFile("library.db", 4 * MEBIBYTE, library_index.HEADER_SIZE)
-COVERS_FILE = CardFile("covers.bin", 80 * MEBIBYTE, cover_export.HEADER.size)
 SCAN_FILE = CardFile("scan.bin", 4096, SCAN_RECORD.size)
 
 
@@ -102,9 +102,15 @@ class InternalDrive:
     volume: CardVolume
 
 
+STREAM_LIBRARY = 1
+STREAM_RECORDS = 2
+STREAM_OTHER_RECORDS = 3
+REGION_LIBRARY = 0
+VALUE_RECORDS = 0
+
+
 @dataclass
 class SyncOptions:
-    library: bool = True
     covers: bool = True
     fingerprint: bool = True
     clock: bool = True
@@ -592,14 +598,34 @@ def internal_root(internal):
     return None if internal is None else internal.root
 
 
-def build_library(card, internal=None, excluded=frozenset()):
+def card_path(prefix, relative):
+    parts = library_index.music_path(prefix, relative).split("/")
+    return b"/".join(card_name(part) for part in parts)
+
+
+def read_music(card, volume, internal=None, excluded=frozenset()):
     step("Reading the music...")
-    tracks, playlists, failures = library_index.scan(card, internal_root(internal), excluded)
+    roots = library_index.MusicRoots(card, internal_root(internal), excluded)
+    tracks, files, failures = [], [], []
+    for base, path, prefix in roots.files(library_index.AUDIO_SUFFIXES):
+        relative = path.relative_to(base)
+        drive = volume if internal is None or base != internal.root else internal.volume
+        try:
+            stat = path.stat()
+        except OSError as error:
+            failures.append(f"{library_index.music_path(prefix, relative)}: {error}")
+            continue
+        try:
+            track = library_index.read_track(base, path, prefix)
+            tracks.append(track)
+        except Exception as error:
+            failures.append(f"{library_index.music_path(prefix, relative)}: {error}")
+            track = None
+        files.append((card_path(prefix, relative), stat.st_size & WORD_MASK,
+                      card_stamp(stat, drive), track))
+    playlists = [library_index.read_playlist(base, path, prefix)
+                 for base, path, prefix in roots.files(library_index.PLAYLIST_SUFFIXES)]
     model = library_index.build_library(tracks, playlists)
-    try:
-        data = library_index.encode_library(model)
-    except ValueError as error:
-        raise SyncError(f"the library is too big for the player: {error}") from error
     print(f"{plural(len(model.tracks), 'track')}, {plural(len(model.albums), 'album')}, "
           f"{plural(len(model.playlists), 'playlist')}")
     for failure in failures:
@@ -608,17 +634,7 @@ def build_library(card, internal=None, excluded=frozenset()):
         if playlist.unresolved:
             missing = plural(playlist.unresolved, "entry", "entries")
             print(f"  playlist {playlist.name}: {missing} not found")
-    return model, data
-
-
-def album_sources(card, model, library_path, internal=None, excluded=frozenset()):
-    if model is not None:
-        return cover_export.album_sources(model)
-    try:
-        return cover_export.album_sources_from_library(library_path.read_bytes())
-    except (OSError, ValueError):
-        print("(no library on the card yet, reading the music first)")
-        return cover_export.album_sources(build_library(card, internal, excluded)[0])
+    return model, roots, files
 
 
 def art_describer(volume, internal=None):
@@ -633,22 +649,28 @@ def art_describer(volume, internal=None):
     return describe
 
 
-def covers_capacity(path, count):
-    return target_size(existing_size(path), cover_export.stamped_size(count),
-                       COVERS_FILE.standard_size)
-
-
-def build_covers(card, sources, volume, options, internal=None):
-    step("Finding album covers...")
-    roots = library_index.MusicRoots(card, internal_root(internal))
-    covers = cover_export.collect_covers(roots, sources, cover_export.cover_record,
-                                         art_describer(volume, internal))
-    capacity = covers_capacity(card / RIPPL_FOLDER / COVERS_FILE.name, len(covers.records))
-    data = cover_export.encode_stamped(covers.records, covers.stamps, capacity)
-    print(f"{plural(len(covers.records), 'cover')}, {len(covers.missing):,} without art")
-    for album in covers.missing if options.verbose else ():
+def build_covers(model, roots, old, volume, options, internal=None):
+    step("Finding album covers..." if options.covers else "Keeping the album covers...")
+    result = tide_covers.build(model, roots, old, art_describer(volume, internal),
+                               decode=options.covers)
+    print(f"{plural(result.covers, 'cover')} ({result.reused:,} kept), "
+          f"{len(result.missing):,} without art")
+    for album in result.missing if options.verbose else ():
         print(f"  no cover: {album}")
-    return data
+    return result
+
+
+def stage_library(card_store, model, files):
+    previous = card_store.value(VALUE_RECORDS)
+    previous = previous if previous in (STREAM_RECORDS, STREAM_OTHER_RECORDS) else STREAM_RECORDS
+    following = STREAM_OTHER_RECORDS if previous == STREAM_RECORDS else STREAM_RECORDS
+    library = rippl_format.encode_library(model)
+    card_store.write(STREAM_LIBRARY, store.POOL_LIBRARY, library)
+    card_store.write(following, store.POOL_LIBRARY, records.encode_records(files))
+    card_store.write(previous, store.POOL_LIBRARY, b"")
+    card_store.set_region(REGION_LIBRARY, STREAM_LIBRARY, 0, len(library))
+    card_store.set_value(VALUE_RECORDS, following)
+    return library
 
 
 def take_fingerprint(card, volume, internal=None, excluded=frozenset()):
@@ -663,15 +685,28 @@ def write_or_report(path, data, card_file, options):
     existing = existing_size(path)
     size = target_size(existing, len(data), card_file.standard_size)
     if options.dry_run:
-        place = "a new" if existing is None else "the" if existing == size else "a larger"
-        print(f"  would write {card_file.name}: {human_size(len(data))} into {place} "
-              f"{human_size(size)} file")
+        print(f"  would write {card_file.name}")
         return
     try:
         write_card_file(path, data, card_file)
     except OSError as error:
         raise SyncError(f"couldn't write {path}: {error.strerror or error}") from error
-    print(f"  {card_file.name:<11} {human_size(len(data))} in a {human_size(size)} file")
+    print(f"  {card_file.name:<11} {human_size(size)}")
+
+
+def commit_store(card_store, library, covers, options):
+    try:
+        added = card_store.new_bytes()
+        if options.dry_run:
+            print(f"  would write the library ({human_size(len(library))}) and "
+                  f"{plural(covers.slots, 'cover')} into {store.MANIFEST_NAME}, adding "
+                  f"{human_size(added)} of segment files")
+            return
+        card_store.commit()
+    except (OSError, store.StoreError) as error:
+        raise SyncError(f"couldn't write the library: {error}") from error
+    print(f"  library     {human_size(len(library))}, {plural(covers.slots, 'cover')}"
+          f" ({human_size(added)} of new segment files)")
 
 
 def record_fingerprint(rippl, card, volume, before, options, internal=None,
@@ -696,26 +731,24 @@ def record_fingerprint(rippl, card, volume, before, options, internal=None,
 
 def sync(card, volume, options, internal=None, internal_missing=False, excluded=frozenset()):
     rippl = card / RIPPL_FOLDER
-    library_path = rippl / LIBRARY_FILE.name
     before = None
-    if options.library and options.fingerprint and not internal_missing:
+    if options.fingerprint and not internal_missing:
         step("Fingerprinting the music...")
         before = take_fingerprint(card, volume, internal, excluded)
         print(f"{before.entries:,} files and folders" if before.complete else "incomplete")
-    model, library_data, covers_data = None, None, None
-    if options.library:
-        model, library_data = build_library(card, internal, excluded)
-    if options.covers:
-        sources = album_sources(card, model, library_path, internal, excluded)
-        covers_data = build_covers(card, sources, volume, options, internal)
-    forget = before is not None or (internal_missing and options.library)
-    if forget and not options.dry_run:
+    try:
+        card_store = store.Store(rippl, options.dry_run)
+        old = tide_covers.OldCovers(card_store)
+    except store.StoreError as error:
+        raise SyncError(f"the card's library can't be read: {error}") from error
+    model, roots, files = read_music(card, volume, internal, excluded)
+    covers = build_covers(model, roots, old, volume, options, internal)
+    if (before is not None or internal_missing) and not options.dry_run:
         forget_fingerprint(rippl / SCAN_FILE.name)
     print(f"{'Planned for' if options.dry_run else 'Writing'} {rippl}")
-    if library_data is not None:
-        write_or_report(library_path, library_data, LIBRARY_FILE, options)
-    if covers_data is not None:
-        write_or_report(rippl / COVERS_FILE.name, covers_data, COVERS_FILE, options)
+    library = stage_library(card_store, model, files)
+    tide_covers.stage(card_store, old, covers)
+    commit_store(card_store, library, covers, options)
     recorded = before is not None and record_fingerprint(rippl, card, volume, before, options,
                                                          internal, excluded)
     if options.clock:
@@ -735,12 +768,12 @@ def print_next_steps(options, recorded, volume, seconds):
         print("The player will use this library without scanning the card again.")
         if volume.caveat:
             print(f"(Note: {volume.caveat}.)")
-    elif options.library and options.fingerprint:
+    elif options.fingerprint:
         print("The player will scan the card once more when it starts or after USB.")
-    elif options.library:
+    else:
         print("After USB the player compares the music with its own last scan, as usual.")
-    if options.library and not options.covers:
-        print("Covers were left as they were: new albums show without a cover until the next "
+    if not options.covers:
+        print("Covers were kept as they were: new albums show without a cover until the next "
               "rescan on the player (Settings, Rescan library).")
 
 
@@ -774,13 +807,14 @@ def describe(fingerprint):
 
 
 def options_from(arguments):
-    return SyncOptions(library=not arguments.covers_only, covers=not arguments.no_covers,
+    return SyncOptions(covers=not arguments.no_covers,
                        fingerprint=not arguments.no_fingerprint, clock=not arguments.no_clock,
                        dry_run=arguments.dry_run, verbose=arguments.verbose)
 
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser(
+        prog="tide sync",
         description="Build the Rippl library and album covers for a memory card on this "
                     "computer, so the player doesn't have to scan it.")
     parser.add_argument("card", nargs="?",
@@ -789,11 +823,9 @@ def parse_arguments(argv):
     parser.add_argument("--internal",
                         help=f"the player's internal storage drive, when it isn't found by its "
                              f"name ({INTERNAL_LABEL})")
-    parts = parser.add_mutually_exclusive_group()
-    parts.add_argument("--no-covers", action="store_true",
-                       help="build the library only and leave covers.bin as it is")
-    parts.add_argument("--covers-only", action="store_true",
-                       help="rebuild covers.bin from the card's library.db only")
+    parser.add_argument("--no-covers", action="store_true",
+                        help="build the library and keep the covers the card already has, "
+                             "without finding new ones")
     parser.add_argument("--no-fingerprint", action="store_true",
                         help="leave scan.bin alone, so the player decides itself whether to "
                              "rescan")
@@ -884,17 +916,14 @@ def run(arguments):
             return run_check(card, volume, internal, excluded)
         require_dependencies()
         options = options_from(arguments)
-        print(f"Rippl sync: {card} ({volume.file_system})")
+        print(f"Tide sync: {card} ({volume.file_system})")
         if internal is not None:
             print(f"  and the internal storage {internal.root} ({internal.volume.file_system})")
         ensure_rippl_folder(rippl, options, arguments.yes)
         recorded = sync(card, volume, options, internal, internal is None, excluded)
     except SyncError as error:
-        print(f"rippl_sync: {error}", file=sys.stderr)
+        print(f"tide sync: {error}", file=sys.stderr)
         return 2
     print_next_steps(options, recorded, volume, time.monotonic() - started)
     return 0
 
-
-if __name__ == "__main__":
-    sys.exit(main())

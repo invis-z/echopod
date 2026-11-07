@@ -14,7 +14,7 @@ The hardware knowledge it relies on comes largely from the [ReChord](https://git
 
 - **Plays** FLAC, ALAC, MP3, AAC, Opus, QOA and WAV, from 8 to 192 kHz with 24-bit output, gapless.
 - **Cover Flow**, with every album and a Random album tile, and **Now Playing** with the cover, progress and seeking.
-- **A library built on the player:** Artists, Album Artists, Albums, Genres, Folders, All Songs, Playlists (M3U and M3U8) and Favorites, with fast scroll and letter jumps. Or build it on a computer with **rippl-sync**.
+- **A library built on the player:** Artists, Album Artists, Albums, Genres, Folders, All Songs, Playlists (M3U and M3U8) and Favorites, with fast scroll and letter jumps. Or build it on a computer with **Tide**.
 - **Queue and modes:** shuffle songs or albums, repeat, and Up Next (Play Next, Add to Up Next). The queue and position come back after power-off.
 - **Equalizer:** FiiO's presets and a 7-band Custom EQ.
 - **Portrait mode:** Settings → Orientation turns the screen upright either way, with layouts made for it. The volume rocker turns with it.
@@ -68,7 +68,7 @@ mkdir -p build/system
 
 The simulator behaves like the player: on the first start it creates the save files in the system folder, scans the music folder (every format stock lists, plus `.m3u`/`.m3u8` playlists) into the library and finds the album covers (segment files in `library/` and `covers/`, and `manifest.bin`). Settings → Rescan library scans again. The music folder is only ever read.
 
-The PC tools (`tools/library_index.py`, `tools/cover_export.py` and **rippl-sync**) still write the old `library.db`, which the player no longer reads, so for now the player scans the card itself after a sync; Tide will replace them with the new format. **rippl-sync** builds the library, the covers and the music fingerprint (`scan.bin`) on a computer, straight into the card's `/.rippl` folder (`docs/user-guide.md`, Build the library on a computer). Each release carries it as one file for Windows, macOS (Apple silicon) and Linux, with nothing to install, built by `.github/workflows/rippl-sync.yml` with PyInstaller; from the source it's `tools/rippl_sync.py E:`. To build the file yourself: `python -m pip install -r tools/requirements.txt -r tools/requirements-build.txt`, then `python -m PyInstaller --onefile --name rippl-sync --paths tools tools/rippl_sync.py`.
+To skip the scan on the player, **Tide** builds the library, the covers and the music fingerprint (`scan.bin`) on a computer, straight into the card's `/.rippl` folder in the player's own segment files, so the player's check after USB finds nothing to rescan and its next rescan reads only new files (`docs/user-guide.md`, Build the library on a computer). Each release carries it as one file for Windows, macOS (Apple silicon) and Linux, with nothing to install, built by `.github/workflows/tide.yml` with PyInstaller; from the source it's `python3 tools/tide sync E:` (`tide bookmarks` lists audiobook bookmarks). To build the file yourself: `python -m pip install -r tools/requirements.txt -r tools/requirements-build.txt`, then `python -m PyInstaller --onefile --name tide --paths tools tools/tide/__main__.py`. `tools/library_index.py` still writes the old `library.db` as the reference the device builder is tested against.
 
 ## Testing on a player
 
@@ -129,7 +129,7 @@ Music → Cover Flow shows your albums as covers, by album artist. Vol± move, P
 
 - `src/`: the player, built for the device and the simulator (`app`, `ui`, `library`, `playback`, `codec`, `dsp`, `sound`, `settings`, `gfx`, `fonts`, `core`, `hal`).
 - `platform/device/`: the firmware for the player (board drivers, the core 1 decoders, the rescan overlay); `platform/sim/`: the SDL2 simulator.
-- `tests/`: host tests, run with `ctest`; `tools/`: image, font and language pack builders, rippl-sync and the PC indexer.
+- `tests/`: host tests, run with `ctest`; `tools/`: image, font and language pack builders, Tide (`tools/tide`) and the PC indexer.
 - `docs/`: install, recovery, user guide, hardware notes, the library format and known issues.
 
 ## License

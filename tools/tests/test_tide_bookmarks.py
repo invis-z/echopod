@@ -9,19 +9,19 @@ from pathlib import Path
 TOOLS_DIRECTORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS_DIRECTORY))
 
-import rippl_bookmarks
+from tide import bookmarks as tide_bookmarks
 
 
 def bookmarks_file(records):
-    body = rippl_bookmarks.HEADER.pack(b"EMBK", 1, len(records), 0)
+    body = tide_bookmarks.HEADER.pack(b"EMBK", 1, len(records), 0)
     for key, track_key, position_ms, chapter, finished in records:
-        body += rippl_bookmarks.RECORD.pack(key, track_key, position_ms, chapter,
+        body += tide_bookmarks.RECORD.pack(key, track_key, position_ms, chapter,
                                            1 if finished else 0, 0)
-    return body + struct.pack("<I", rippl_bookmarks.fnv1a(body))
+    return body + struct.pack("<I", tide_bookmarks.fnv1a(body))
 
 
 def key(path):
-    return rippl_bookmarks.fnv1a(path.encode("utf-8"))
+    return tide_bookmarks.fnv1a(path.encode("utf-8"))
 
 
 class BookmarksTest(unittest.TestCase):
@@ -38,14 +38,14 @@ class BookmarksTest(unittest.TestCase):
     def run_tool(self, root, *options):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            self.assertEqual(0, rippl_bookmarks.main([str(root), *options]))
+            self.assertEqual(0, tide_bookmarks.main([str(root), *options]))
         return output.getvalue()
 
     def test_a_damaged_file_reads_as_no_bookmarks(self):
         data = bytearray(bookmarks_file([(1, 2, 3, 0, False)]))
         data[-1] ^= 1
-        self.assertEqual([], rippl_bookmarks.read_bookmarks(bytes(data)))
-        self.assertEqual([], rippl_bookmarks.read_bookmarks(bytes(4096)))
+        self.assertEqual([], tide_bookmarks.read_bookmarks(bytes(data)))
+        self.assertEqual([], tide_bookmarks.read_bookmarks(bytes(4096)))
 
     def test_finished_episodes_and_books_are_listed_by_path(self):
         episode = "Podcasts/Show/Episode 1.mp3"
