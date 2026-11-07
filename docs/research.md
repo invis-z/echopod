@@ -20,7 +20,7 @@ Unknown:
 
 What is known:
 
-- The module takes the DAC's analogue output, not digital audio (`docs/architecture.md`, Bluetooth: Settings → Bluetooth level picks the DAC volume table for it; `docs/hardware.md`: GPIO2.0 and GPIO2.14 switch the analogue path). The module samples and encodes that signal itself.
+- The module takes the DAC's analogue output, not digital audio (Settings → Bluetooth level picks the DAC volume table for it; `docs/hardware.md`: GPIO2.0 and GPIO2.14 switch the analogue path). The module samples and encodes that signal itself.
 - Rippl's only control over the stream is `CY0` followed by one level byte (stock sends `1E` to start, `00` to stop). What the `1E` means is unknown; no other value has been tried.
 - No frame in `bt_module.c` selects a codec, a bitrate or a sample rate, and none reports one.
 

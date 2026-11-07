@@ -127,7 +127,10 @@ Music → Cover Flow shows your albums as covers, by album artist. Vol± move, P
 
 ## Layout
 
-See `docs/architecture.md`.
+- `src/`: the player, built for the device and the simulator (`app`, `ui`, `library`, `playback`, `codec`, `dsp`, `sound`, `settings`, `gfx`, `fonts`, `core`, `hal`).
+- `platform/device/`: the firmware for the player (board drivers, the core 1 decoders, the rescan overlay); `platform/sim/`: the SDL2 simulator.
+- `tests/`: host tests, run with `ctest`; `tools/`: image, font and language pack builders, rippl-sync and the PC indexer.
+- `docs/`: install, recovery, user guide, hardware notes, the library format and known issues.
 
 ## License
 
