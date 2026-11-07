@@ -51,6 +51,7 @@ typedef struct Library {
     bool wide;
     LibrarySectionInfo sections[LIBRARY_SECTION_COUNT];
     LibrarySectionInfo ids;
+    uint32_t generation;
 } Library;
 
 typedef struct LibraryTrack {

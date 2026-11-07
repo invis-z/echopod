@@ -388,7 +388,7 @@ static uint32_t hash_word(uint32_t hash, uint32_t value)
 
 uint32_t library_fingerprint(const Library *library)
 {
-    uint32_t hash = HASH_START;
+    uint32_t hash = hash_word(HASH_START, library->generation);
     for (int section = 0; section < LIBRARY_SECTION_COUNT; section++) {
         hash = hash_word(hash, library->sections[section].offset);
         hash = hash_word(hash, library->sections[section].count);

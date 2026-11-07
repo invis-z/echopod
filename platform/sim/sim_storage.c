@@ -187,6 +187,18 @@ bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uin
     return fclose(handle) == 0 && written;
 }
 
+static void make_parents(char *resolved)
+{
+    size_t start = strlen(storage.system_directory);
+    for (size_t index = start + 1; resolved[index] != '\0'; index++) {
+        if (resolved[index] == '/') {
+            resolved[index] = '\0';
+            (void)mkdir(resolved, 0777);
+            resolved[index] = '/';
+        }
+    }
+}
+
 HalReserveResult hal_file_reserve(const char *path, uint32_t size)
 {
     char resolved[PATH_CAPACITY];
@@ -198,6 +210,7 @@ HalReserveResult hal_file_reserve(const char *path, uint32_t size)
     if (stat(resolved, &existing) == 0) {
         return HAL_RESERVE_EXISTS;
     }
+    make_parents(resolved);
     FILE *handle = fopen(resolved, "wb");
     if (handle == NULL) {
         return HAL_RESERVE_FAILED;

@@ -876,7 +876,7 @@ static void report_card_files(CardFilesReport files, uint32_t now_ms)
     if (files.card_full) {
         toast_show(&app.toast, i18n_text(STR_BOOT_CARD_FULL), now_ms);
     }
-    if (files.library_created) {
+    if (files.created && !segment_store_found(&app.library.segments)) {
         app.rescan_requested = true;
     } else if (music_check_firmware_is_new()) {
         app.music_check_requested = true;
@@ -995,7 +995,7 @@ static void run_rescan(void)
 {
     app_show_notice(i18n_text(STR_RESCAN_TITLE), i18n_text(STR_RESCAN_STARTING));
     RescanProgress progress = {show_rescan_progress, show_cover_progress};
-    RescanOutcome outcome = library_rescan_run(progress);
+    RescanOutcome outcome = library_rescan_run(&app.library, progress);
     static char message[MESSAGE_TEXT_CAPACITY];
     const char *text = library_rescan_message(outcome, message, sizeof message);
     if (outcome.result == SCAN_OK) {

@@ -32,6 +32,7 @@ add_library(rippl_library_scan STATIC
     library_builder_model.c
     library_builder_paths.c
     library_builder_rank.c
+    library_rebuild.c
     library_scan.c
     library_scan_entry.c
     segment_scratch.c

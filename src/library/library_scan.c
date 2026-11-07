@@ -886,6 +886,10 @@ ScanResult library_scan(const ScanJob *job, ScanStats *stats)
     if (result != SCAN_OK) {
         return result;
     }
+    if (job->wide) {
+        return builder_result(
+            library_builder_finish_wide(&state->builder, job->sink, job->capacity, &stats->length));
+    }
     return builder_result(
         library_builder_finish(&state->builder, job->sink, job->capacity, &stats->length));
 }
