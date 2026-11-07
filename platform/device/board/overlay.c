@@ -92,11 +92,30 @@ static uint32_t load_from(uint32_t slot, const BoardOverlay *overlay)
     return size;
 }
 
+static bool installed_header_matches(const BoardOverlay *overlay, uint32_t slot)
+{
+    static uint32_t sector[SECTOR_BYTES / 4];
+    if (!emmc_read(NULL, slot + overlay->image_offset / SECTOR_BYTES, 1, sector)) {
+        return false;
+    }
+    const uint8_t *installed = (const uint8_t *)sector;
+    for (uint32_t index = 0; index < OVERLAY_HEADER_BYTES; index++) {
+        if (installed[index] != overlay->base[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool board_overlay_load(const BoardOverlay *overlay)
 {
     EmmcInfo info;
+    bool storage = emmc_start(&info);
     uint32_t size = already_loaded(overlay);
-    if (size == 0 && emmc_start(&info)) {
+    if (size != 0 && storage && !installed_header_matches(overlay, info.layout.slot_1)) {
+        size = 0;
+    }
+    if (size == 0 && storage) {
         size = load_from(info.layout.slot_1, overlay);
         size = size != 0 ? size : load_from(info.layout.slot_2, overlay);
     }

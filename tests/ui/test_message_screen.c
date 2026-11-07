@@ -1,4 +1,5 @@
 #include "check.h"
+#include "gfx/text.h"
 #include "ui/message_screen.h"
 #include "ui_test_canvas.h"
 #include "ui_test_theme.h"
@@ -121,6 +122,50 @@ static void a_new_message_is_wrapped_again(void)
     CHECK(same_pixels());
 }
 
+static void draw_message(const char *text)
+{
+    MessageConfig config = {.title = "Note", .message = text, .theme = &TEST_THEME};
+    Screen *screen = message_screen_init(&message, config);
+    Canvas canvas = ui_test_canvas();
+    screen->draw(screen->context, &canvas);
+}
+
+static void a_line_break_puts_what_follows_on_its_own_line(void)
+{
+    draw_message("Don't unplug. \n45%");
+    CHECK_EQUAL(2, message.layout.count);
+    CHECK_EQUAL(13, message.layout.length[0]);
+    CHECK_EQUAL(15, message.layout.start[1]);
+    CHECK_EQUAL(3, message.layout.length[1]);
+}
+
+static void a_word_wider_than_the_screen_breaks_between_characters(void)
+{
+    static char text[128];
+    Rect content = theme_content_area(&TEST_THEME);
+    int width = content.width - 2 * TEST_THEME.metrics.padding;
+    size_t used = 0;
+    while (text_width(TEST_THEME.fonts.body, text) <= width + width / 2) {
+        text[used++] = 'A';
+        text[used++] = 'B';
+    }
+    text[used++] = '\n';
+    text[used++] = '4';
+    text[used++] = '5';
+    text[used] = '%';
+    draw_message(text);
+    CHECK_EQUAL(3, message.layout.count);
+    for (int index = 0; index < message.layout.count; index++) {
+        char line[128] = {0};
+        for (int at = 0; at < message.layout.length[index]; at++) {
+            line[at] = message.config.message[message.layout.start[index] + at];
+        }
+        CHECK(text_width(TEST_THEME.fonts.body, line) <= width);
+    }
+    CHECK_EQUAL(message.layout.start[0] + message.layout.length[0], message.layout.start[1]);
+    CHECK_EQUAL(3, message.layout.length[2]);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -131,6 +176,8 @@ int main(void)
         TEST_CASE(a_message_too_wide_for_the_screen_wraps_onto_more_lines),
         TEST_CASE(a_message_drawn_in_strips_matches_one_drawn_whole),
         TEST_CASE(a_new_message_is_wrapped_again),
+        TEST_CASE(a_line_break_puts_what_follows_on_its_own_line),
+        TEST_CASE(a_word_wider_than_the_screen_breaks_between_characters),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

@@ -50,6 +50,18 @@ void board_watchdog_after_clock_change(void)
     }
 }
 
+void board_restart(void)
+{
+    if (!running) {
+        board_watchdog_start();
+    }
+    __asm__ volatile("cpsid i" ::: "memory");
+    register_write(WDT_TIMEOUT, 0);
+    register_write(WDT_RESTART, RESTART_KEY);
+    for (;;) {
+    }
+}
+
 void hal_system_watchdog_test(void)
 {
     board_start_record_step(HAL_START_STEP_WATCHDOG_TEST);

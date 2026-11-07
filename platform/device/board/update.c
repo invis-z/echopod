@@ -10,7 +10,9 @@
 #include "device/fat.h"
 #include "device/updater.h"
 #include "emmc.h"
+#include "hal/clock.h"
 #include "storage_reset.h"
+#include "usb.h"
 
 enum {
     MESSAGE_CAPACITY = 128,
@@ -20,7 +22,8 @@ enum {
     HIGHEST_NUMBER = 97,
     TENS_AT = 7,
     UNITS_AT = 8,
-    SECTORS_PER_MIB = 2048
+    SECTORS_PER_MIB = 2048,
+    UNPLUG_SETTLE_MS = 500
 };
 
 static const char UPDATE_TEMPLATE[] = "/HIFIEC00.IMG";
@@ -40,15 +43,21 @@ static bool read_update(void *context, uint32_t offset, void *buffer, uint32_t l
     return fat_read(&volume, &file, offset, buffer, length);
 }
 
-static void show_percent(uint32_t percent)
+static void percent_text(uint32_t percent, char *text)
 {
-    char text[MESSAGE_CAPACITY];
-    StringBuilder builder = string_builder_make(text, sizeof text);
+    StringBuilder builder = string_builder_make(text, MESSAGE_CAPACITY);
     char number[PERCENT_CAPACITY];
     StringBuilder digits = string_builder_make(number, sizeof number);
+    string_builder_append(&digits, "\n");
     string_builder_append_unsigned(&digits, percent);
     const char *arguments[] = {number};
     i18n_format(&builder, STR_UPDATE_DONT_UNPLUG, arguments, 1);
+}
+
+static void show_percent(uint32_t percent)
+{
+    char text[MESSAGE_CAPACITY];
+    percent_text(percent, text);
     app_show_notice(install_title, text);
     board_display_service();
 }
@@ -118,20 +127,51 @@ static void remember(HalUpdateRecord record)
     (void)update_record_save(record);
 }
 
+static void prepare_notices(bool stock)
+{
+    char progress[MESSAGE_CAPACITY];
+    percent_text(PERCENT, progress);
+    for (int pass = 0; pass < 2; pass++) {
+        app_prepare_notice(install_title, progress);
+        app_prepare_notice(i18n_text(stock ? STR_UPDATE_FIIO_INSTALLED : STR_UPDATE_INSTALLED),
+                           i18n_text(STR_UPDATE_UNPLUG_TO_RESTART));
+        app_prepare_notice(i18n_text(STR_UPDATE_FAILED), i18n_text(STR_UPDATE_RETRY));
+    }
+}
+
+static void restart_after_unplug(void)
+{
+    bool unplugged = false;
+    uint32_t unplugged_ms = 0;
+    for (;;) {
+        board_display_service();
+        uint32_t now_ms = hal_clock_milliseconds();
+        if (usb_vbus_present()) {
+            unplugged = false;
+        } else if (!unplugged) {
+            unplugged = true;
+            unplugged_ms = now_ms;
+        } else if (now_ms - unplugged_ms >= UNPLUG_SETTLE_MS) {
+            board_restart();
+        }
+    }
+}
+
 static void install(const UpdateFile *update, const UpdateStorage *storage, bool stock)
 {
     install_title = i18n_text(stock ? STR_UPDATE_INSTALLING_FIIO : STR_UPDATE_INSTALLING);
     last_percent = 0;
+    prepare_notices(stock);
     show_percent(0);
     shared->flash_rewritten = true;
     bool installed = updater_install(update, storage, (UpdateProgress){report, NULL});
     remember(outcome(installed ? HAL_UPDATE_INSTALLED : HAL_UPDATE_FAILED, (uint8_t)last_percent));
     if (installed) {
         app_show_notice(i18n_text(stock ? STR_UPDATE_FIIO_INSTALLED : STR_UPDATE_INSTALLED),
-                        i18n_text(STR_UPDATE_UNPLUG_AND_RESTART));
-    } else {
-        app_show_notice(i18n_text(STR_UPDATE_FAILED), i18n_text(STR_UPDATE_RETRY));
+                        i18n_text(STR_UPDATE_UNPLUG_TO_RESTART));
+        restart_after_unplug();
     }
+    app_show_notice(i18n_text(STR_UPDATE_FAILED), i18n_text(STR_UPDATE_RETRY));
     board_wait_for_key();
 }
 

@@ -26,7 +26,7 @@ static void update(void *context, uint32_t now_ms)
 
 static size_t word_end(const char *text, size_t from)
 {
-    while (text[from] != '\0' && text[from] != ' ') {
+    while (text[from] != '\0' && text[from] != ' ' && text[from] != '\n') {
         from++;
     }
     return from;
@@ -38,12 +38,37 @@ static void copy_span(char *line, const char *text, size_t count)
     for (size_t index = 0; index < length; index++) {
         line[index] = text[index];
     }
+    while (length > 0 && line[length - 1] == ' ') {
+        length--;
+    }
     line[length] = '\0';
+}
+
+static size_t fitting_part(const Font *font, const char *text, size_t end, int width, char *line)
+{
+    size_t fitted = 0;
+    for (size_t next = 1; next <= end; next++) {
+        if (next < end && ((unsigned char)text[next] & 0xC0) == 0x80) {
+            continue;
+        }
+        copy_span(line, text, next);
+        if (fitted > 0 && text_width(font, line) > width) {
+            break;
+        }
+        fitted = next;
+    }
+    return fitted;
 }
 
 static size_t next_line(const Font *font, const char *text, int width, bool last, char *line)
 {
     size_t fitted = word_end(text, 0);
+    copy_span(line, text, fitted);
+    if (text_width(font, line) > width) {
+        fitted = fitting_part(font, text, fitted, width, line);
+        copy_span(line, text, fitted);
+        return fitted;
+    }
     while (text[fitted] == ' ') {
         size_t end = word_end(text, fitted + 1);
         copy_span(line, text, end);
@@ -54,6 +79,9 @@ static size_t next_line(const Font *font, const char *text, int width, bool last
     }
     copy_span(line, text, fitted);
     while (text[fitted] == ' ') {
+        fitted++;
+    }
+    if (text[fitted] == '\n') {
         fitted++;
     }
     return fitted;

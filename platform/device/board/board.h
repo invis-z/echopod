@@ -41,6 +41,7 @@ void board_stall_report(const uint32_t *frame);
 void board_panic_show(const char *title, const uint32_t *frame, uint32_t status);
 void board_watchdog_start(void);
 void board_watchdog_kick(void);
+__attribute__((noreturn)) void board_restart(void);
 void board_watchdog_after_clock_change(void);
 uint16_t board_battery_boot_reading(void);
 const char *board_audio_current_path(void);
