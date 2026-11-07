@@ -1,12 +1,17 @@
 #include <stddef.h>
 
 #include "builder_internal.h"
+#include "core/hash.h"
+#include "library/library.h"
 #include "library/sort_key.h"
 
 enum {
     HEADER_SIZE = 128,
     WIDE_HEADER_SIZE = 256,
     SECTION_COUNT = 10,
+    WIDE_SECTION_COUNT = 11,
+    ID_RECORD = 12,
+    ID_ENTRY = 14,
     VERSION = 3,
     WIDE_VERSION = 1,
     WIDE_TRACK_RECORD = 32,
@@ -58,6 +63,7 @@ typedef struct Layout {
     uint32_t count[SECTION_COUNT];
     uint16_t record_size[SECTION_COUNT];
     uint32_t music[SECTION_COUNT];
+    uint32_t ids;
     uint32_t end;
 } Layout;
 
@@ -74,6 +80,7 @@ typedef struct Encode {
     uint32_t folder_text_node;
     uint32_t folder_text_length;
     uint32_t strings;
+    Region ids;
 } Encode;
 
 static void flush(Writer *writer)
@@ -330,14 +337,15 @@ static void plan(Encode *encode, Layout *layout, uint32_t strings)
         layout->music[section] = music[section];
         offset += counts[section] * sizes[section];
     }
-    layout->end = offset;
+    layout->ids = (offset + ALIGNMENT - 1) & ~(uint32_t)(ALIGNMENT - 1);
+    layout->end = encode->wide ? layout->ids + state->track_count * ID_RECORD : offset;
 }
 
-static void write_header(Writer *writer, const Layout *layout, bool wide)
+static void write_header(Writer *writer, const Layout *layout, bool wide, uint32_t tracks)
 {
     put_u32(writer, 0);
     put_u16(writer, wide ? WIDE_VERSION : VERSION);
-    put_u16(writer, SECTION_COUNT);
+    put_u16(writer, wide ? WIDE_SECTION_COUNT : SECTION_COUNT);
     for (int section = 0; section < SECTION_COUNT; section++) {
         put_u32(writer, layout->offset[section]);
         put_u32(writer, layout->count[section]);
@@ -348,6 +356,13 @@ static void write_header(Writer *writer, const Layout *layout, bool wide)
         } else {
             put_u16(writer, layout->music[section]);
         }
+    }
+    if (wide) {
+        put_u32(writer, layout->ids);
+        put_u32(writer, tracks);
+        put_u16(writer, ID_RECORD);
+        put_u16(writer, 0);
+        put_u32(writer, 0);
     }
     pad_to(writer, wide ? WIDE_HEADER_SIZE : HEADER_SIZE);
 }
@@ -690,7 +705,7 @@ static bool write_records(Encode *encode, const Layout *layout)
     const Prepared *prepared = encode->prepared;
     Writer *writer = encode->writer;
     encode->strings = 1;
-    write_header(writer, layout, encode->wide);
+    write_header(writer, layout, encode->wide, encode->state->track_count);
     if (!write_tracks(encode)) {
         return false;
     }
@@ -776,8 +791,18 @@ static bool emit_track_strings(Encode *encode)
     Prepared *prepared = encode->prepared;
     uint32_t mark = state->arena.used;
     In in;
+    Out ids;
     if (!open_in(state, &in, encode->placed, state->track_count * PLACED_SIZE)) {
         return false;
+    }
+    if (encode->wide) {
+        uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+        encode->ids = store_take(&state->store, state->track_count * ID_ENTRY);
+        if (state->arena.failed || state->store.failed) {
+            return false;
+        }
+        encode->ids.size = state->track_count * ID_ENTRY;
+        out_open(&ids, &state->store, encode->ids, buffer, STREAM_BUFFER);
     }
     for (uint32_t position = 0; position < state->track_count; position++) {
         Placed placed;
@@ -790,6 +815,62 @@ static bool emit_track_strings(Encode *encode)
         put_bytes(encode->writer, encode->folder_text, encode->folder_text_length);
         put_bytes(encode->writer, encode->text, placed.file_length);
         put_byte(encode->writer, 0);
+        if (encode->wide) {
+            uint64_t id =
+                library_path_id(HASH64_START, encode->folder_text, encode->folder_text_length);
+            id = library_path_id(id, encode->text, placed.file_length);
+            uint8_t entry[ID_ENTRY];
+            builder_put16(entry, ID_ENTRY);
+            builder_put32(entry + 2, (uint32_t)(id >> 32));
+            builder_put32(entry + 6, (uint32_t)id);
+            builder_put32(entry + 10, position);
+            if (!out_put(&ids, entry, sizeof entry)) {
+                return false;
+            }
+        }
+    }
+    bool closed = !encode->wide || out_close(&ids);
+    state->arena.used = mark;
+    return closed;
+}
+
+static int by_id_then_track(const uint8_t *left, const uint8_t *right, const void *context)
+{
+    (void)context;
+    for (uint32_t offset = 2; offset <= 10; offset += 4) {
+        uint32_t a = builder_get32(left + offset);
+        uint32_t b = builder_get32(right + offset);
+        if (a != b) {
+            return a < b ? -1 : 1;
+        }
+    }
+    return 0;
+}
+
+static bool write_ids(Encode *encode, const Layout *layout)
+{
+    BuilderState *state = encode->state;
+    Region sorted;
+    flush(encode->writer);
+    if (!builder_sort(state, encode->ids, by_id_then_track, &sorted)) {
+        return false;
+    }
+    uint32_t mark = state->arena.used;
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    if (state->arena.failed) {
+        return false;
+    }
+    In in;
+    in_open(&in, &state->store, sorted.offset, sorted.offset + sorted.size, buffer, STREAM_BUFFER);
+    pad_to(encode->writer, layout->ids);
+    for (uint32_t index = 0; index < state->track_count; index++) {
+        uint8_t entry[ID_ENTRY];
+        if (!in_get(&in, entry, sizeof entry)) {
+            return false;
+        }
+        put_u32(encode->writer, builder_get32(entry + 6));
+        put_u32(encode->writer, builder_get32(entry + 2));
+        put_u32(encode->writer, builder_get32(entry + 10));
     }
     state->arena.used = mark;
     return true;
@@ -897,7 +978,8 @@ BuilderResult builder_encode(BuilderState *state, Prepared *prepared, ByteSink s
         return BUILDER_WRITE_FAILED;
     }
     put_byte(writer, 0);
-    if (!emit_track_strings(&encode) || !emit_names(&encode)) {
+    if (!emit_track_strings(&encode) || !emit_names(&encode) ||
+        (wide && !write_ids(&encode, &layout))) {
         return BUILDER_WRITE_FAILED;
     }
     flush(writer);

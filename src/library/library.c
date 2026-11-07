@@ -89,7 +89,8 @@ static LibraryStatus decode_header(Library *library, const uint8_t *header, uint
     if (u16_at(header, VERSION_FIELD) != (wide ? LIBRARY_WIDE_VERSION : LIBRARY_VERSION)) {
         return LIBRARY_BAD_VERSION;
     }
-    if (u16_at(header, SECTION_COUNT_FIELD) != LIBRARY_SECTION_COUNT) {
+    if (u16_at(header, SECTION_COUNT_FIELD) !=
+        (wide ? LIBRARY_WIDE_SECTION_COUNT : LIBRARY_SECTION_COUNT)) {
         return LIBRARY_BAD_LAYOUT;
     }
     const uint16_t *sizes = wide ? WIDE_RECORD_SIZES : RECORD_SIZES;
@@ -100,6 +101,13 @@ static LibraryStatus decode_header(Library *library, const uint8_t *header, uint
             return LIBRARY_BAD_LAYOUT;
         }
         library->sections[section] = info;
+    }
+    if (wide) {
+        library->ids = decode_section(header, LIBRARY_SECTION_COUNT, true);
+        if (!section_fits(library->ids, LIBRARY_ID_SIZE, header_size, size) ||
+            library->ids.count != library->sections[LIBRARY_TRACKS].count) {
+            return LIBRARY_BAD_LAYOUT;
+        }
     }
     library->wide = wide;
     return LIBRARY_OK;
@@ -428,4 +436,79 @@ uint32_t library_album_key(const Library *library, uint32_t album_index)
     uint32_t hash = hash_string(library, HASH_START, artist.name);
     hash = hash_update(hash, &separator, sizeof separator);
     return hash_string(library, hash, album.title);
+}
+
+enum {
+    ID_CHUNK = 32
+};
+
+uint64_t library_path_id(uint64_t hash, const char *bytes, uint32_t length)
+{
+    for (uint32_t index = 0; index < length; index++) {
+        uint8_t byte = (uint8_t)bytes[index];
+        byte = byte >= 'A' && byte <= 'Z' ? (uint8_t)(byte - 'A' + 'a') : byte;
+        hash = hash64_update(hash, &byte, 1);
+    }
+    return hash;
+}
+
+bool library_track_id(const Library *library, uint32_t track, uint64_t *id)
+{
+    LibraryTrack record;
+    LibrarySectionInfo strings = library->sections[LIBRARY_STRINGS];
+    if (!library_read_track(library, track, &record) || record.path >= strings.count) {
+        return false;
+    }
+    uint64_t hash = HASH64_START;
+    char text[ID_CHUNK];
+    for (uint32_t done = 0; record.path + done < strings.count; done += ID_CHUNK) {
+        uint32_t left = strings.count - record.path - done;
+        uint32_t wanted = left < ID_CHUNK ? left : ID_CHUNK;
+        if (!read_source(library, strings.offset + record.path + done, text, wanted)) {
+            return false;
+        }
+        uint32_t length = 0;
+        while (length < wanted && text[length] != '\0') {
+            length++;
+        }
+        hash = library_path_id(hash, text, length);
+        if (length < wanted) {
+            break;
+        }
+    }
+    *id = hash;
+    return true;
+}
+
+static bool read_id(const Library *library, uint32_t row, uint64_t *id, uint32_t *track)
+{
+    uint8_t bytes[LIBRARY_ID_SIZE];
+    if (!read_source(library, library->ids.offset + row * LIBRARY_ID_SIZE, bytes, sizeof bytes)) {
+        return false;
+    }
+    *id = (uint64_t)u32_at(bytes, 4) << 32 | u32_at(bytes, 0);
+    *track = u32_at(bytes, 8);
+    return true;
+}
+
+bool library_find_track(const Library *library, uint64_t id, uint32_t *track)
+{
+    uint32_t low = 0;
+    uint32_t high = library->ids.count;
+    while (low < high) {
+        uint32_t middle = low + (high - low) / 2;
+        uint64_t value = 0;
+        uint32_t found = 0;
+        if (!read_id(library, middle, &value, &found)) {
+            return false;
+        }
+        if (value < id) {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+    uint64_t value = 0;
+    return low < library->ids.count && read_id(library, low, &value, track) && value == id &&
+           *track < library->sections[LIBRARY_TRACKS].count;
 }

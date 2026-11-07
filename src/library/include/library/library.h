@@ -24,7 +24,9 @@ enum {
     LIBRARY_VERSION = 3,
     LIBRARY_HEADER_SIZE = 128,
     LIBRARY_WIDE_VERSION = 1,
-    LIBRARY_WIDE_HEADER_SIZE = 256
+    LIBRARY_WIDE_HEADER_SIZE = 256,
+    LIBRARY_WIDE_SECTION_COUNT = LIBRARY_SECTION_COUNT + 1,
+    LIBRARY_ID_SIZE = 12
 };
 
 #define LIBRARY_NONE UINT32_C(0xFFFFFFFF)
@@ -48,6 +50,7 @@ typedef struct Library {
     ByteSource source;
     bool wide;
     LibrarySectionInfo sections[LIBRARY_SECTION_COUNT];
+    LibrarySectionInfo ids;
 } Library;
 
 typedef struct LibraryTrack {
@@ -99,3 +102,6 @@ bool library_read_index(const Library *library, LibrarySection section, uint32_t
 bool library_read_string(const Library *library, uint32_t offset, char *buffer, size_t capacity);
 uint32_t library_fingerprint(const Library *library);
 uint32_t library_album_key(const Library *library, uint32_t album_index);
+uint64_t library_path_id(uint64_t hash, const char *bytes, uint32_t length);
+bool library_track_id(const Library *library, uint32_t track, uint64_t *id);
+bool library_find_track(const Library *library, uint64_t id, uint32_t *track);

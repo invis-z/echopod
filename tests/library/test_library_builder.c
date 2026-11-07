@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "check.h"
+#include "core/hash.h"
 #include "library/library.h"
 #include "library/library_builder.h"
 #include "library_compare.h"
@@ -452,6 +453,58 @@ static void a_wide_library_takes_the_65536th_track(void)
     free(built.output.bytes);
 }
 
+static uint64_t expected_id(const char *path)
+{
+    uint64_t hash = HASH64_START;
+    for (const char *cursor = path; *cursor != '\0'; cursor++) {
+        uint8_t byte = (uint8_t)*cursor;
+        byte = byte >= 'A' && byte <= 'Z' ? (uint8_t)(byte + 32) : byte;
+        hash = hash64_update(hash, &byte, 1);
+    }
+    return hash;
+}
+
+static void every_track_is_found_by_its_path_id(void)
+{
+    RandomLibrary library;
+    random_library_make(&library, 3000, 0, 7);
+    LibraryBuilder builder;
+    start(&builder);
+    CHECK_EQUAL(BUILDER_OK, add_library(&builder, &library));
+    Built built;
+    finish_wide(&builder, &built);
+    CHECK_EQUAL(BUILDER_OK, built.result);
+    MemorySource memory = {.bytes = built.output.bytes, .size = built.length};
+    Library opened;
+    CHECK_EQUAL(LIBRARY_OK, library_open(&opened, memory_source(&memory), built.length));
+    uint32_t count = library_count(&opened, LIBRARY_TRACKS);
+    CHECK_EQUAL(3000, count);
+    for (uint32_t track = 0; track < count; track++) {
+        LibraryTrack record;
+        char path[1100];
+        uint64_t id = 0;
+        uint64_t found_id = 0;
+        uint32_t found = LIBRARY_NONE;
+        CHECK(library_read_track(&opened, track, &record));
+        CHECK(library_read_string(&opened, record.path, path, sizeof path));
+        CHECK(library_track_id(&opened, track, &id));
+        CHECK(id == expected_id(path));
+        for (char *cursor = path; *cursor != '\0'; cursor++) {
+            *cursor = *cursor >= 'a' && *cursor <= 'z' ? (char)(*cursor - 32) : *cursor;
+        }
+        uint64_t upper = library_path_id(HASH64_START, path, (uint32_t)strlen(path));
+        CHECK(upper == id);
+        CHECK(library_find_track(&opened, upper, &found));
+        CHECK(found <= track);
+        CHECK(library_track_id(&opened, found, &found_id));
+        CHECK(found_id == id);
+    }
+    uint32_t missing = 0;
+    CHECK(!library_find_track(&opened, expected_id("not/in/the/library.flac"), &missing));
+    free(built.output.bytes);
+    random_library_free(&library);
+}
+
 static void random_libraries_match_the_reference_builder(void)
 {
     check_matches_reference(1, 1, 1);
@@ -667,6 +720,7 @@ int main(void)
         TEST_CASE(a_wide_library_means_the_same_as_a_16_bit_one),
         TEST_CASE(the_fixture_tracks_mean_the_same_in_a_wide_library),
         TEST_CASE(a_wide_library_takes_the_65536th_track),
+        TEST_CASE(every_track_is_found_by_its_path_id),
         TEST_CASE(a_library_bigger_than_its_room_writes_nothing),
         TEST_CASE(an_empty_library_still_writes_a_valid_header),
         TEST_CASE(a_featured_artist_stays_with_the_album),

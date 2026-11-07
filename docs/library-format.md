@@ -100,9 +100,10 @@ On the device, `track_tags_read` reads through a `ByteSource` with small bounded
 
 ## Rippl library format (version 1)
 
-Rippl's own library uses the same sections, order, sorting and meaning as version 3, with 32-bit numbers. It lives in a stream of the segment store (`library/segment_store`, see `docs/architecture.md`), not in `library.db`: `library/segment_stream` gives the builder a sink that appends to a working stream and gives the reader a source over the committed one.
+Rippl's own library uses the same sections, order, sorting and meaning as version 3, with 32-bit numbers. It lives in a stream of the segment store (`library/segment_store`, see Segment store above), not in `library.db`: `library/segment_stream` gives the builder a sink that appends to a working stream and gives the reader a source over the committed one.
 
-- Header: 256 bytes, magic `RLIB`, `u16` version 1, `u16` section count 10, then ten 16-byte entries: `u32 offset`, `u32 count`, `u16 record size`, `u16` 0, `u32 music count`.
+- Header: 256 bytes, magic `RLIB`, `u16` version 1, `u16` section count 11, then eleven 16-byte entries: `u32 offset`, `u32 count`, `u16 record size`, `u16` 0, `u32 music count`. The eleventh is the path IDs, after the strings.
+- A track's path ID is the 64-bit FNV-1a hash of its library path with ASCII letters lowercased (`library_path_id`), so the same file keeps its ID across rescans, whatever its track number. `library_track_id` gives a track's ID and `library_find_track` finds the first track with an ID by a binary search in the path IDs: about 18 reads at 250,000 tracks.
 - No `none` value is stored except a folder's parent: the root's is `0xFFFFFFFF`. Albums have no cover field; the reader reports `LIBRARY_NONE`.
 
 | Record | Size | Layout |
@@ -112,8 +113,9 @@ Rippl's own library uses the same sections, order, sorting and meaning as versio
 | Group | 12 | `u32 name`, `u32 first_link`, `u32 link_count` |
 | Folder | 20 | `u32 name`, `u32 parent`, `u32 subfolder_count`, `u32 first_link`, `u32 track_count` |
 | Title order, links | 4 | `u32` |
+| Path ID | 12 | `u64 id`, `u32 track`, one per track, sorted by ID, then track |
 
-`library_open` reads either format from the magic (`Library.wide`), and `library.h` gives 32-bit numbers for both (`LIBRARY_NONE` is `0xFFFFFFFF`; a version-3 `0xFFFF` parent or cover reads as it). Tests build every random library and the PC fixture in both formats and compare them field by field, and build 250,000 tracks with the player's 360 KB through segment scratch into a stream, commit it and read it back (`test_large_library`): about 36 MB, 143 bytes a track.
+`library_open` reads either format from the magic (`Library.wide`), and `library.h` gives 32-bit numbers for both (`LIBRARY_NONE` is `0xFFFFFFFF`; a version-3 `0xFFFF` parent or cover reads as it). Tests build every random library and the PC fixture in both formats and compare them field by field, and build 250,000 tracks with the player's 360 KB through segment scratch into a stream, commit it, read it back and find sampled tracks by path ID (`test_large_library`): about 39 MB, 155 bytes a track. `test_library_builder` finds every track of a random library by its ID, spelled in either case.
 
 ## Fallbacks for missing tags
 
