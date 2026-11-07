@@ -13,6 +13,7 @@
 #include "hal/time.h"
 
 void fake_hal_reset(void);
+uint32_t fake_hal_file_read_count(void);
 void fake_hal_set_version(const char *version);
 void fake_hal_set_build_day(uint32_t day);
 void fake_hal_add_file(const char *path, const uint8_t *bytes, uint32_t size);
@@ -45,7 +46,6 @@ int fake_hal_dir_next_count(void);
 int fake_hal_presents_at_last_dir_open(void);
 bool fake_hal_lit_at_last_dir_open(void);
 int fake_hal_library_writes(void);
-int fake_hal_covers_writes(void);
 int fake_hal_scratch_outstanding(void);
 int fake_hal_loop_bench_count(void);
 int fake_hal_core1_test_count(void);

@@ -16,11 +16,7 @@ from mutagen.oggopus import OggOpus
 import check_cover_decode
 import cover_export
 
-HEADER = struct.Struct("<4sHHHHI")
-ENTRY = struct.Struct("<II")
 RECORD_BYTES = check_cover_decode.RECORD_BYTES
-TOOL_COVERS_CAPACITY = 8 * 1024 * 1024
-NANOSECONDS = 1_000_000_000
 TOOL_COUNTS = re.compile(r"(\d+) covers, (\d+) reused")
 
 
@@ -144,22 +140,27 @@ def build_music(root, source):
     return expected
 
 
-def read_covers(data):
-    magic, version, count, full, half, _ = HEADER.unpack_from(data, 0)
-    if magic != b"EMCV" or version != 1 or (full, half) != (112, 56):
-        raise ValueError("bad covers header")
-    entries = [ENTRY.unpack_from(data, HEADER.size + index * ENTRY.size) for index in range(count)]
-    if [key for key, _ in entries] != sorted(key for key, _ in entries):
-        raise ValueError("index not sorted")
-    return {key: data[offset:offset + RECORD_BYTES] for key, offset in entries}
+def read_dump(data):
+    covers = {}
+    offset = 0
+    while offset < len(data):
+        (length,) = struct.unpack_from("<H", data, offset)
+        title = data[offset + 2:offset + 2 + length].decode("utf-8")
+        offset += 2 + length
+        present = data[offset]
+        offset += 1
+        if present:
+            covers[title] = data[offset:offset + RECORD_BYTES]
+            offset += RECORD_BYTES
+    return covers
 
 
 def check(covers, expected):
     failures = []
-    if set(covers) != {cover_export.album_key("Tester", album) for album in expected}:
-        failures.append(f"covers for {len(covers)} albums, expected {len(expected)}")
+    if set(covers) != set(expected):
+        failures.append(f"covers for {sorted(covers)}, expected {sorted(expected)}")
     for album, data in expected.items():
-        record = covers.get(cover_export.album_key("Tester", album))
+        record = covers.get(album)
         if record is None:
             failures.append(f"{album}: no cover")
             continue
@@ -171,19 +172,6 @@ def check(covers, expected):
     return failures
 
 
-def simulator_describe(path):
-    return path.name.encode("utf-8"), path.stat().st_mtime_ns // NANOSECONDS
-
-
-def export_like_rippl_sync(music, output):
-    sources = cover_export.album_sources_from_library((output / "library.db").read_bytes())
-    covers = cover_export.collect_covers(music, sources, cover_export.cover_record,
-                                         simulator_describe)
-    data = cover_export.encode_stamped(covers.records, covers.stamps, TOOL_COVERS_CAPACITY)
-    (output / "covers.bin").write_bytes(data)
-    return len(covers.records)
-
-
 def run_tool(tool, music, output):
     result = subprocess.run([str(tool), str(music), str(output)], capture_output=True, text=True)
     print(result.stdout.strip())
@@ -193,14 +181,13 @@ def run_tool(tool, music, output):
 
 
 def reuse_failures(tool, music, output):
-    exported = export_like_rippl_sync(music, output)
     result = run_tool(tool, music, output)
     counts = TOOL_COUNTS.search(result.stdout)
     if result.returncode != 0 or counts is None:
-        return ["the player side couldn't read rippl-sync's covers"]
+        return ["the second build failed"]
     covers, reused = int(counts.group(1)), int(counts.group(2))
-    if (covers, reused) != (exported, exported):
-        return [f"rippl-sync wrote {exported} covers, the player kept {reused} of {covers}"]
+    if covers != reused:
+        return [f"the second build kept {reused} of {covers} covers"]
     return []
 
 
@@ -221,7 +208,7 @@ def main(argv=None):
     expected = build_music(music, arguments.fixtures / "tags")
     if run_tool(arguments.tool, music, output).returncode != 0:
         return 1
-    failures = check(read_covers((output / "covers.bin").read_bytes()), expected)
+    failures = check(read_dump((output / "covers.dump").read_bytes()), expected)
     failures += reuse_failures(arguments.tool, music, output)
     for failure in failures:
         print(f"FAIL {failure}", file=sys.stderr)

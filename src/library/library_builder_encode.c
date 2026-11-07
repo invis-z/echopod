@@ -9,7 +9,8 @@ enum {
     HEADER_SIZE = 128,
     WIDE_HEADER_SIZE = 256,
     SECTION_COUNT = 10,
-    WIDE_SECTION_COUNT = 11,
+    WIDE_SECTION_COUNT = 13,
+    KEY_SEPARATOR = 0x1F,
     ID_RECORD = 12,
     ID_ENTRY = 14,
     VERSION = 3,
@@ -64,6 +65,8 @@ typedef struct Layout {
     uint16_t record_size[SECTION_COUNT];
     uint32_t music[SECTION_COUNT];
     uint32_t ids;
+    uint32_t album_keys;
+    uint32_t album_ranks;
     uint32_t end;
 } Layout;
 
@@ -338,10 +341,24 @@ static void plan(Encode *encode, Layout *layout, uint32_t strings)
         offset += counts[section] * sizes[section];
     }
     layout->ids = (offset + ALIGNMENT - 1) & ~(uint32_t)(ALIGNMENT - 1);
-    layout->end = encode->wide ? layout->ids + state->track_count * ID_RECORD : offset;
+    uint32_t ids_end = layout->ids + state->track_count * ID_RECORD;
+    layout->album_keys = (ids_end + ALIGNMENT - 1) & ~(uint32_t)(ALIGNMENT - 1);
+    layout->album_ranks = layout->album_keys + prepared->album_count * ID_RECORD;
+    layout->end =
+        encode->wide ? layout->album_ranks + prepared->album_count * WIDE_INDEX_RECORD : offset;
 }
 
-static void write_header(Writer *writer, const Layout *layout, bool wide, uint32_t tracks)
+static void put_extra(Writer *writer, uint32_t offset, uint32_t count, uint32_t size)
+{
+    put_u32(writer, offset);
+    put_u32(writer, count);
+    put_u16(writer, size);
+    put_u16(writer, 0);
+    put_u32(writer, 0);
+}
+
+static void write_header(Writer *writer, const Layout *layout, bool wide, uint32_t tracks,
+                         uint32_t albums)
 {
     put_u32(writer, 0);
     put_u16(writer, wide ? WIDE_VERSION : VERSION);
@@ -358,11 +375,9 @@ static void write_header(Writer *writer, const Layout *layout, bool wide, uint32
         }
     }
     if (wide) {
-        put_u32(writer, layout->ids);
-        put_u32(writer, tracks);
-        put_u16(writer, ID_RECORD);
-        put_u16(writer, 0);
-        put_u32(writer, 0);
+        put_extra(writer, layout->ids, tracks, ID_RECORD);
+        put_extra(writer, layout->album_keys, albums, ID_RECORD);
+        put_extra(writer, layout->album_ranks, albums, WIDE_INDEX_RECORD);
     }
     pad_to(writer, wide ? WIDE_HEADER_SIZE : HEADER_SIZE);
 }
@@ -705,7 +720,7 @@ static bool write_records(Encode *encode, const Layout *layout)
     const Prepared *prepared = encode->prepared;
     Writer *writer = encode->writer;
     encode->strings = 1;
-    write_header(writer, layout, encode->wide, encode->state->track_count);
+    write_header(writer, layout, encode->wide, encode->state->track_count, prepared->album_count);
     if (!write_tracks(encode)) {
         return false;
     }
@@ -847,12 +862,69 @@ static int by_id_then_track(const uint8_t *left, const uint8_t *right, const voi
     return 0;
 }
 
-static bool write_ids(Encode *encode, const Layout *layout)
+static bool hash_text(Encode *encode, uint32_t offset, uint32_t length, uint64_t *hash)
+{
+    if (length > 0 && !builder_read_text(&encode->prepared->heap, offset, length, encode->text)) {
+        return false;
+    }
+    *hash = hash64_update(*hash, encode->text, length);
+    return true;
+}
+
+static bool album_key(Encode *encode, uint32_t album, uint64_t *key)
+{
+    Prepared *prepared = encode->prepared;
+    uint8_t record[ALBUM_FINAL];
+    uint8_t display[DISPLAY_SIZE];
+    uint8_t separator = KEY_SEPARATOR;
+    *key = HASH64_START;
+    if (!read_region(encode, prepared->albums, album * ALBUM_FINAL, record, sizeof record) ||
+        !read_region(encode, prepared->album_artists.display,
+                     builder_get32(record + 6) * DISPLAY_SIZE, display, sizeof display) ||
+        !hash_text(encode, builder_get32(display), builder_get16(display + 4), key)) {
+        return false;
+    }
+    *key = hash64_update(*key, &separator, sizeof separator);
+    return hash_text(encode, builder_get32(record), builder_get16(record + 4), key);
+}
+
+static bool collect_album_keys(Encode *encode, Region *keys)
+{
+    BuilderState *state = encode->state;
+    uint32_t count = encode->prepared->album_count;
+    uint32_t mark = state->arena.used;
+    uint8_t *buffer = arena_take(&state->arena, STREAM_BUFFER);
+    *keys = store_take(&state->store, count * ID_ENTRY);
+    if (state->arena.failed || state->store.failed) {
+        return false;
+    }
+    keys->size = count * ID_ENTRY;
+    Out out;
+    out_open(&out, &state->store, *keys, buffer, STREAM_BUFFER);
+    for (uint32_t album = 0; album < count; album++) {
+        uint64_t key = 0;
+        uint8_t entry[ID_ENTRY];
+        if (!album_key(encode, album, &key)) {
+            return false;
+        }
+        builder_put16(entry, ID_ENTRY);
+        builder_put32(entry + 2, (uint32_t)(key >> 32));
+        builder_put32(entry + 6, (uint32_t)key);
+        builder_put32(entry + 10, album);
+        if (!out_put(&out, entry, sizeof entry)) {
+            return false;
+        }
+    }
+    bool closed = out_close(&out);
+    state->arena.used = mark;
+    return closed;
+}
+
+static bool write_sorted(Encode *encode, Region rows, uint32_t start, uint32_t count)
 {
     BuilderState *state = encode->state;
     Region sorted;
-    flush(encode->writer);
-    if (!builder_sort(state, encode->ids, by_id_then_track, &sorted)) {
+    if (!builder_sort(state, rows, by_id_then_track, &sorted)) {
         return false;
     }
     uint32_t mark = state->arena.used;
@@ -862,8 +934,8 @@ static bool write_ids(Encode *encode, const Layout *layout)
     }
     In in;
     in_open(&in, &state->store, sorted.offset, sorted.offset + sorted.size, buffer, STREAM_BUFFER);
-    pad_to(encode->writer, layout->ids);
-    for (uint32_t index = 0; index < state->track_count; index++) {
+    pad_to(encode->writer, start);
+    for (uint32_t index = 0; index < count; index++) {
         uint8_t entry[ID_ENTRY];
         if (!in_get(&in, entry, sizeof entry)) {
             return false;
@@ -874,6 +946,56 @@ static bool write_ids(Encode *encode, const Layout *layout)
     }
     state->arena.used = mark;
     return true;
+}
+
+static bool write_album_keys(Encode *encode, const Layout *layout)
+{
+    BuilderState *state = encode->state;
+    uint32_t count = encode->prepared->album_count;
+    Region keys;
+    Region sorted;
+    if (!collect_album_keys(encode, &keys) ||
+        !builder_sort(state, keys, by_id_then_track, &sorted)) {
+        return false;
+    }
+    uint32_t mark = state->arena.used;
+    uint8_t *in_buffer = arena_take(&state->arena, STREAM_BUFFER);
+    uint8_t *out_buffer = arena_take(&state->arena, STREAM_BUFFER);
+    Region pairs = store_take(&state->store, count * BUILDER_PAIR_SIZE);
+    Region ranks = store_take(&state->store, count * WIDE_INDEX_RECORD);
+    if (state->arena.failed || state->store.failed) {
+        return false;
+    }
+    In in;
+    in_open(&in, &state->store, sorted.offset, sorted.offset + sorted.size, in_buffer,
+            STREAM_BUFFER);
+    Out out;
+    out_open(&out, &state->store, pairs, out_buffer, STREAM_BUFFER);
+    pad_to(encode->writer, layout->album_keys);
+    for (uint32_t position = 0; position < count; position++) {
+        uint8_t entry[ID_ENTRY];
+        if (!in_get(&in, entry, sizeof entry) ||
+            !builder_put_pair(&out, builder_get32(entry + 10), position)) {
+            return false;
+        }
+        put_u32(encode->writer, builder_get32(entry + 6));
+        put_u32(encode->writer, builder_get32(entry + 2));
+        put_u32(encode->writer, builder_get32(entry + 10));
+    }
+    bool closed = out_close(&out);
+    state->arena.used = mark;
+    if (!closed || !builder_scatter(state, pairs, ranks, count)) {
+        return false;
+    }
+    pad_to(encode->writer, layout->album_ranks);
+    return copy_indices(encode, ranks, 0, count);
+}
+
+static bool write_ids(Encode *encode, const Layout *layout)
+{
+    flush(encode->writer);
+    return write_sorted(encode, encode->ids, layout->ids, encode->state->track_count) &&
+           write_album_keys(encode, layout);
 }
 
 static bool emit_names(Encode *encode)

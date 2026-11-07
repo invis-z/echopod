@@ -94,6 +94,7 @@ uint32_t segment_store_value(const SegmentStore *store, uint8_t index);
 void segment_store_begin(SegmentStore *store);
 void segment_store_start(SegmentStore *store, uint8_t stream, uint8_t pool);
 void segment_store_drop(SegmentStore *store, uint8_t stream);
+void segment_store_keep(SegmentStore *store, uint8_t stream);
 uint32_t segment_store_working_length(const SegmentStore *store, uint8_t stream);
 SegmentResult segment_store_append(SegmentStore *store, uint8_t stream, const void *bytes,
                                    uint32_t length);

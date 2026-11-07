@@ -45,7 +45,7 @@ static bool save(const FavoritesStore *store)
 
 FavoriteResult favorites_store_toggle_album(FavoritesStore *store, uint32_t album)
 {
-    uint32_t key = library_album_key(store->library, album);
+    uint64_t key = library_album_key(store->library, album);
     bool present = favorites_contains(&store->favorites, key);
     if (!present && store->favorites.count == FAVORITES_CAPACITY) {
         return (FavoriteResult){.change = FAVORITE_FULL, .saved = true};

@@ -805,7 +805,7 @@ static void start_playback(void)
     favorites_store_load(&app.favorites, &app.library.library);
     spoken_store_load(&app.spoken, &app.library.library);
     player_set_resume(&app.player, spoken_store_resume(&app.spoken));
-    cover_cache_open(&app.covers, &app.library.library);
+    cover_cache_open(&app.covers, &app.library.library, &app.library.segments);
 }
 
 static void start_hardware(uint32_t now_ms)

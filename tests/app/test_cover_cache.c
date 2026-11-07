@@ -2,42 +2,46 @@
 #include "cover_cache.h"
 #include "fake_hal.h"
 #include "fixture_library.h"
+#include "library_store.h"
 
 enum {
-    RED_ALBUM = 0,
+    RED_ALBUM = FIXTURE_RED_ALBUM,
     BARE_ALBUM = 1,
-    BLUE_ALBUM = 2,
-    RED = 0xF800,
-    BLUE = 0x001F
+    BLUE_ALBUM = FIXTURE_BLUE_ALBUM,
+    RED = FIXTURE_RED,
+    BLUE = FIXTURE_BLUE
 };
 
 static FixtureLibrary fixture;
 static CoverCache cache;
+static SegmentStore store;
 
 static CoverCache *cache_with_covers(void)
 {
-    uint32_t size = 0;
-    const uint8_t *bytes = fixture_covers_bytes(&size);
     fake_hal_reset();
-    fake_hal_add_file("/.rippl/covers.bin", bytes, size);
-    cover_cache_open(&cache, fixture_library_open(&fixture));
+    Library *library = fixture_library_open(&fixture);
+    segment_store_open(&store, library_store_files());
+    CHECK(fixture_covers_write(&store, library));
+    cover_cache_open(&cache, library, &store);
     return &cache;
 }
 
-static void without_a_covers_file_every_cover_is_missing(void)
+static void without_covers_every_cover_is_missing(void)
 {
     fake_hal_reset();
-    cover_cache_open(&cache, fixture_library_open(&fixture));
+    segment_store_open(&store, library_store_files());
+    cover_cache_open(&cache, fixture_library_open(&fixture), &store);
     CHECK(!cache.available);
     Image image;
     cover_cache_load_half(&cache, 0, RED_ALBUM);
     CHECK_EQUAL(COVER_MISSING, cover_cache_half(&cache, 0, RED_ALBUM, &image));
 }
 
-static void without_a_covers_file_loading_reads_nothing_from_the_library(void)
+static void without_covers_loading_reads_nothing_from_the_library(void)
 {
     fake_hal_reset();
-    cover_cache_open(&cache, fixture_library_open(&fixture));
+    segment_store_open(&store, library_store_files());
+    cover_cache_open(&cache, fixture_library_open(&fixture), &store);
     fixture.memory.reads = 0;
     cover_cache_load_full(&cache, RED_ALBUM);
     cover_cache_load_half(&cache, 0, RED_ALBUM);
@@ -45,7 +49,7 @@ static void without_a_covers_file_loading_reads_nothing_from_the_library(void)
     CHECK_EQUAL(0, fixture.memory.reads);
 }
 
-static void an_album_has_a_cover_only_when_the_covers_file_holds_one(void)
+static void an_album_has_a_cover_only_when_the_store_holds_one(void)
 {
     CoverCache *covers = cache_with_covers();
     Image image;
@@ -107,9 +111,9 @@ static void a_position_reuses_the_slot_of_one_a_window_away(void)
 int main(void)
 {
     static const TestCase cases[] = {
-        TEST_CASE(without_a_covers_file_every_cover_is_missing),
-        TEST_CASE(without_a_covers_file_loading_reads_nothing_from_the_library),
-        TEST_CASE(an_album_has_a_cover_only_when_the_covers_file_holds_one),
+        TEST_CASE(without_covers_every_cover_is_missing),
+        TEST_CASE(without_covers_loading_reads_nothing_from_the_library),
+        TEST_CASE(an_album_has_a_cover_only_when_the_store_holds_one),
         TEST_CASE(an_unloaded_cover_is_empty),
         TEST_CASE(a_loaded_half_cover_has_its_pixels),
         TEST_CASE(a_loaded_full_cover_has_its_pixels),

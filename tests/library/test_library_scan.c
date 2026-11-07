@@ -771,7 +771,10 @@ static ScanResult rebuild(const char *folder, ScanStats *stats)
             },
         .store = &rebuild_store,
     };
-    return library_rebuild(&job, stats);
+    RebuildStats rebuild;
+    ScanResult result = library_rebuild(&job, &rebuild);
+    *stats = rebuild.scan;
+    return result;
 }
 
 static void check_committed(const char *fixture)
@@ -800,7 +803,6 @@ static void a_rebuild_commits_the_library_and_reuses_it_next_time(void)
     CHECK_EQUAL(SCAN_OK, rebuild(RIPPL_FIXTURE_DIR "/tags", &stats));
     CHECK_EQUAL(13u, stats.tracks);
     CHECK_EQUAL(stats.files, stats.reused);
-    CHECK_EQUAL(0, cached_files.opens);
     CHECK_EQUAL(first + 1, segment_store_sequence(&rebuild_store));
     check_committed("tags_library.db");
     CHECK_EQUAL(SCAN_OK, rebuild(RIPPL_FIXTURE_DIR "/scan_music", &stats));

@@ -1,13 +1,5 @@
 #include "cover_cache.h"
 
-const char COVER_CACHE_PATH[] = "/.rippl/covers.bin";
-
-static bool read_file(void *context, uint32_t offset, void *buffer, uint32_t length)
-{
-    const CoverCache *cache = context;
-    return hal_file_read(cache->file, offset, buffer, length);
-}
-
 static void clear_slots(CoverCache *cache)
 {
     for (int slot = 0; slot < COVER_CACHE_SLOTS; slot++) {
@@ -19,25 +11,15 @@ static void clear_slots(CoverCache *cache)
 
 void cover_cache_close(CoverCache *cache)
 {
-    if (cache->available) {
-        hal_file_close(&cache->file);
-    }
     cache->available = false;
 }
 
-void cover_cache_open(CoverCache *cache, const Library *library)
+void cover_cache_open(CoverCache *cache, const Library *library, const SegmentStore *store)
 {
     cache->library = library;
-    cache->available = false;
     clear_slots(cache);
-    if (!hal_file_open(&cache->file, COVER_CACHE_PATH)) {
-        return;
-    }
-    ByteSource source = {.read = read_file, .context = cache};
-    cache->available = covers_open(&cache->covers, source, cache->file.size);
-    if (!cache->available) {
-        hal_file_close(&cache->file);
-    }
+    cache->available = covers_open(&cache->covers, store) &&
+                       cache->covers.albums == library_count(library, LIBRARY_ALBUMS);
 }
 
 static int slot_of(int position)
@@ -74,21 +56,18 @@ CoverState cover_cache_full(const CoverCache *cache, uint32_t album, Image *imag
 
 static CoverState read_cover(CoverCache *cache, uint32_t album, CoverSize size, Color *pixels)
 {
-    uint32_t record = 0;
-    if (!cache->available) {
-        return COVER_MISSING;
-    }
-    uint32_t key = library_album_key(cache->library, album);
-    bool found = covers_find(&cache->covers, key, &record) &&
-                 covers_read(&cache->covers, record, size, pixels);
+    uint32_t rank = 0;
+    bool found = cache->available && library_album_rank(cache->library, album, &rank) &&
+                 covers_read(&cache->covers, rank, size, pixels);
     return found ? COVER_LOADED : COVER_MISSING;
 }
 
 bool cover_cache_has_cover(CoverCache *cache, uint32_t album)
 {
-    uint32_t record = 0;
-    return cache->available &&
-           covers_find(&cache->covers, library_album_key(cache->library, album), &record);
+    uint32_t rank = 0;
+    uint32_t slot = 0;
+    return cache->available && library_album_rank(cache->library, album, &rank) &&
+           covers_slot(&cache->covers, rank, &slot);
 }
 
 bool cover_cache_load_half(CoverCache *cache, int position, uint32_t album)

@@ -116,13 +116,14 @@ static void install_library(const uint8_t *bytes, uint32_t size)
 
 static void start_app_with_library(void)
 {
+    static FixtureLibrary fixture;
+    static SegmentStore store;
     uint32_t size = 0;
-    uint32_t covers_size = 0;
     const uint8_t *bytes = fixture_bytes(&size);
-    const uint8_t *covers = fixture_covers_bytes(&covers_size);
     fake_hal_reset();
     install_library(bytes, size);
-    fake_hal_add_file("/.rippl/covers.bin", covers, covers_size);
+    segment_store_open(&store, library_store_files());
+    CHECK(fixture_covers_write(&store, fixture_library_open(&fixture)));
     now_ms = START_MS;
     fake_hal_set_milliseconds(now_ms);
     app_start();
@@ -1315,10 +1316,6 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/settings.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/resume.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/favorites.bin"));
-    uint32_t covers_size = fake_hal_reserved_size("/.rippl/covers.bin");
-    CHECK_EQUAL(80 * 1024 * 1024, covers_size);
-    CHECK((covers_size - COVERS_HEADER_SIZE) / (COVERS_ENTRY_SIZE + COVER_BUILD_RECORD_BYTES) >=
-          2500);
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/scan.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/upnext.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/bluetooth.bin"));
@@ -1332,7 +1329,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(12, fake_hal_reserve_count());
+    CHECK_EQUAL(11, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
@@ -1512,13 +1509,18 @@ static void a_rescan_borrows_the_idle_audio_buffer_for_its_listing(void)
     CHECK_EQUAL(1, fake_hal_listing_borrow_count());
 }
 
-static void a_rescan_rebuilds_the_covers_file(void)
+static void a_rescan_replaces_the_covers(void)
 {
     start_app_with_library();
+    static SegmentStore store;
+    Covers covers;
+    segment_store_open(&store, library_store_files());
+    CHECK(covers_open(&covers, &store));
     fake_hal_set_empty_card(true);
     app_request_rescan();
     step();
-    CHECK(fake_hal_covers_writes() > 0);
+    segment_store_open(&store, library_store_files());
+    CHECK(!covers_open(&covers, &store));
     CHECK(toast_is("Library: 0 tracks"));
 }
 
@@ -2782,7 +2784,7 @@ int main(void)
         TEST_CASE(rescanning_without_a_card_says_so),
         TEST_CASE(a_rescan_of_an_empty_card_writes_an_empty_library),
         TEST_CASE(a_rescan_keeps_the_stall_watch_fed),
-        TEST_CASE(a_rescan_rebuilds_the_covers_file),
+        TEST_CASE(a_rescan_replaces_the_covers),
         TEST_CASE(a_rescan_after_an_installed_update_asks_for_a_restart),
         TEST_CASE(a_rescan_without_scratch_memory_says_so),
         TEST_CASE(a_rescan_borrows_the_idle_audio_buffer_for_its_listing),

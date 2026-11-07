@@ -25,7 +25,7 @@ enum {
     LIBRARY_HEADER_SIZE = 128,
     LIBRARY_WIDE_VERSION = 1,
     LIBRARY_WIDE_HEADER_SIZE = 256,
-    LIBRARY_WIDE_SECTION_COUNT = LIBRARY_SECTION_COUNT + 1,
+    LIBRARY_WIDE_SECTION_COUNT = LIBRARY_SECTION_COUNT + 3,
     LIBRARY_ID_SIZE = 12
 };
 
@@ -51,6 +51,8 @@ typedef struct Library {
     bool wide;
     LibrarySectionInfo sections[LIBRARY_SECTION_COUNT];
     LibrarySectionInfo ids;
+    LibrarySectionInfo album_keys;
+    LibrarySectionInfo album_ranks;
     uint32_t generation;
 } Library;
 
@@ -102,7 +104,11 @@ bool library_read_index(const Library *library, LibrarySection section, uint32_t
                         uint32_t *value);
 bool library_read_string(const Library *library, uint32_t offset, char *buffer, size_t capacity);
 uint32_t library_fingerprint(const Library *library);
-uint32_t library_album_key(const Library *library, uint32_t album_index);
+uint64_t library_album_key(const Library *library, uint32_t album_index);
+bool library_album_rank(const Library *library, uint32_t album, uint32_t *rank);
+bool library_find_album(const Library *library, uint64_t key, uint32_t *album);
+bool library_album_key_at(const Library *library, uint32_t position, uint64_t *key,
+                          uint32_t *album);
 uint64_t library_path_id(uint64_t hash, const char *bytes, uint32_t length);
 bool library_track_id(const Library *library, uint32_t track, uint64_t *id);
 bool library_find_track(const Library *library, uint64_t id, uint32_t *track);
