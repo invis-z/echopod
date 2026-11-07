@@ -14,6 +14,7 @@ enum {
 
 typedef struct ScanEntry {
     bool directory;
+    uint32_t size;
     uint32_t modified;
     char name[SCAN_NAME_CAPACITY];
 } ScanEntry;
@@ -51,8 +52,16 @@ typedef struct ScanStats {
     uint32_t files;
     uint32_t tracks;
     uint32_t skipped;
+    uint32_t reused;
     uint32_t length;
 } ScanStats;
+
+typedef struct ScanCache {
+    ByteSource previous;
+    uint32_t previous_length;
+    ByteSink next;
+    uint32_t next_length;
+} ScanCache;
 
 typedef struct ScanJob {
     ScanFileSystem files;
@@ -64,6 +73,7 @@ typedef struct ScanJob {
     ByteSink sink;
     uint32_t capacity;
     ScanProgress progress;
+    ScanCache *cache;
 } ScanJob;
 
 #define LIBRARY_SCAN_MAGIC 0x4E414353u
