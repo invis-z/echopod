@@ -38,7 +38,7 @@ If FiiO's updater won't take the file, maskrom can write the image straight into
    - Windows (PowerShell): `Copy-Item build\device\HIFIEC90.IMG E:\` then `Get-FileHash E:\HIFIEC90.IMG`, with E: the internal drive.
    - macOS: `cp -X build/device/HIFIEC90.IMG "/Volumes/ECHO MINI/"`, then `rm -f "/Volumes/ECHO MINI/._HIFIEC90.IMG"` and `shasum -a 256` on both copies.
 3. Eject both drives. The player shows "Checking HIFIEC90.IMG", then "Installing update" with a percentage, then "Update installed".
-4. Unplug, hold Power to switch off, then switch on. The new build starts.
+4. Unplug: the player restarts by itself about half a second later, and the new build starts.
 
 **8 MiB images (prototype).** The build writes the 8 MiB image as `RIPPL.IMG`, and `flasher/HIFIEC90.IMG`, a 5 MiB image of the same firmware without the extended CJK glyphs. How to install `RIPPL.IMG` depends on what the player runs now:
 

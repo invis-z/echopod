@@ -144,6 +144,7 @@ set(RIPPL_OVERLAY_IMPORTS
     app_dac_keys_start
     app_dac_keys_stop
     app_dac_next_key
+    app_prepare_notice
     app_remember_dac_volume
     app_show_notice
     board_audio_stream_attenuation
@@ -155,6 +156,7 @@ set(RIPPL_OVERLAY_IMPORTS
     board_audio_stream_ring
     board_audio_volume_level
     board_display_service
+    board_restart
     board_start_record_update
     board_wait_for_key
     covers_open

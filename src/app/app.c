@@ -1348,6 +1348,13 @@ void app_show_notice(const char *title, const char *message)
     light_after_first_frame();
 }
 
+void app_prepare_notice(const char *title, const char *message)
+{
+    const Theme *theme = current_theme();
+    (void)text_width(theme->fonts.title, title);
+    (void)text_width(theme->fonts.body, message);
+}
+
 void app_show_splash(void)
 {
     app.now_ms = hal_clock_milliseconds();

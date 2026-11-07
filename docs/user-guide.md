@@ -278,7 +278,7 @@ Podcasts/
 
 1. Copy the new `HIFIEC90.IMG` to the top level of internal storage.
 2. Eject both drives. The player checks the file and shows "Installing update", then "Update installed".
-3. Unplug, then hold Power to turn the player off, and switch it on again.
+3. Unplug: the player restarts by itself and starts the new version.
 
 ## Going back to FiiO's firmware
 
@@ -286,7 +286,7 @@ Podcasts/
 2. Delete `HIFIEC90.IMG` from internal storage if it's still there.
 3. Copy FiiO's `HIFIECnn.IMG` (for example `HIFIEC40.IMG`) to the top level of internal storage, unchanged. Don't copy the `MINIVnnn.IMG` file from the same zip: that one is for the 512 MB model, and Rippl refuses it.
 4. Eject both drives. The player checks the file (this takes a while) and shows "Installing FiiO firmware", then "FiiO firmware installed".
-5. Unplug, take the microSD card out, hold Power to turn the player off, and switch it on. FiiO's firmware starts, shows "Updating" once more for a minute or two while it installs the same file, and deletes it.
+5. Take the microSD card out first, then unplug: the player restarts by itself into FiiO's firmware, which shows "Updating" once more for a minute or two while it installs the same file, and deletes it.
 
 ## If something goes wrong
 
