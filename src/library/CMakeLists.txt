@@ -47,5 +47,5 @@ add_library(echo_library_scan STATIC
 target_include_directories(echo_library_scan PUBLIC include)
 target_link_libraries(echo_library_scan
     PUBLIC echo_core echo_image echo_library
-    PRIVATE echo_options
+    PRIVATE echo_options echo_compact
 )
