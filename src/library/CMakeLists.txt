@@ -47,6 +47,6 @@ add_library(rippl_library_scan STATIC
 target_include_directories(rippl_library_scan PUBLIC include)
 target_link_libraries(rippl_library_scan
     PUBLIC rippl_core rippl_image rippl_library
-    PRIVATE rippl_options
+    PRIVATE rippl_options rippl_compact
 )
 target_link_libraries(rippl_library PRIVATE rippl_lto)
