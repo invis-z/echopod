@@ -19,6 +19,7 @@ typedef struct HostFiles {
     HalDir dir;
     HalFile file;
     HalDirEntry entry;
+    uint32_t opens;
 } HostFiles;
 
 typedef struct Output {
@@ -39,6 +40,8 @@ static bool next_entry(void *context, ScanEntry *entry)
         return false;
     }
     entry->directory = files->entry.directory;
+    entry->size = files->entry.size;
+    entry->modified = files->entry.modified;
     memcpy(entry->name, files->entry.name, sizeof entry->name);
     return true;
 }
@@ -58,6 +61,7 @@ static bool read_host(void *context, uint32_t offset, void *buffer, uint32_t len
 static bool open_file(void *context, const char *path, ByteSource *source, uint32_t *size)
 {
     HostFiles *files = context;
+    files->opens++;
     if (!hal_file_open(&files->file, path)) {
         return false;
     }
@@ -187,6 +191,182 @@ static void scanning_folders_and_playlists_matches_the_pc_indexer(void)
     uint8_t *expected = read_fixture("scan_music.db", &expected_size);
     CHECK(library_compare(expected, expected_size, output.bytes, stats.length));
     free(expected);
+}
+
+enum {
+    CACHE_CAPACITY = 256 * 1024,
+    CACHE_HEADER = 20
+};
+
+typedef struct CacheBytes {
+    uint8_t bytes[CACHE_CAPACITY];
+    uint32_t length;
+} CacheBytes;
+
+static bool read_cache(void *context, uint32_t offset, void *buffer, uint32_t length)
+{
+    const CacheBytes *cache = context;
+    if (offset > cache->length || length > cache->length - offset) {
+        return false;
+    }
+    memcpy(buffer, cache->bytes + offset, length);
+    return true;
+}
+
+static bool write_cache(void *context, uint32_t offset, const void *bytes, uint32_t length)
+{
+    CacheBytes *cache = context;
+    if (offset > CACHE_CAPACITY || length > CACHE_CAPACITY - offset) {
+        return false;
+    }
+    memcpy(cache->bytes + offset, bytes, length);
+    cache->length = offset + length > cache->length ? offset + length : cache->length;
+    return true;
+}
+
+static uint32_t record_length(const CacheBytes *cache, uint32_t offset)
+{
+    return (uint32_t)cache->bytes[offset] | (uint32_t)cache->bytes[offset + 1] << 8;
+}
+
+static uint32_t find_record(const CacheBytes *cache, const char *path)
+{
+    for (uint32_t offset = 0; offset < cache->length; offset += record_length(cache, offset)) {
+        if (strcmp((const char *)cache->bytes + offset + CACHE_HEADER, path) == 0) {
+            return offset;
+        }
+    }
+    return UINT32_MAX;
+}
+
+static uint32_t record_count(const CacheBytes *cache)
+{
+    uint32_t count = 0;
+    for (uint32_t offset = 0; offset < cache->length; offset += record_length(cache, offset)) {
+        count++;
+    }
+    return count;
+}
+
+static HostFiles cached_files;
+
+static ScanResult scan_cached(const char *folder, CacheBytes *previous, CacheBytes *next,
+                              Output *output, ScanStats *stats)
+{
+    static uint8_t memory[MEMORY_SIZE];
+    sim_storage_configure(folder, NULL);
+    output->length = 0;
+    next->length = 0;
+    cached_files.opens = 0;
+    ScanCache cache = {.previous = {read_cache, previous},
+                       .previous_length = previous->length,
+                       .next = {write_cache, next}};
+    ScanJob job = {
+        .files = {open_dir, next_entry, close_dir, open_file, close_file, &cached_files},
+        .memory = memory,
+        .size = sizeof memory,
+        .scratch = SCRATCH,
+        .sink = {write_output, output},
+        .cache = &cache,
+    };
+    ScanResult result = library_scan(&job, stats);
+    CHECK_EQUAL(next->length, cache.next_length);
+    return result;
+}
+
+static void check_output(const Output *output, const ScanStats *stats, const char *fixture)
+{
+    uint32_t expected_size = 0;
+    uint8_t *expected = read_fixture(fixture, &expected_size);
+    CHECK(library_compare(expected, expected_size, output->bytes, stats->length));
+    free(expected);
+}
+
+static CacheBytes first_cache;
+static CacheBytes edited_cache;
+static CacheBytes second_cache;
+static Output cached_output;
+
+static void first_scan(const char *folder, const char *fixture, ScanStats *stats)
+{
+    static CacheBytes none = {.length = 0};
+    CHECK_EQUAL(SCAN_OK, scan_cached(folder, &none, &first_cache, &cached_output, stats));
+    CHECK_EQUAL(0, stats->reused);
+    CHECK_EQUAL(stats->files, record_count(&first_cache));
+    check_output(&cached_output, stats, fixture);
+}
+
+static void a_second_scan_reads_no_unchanged_file(void)
+{
+    ScanStats stats;
+    first_scan(ECHO_FIXTURE_DIR "/tags", "tags_library.db", &stats);
+    uint32_t opened = cached_files.opens;
+    CHECK(opened >= stats.files);
+    CHECK_EQUAL(SCAN_OK, scan_cached(ECHO_FIXTURE_DIR "/tags", &first_cache, &second_cache,
+                                     &cached_output, &stats));
+    CHECK_EQUAL(13u, stats.tracks);
+    CHECK_EQUAL(stats.files, stats.reused);
+    CHECK_EQUAL(0, cached_files.opens);
+    CHECK_EQUAL(first_cache.length, second_cache.length);
+    CHECK(memcmp(first_cache.bytes, second_cache.bytes, first_cache.length) == 0);
+    check_output(&cached_output, &stats, "tags_library.db");
+}
+
+static void a_changed_file_is_read_again(void)
+{
+    ScanStats stats;
+    first_scan(ECHO_FIXTURE_DIR "/scan_music", "scan_music.db", &stats);
+    edited_cache = first_cache;
+    uint32_t record = find_record(&edited_cache, "Artist A/Album One/02 - Second.ogg");
+    CHECK(record != UINT32_MAX);
+    edited_cache.bytes[record + 4] ^= 1;
+    CHECK_EQUAL(SCAN_OK, scan_cached(ECHO_FIXTURE_DIR "/scan_music", &edited_cache, &second_cache,
+                                     &cached_output, &stats));
+    CHECK_EQUAL(stats.files - 1, stats.reused);
+    CHECK_EQUAL(first_cache.length, second_cache.length);
+    CHECK(memcmp(first_cache.bytes, second_cache.bytes, first_cache.length) == 0);
+    check_output(&cached_output, &stats, "scan_music.db");
+}
+
+static void removed_and_added_files_are_handled(void)
+{
+    ScanStats stats;
+    first_scan(ECHO_FIXTURE_DIR "/scan_music", "scan_music.db", &stats);
+    uint32_t files = stats.files;
+    uint32_t second = record_length(&first_cache, 0);
+    uint32_t dropped = record_length(&first_cache, second);
+    uint8_t gone[64] = {0};
+    const char *gone_path = "!gone.mp3";
+    uint32_t gone_length = CACHE_HEADER + (uint32_t)strlen(gone_path) + 1;
+    gone[0] = (uint8_t)gone_length;
+    gone[2] = 2;
+    memcpy(gone + CACHE_HEADER, gone_path, strlen(gone_path) + 1);
+    memcpy(edited_cache.bytes, gone, gone_length);
+    memcpy(edited_cache.bytes + gone_length, first_cache.bytes, second);
+    memcpy(edited_cache.bytes + gone_length + second, first_cache.bytes + second + dropped,
+           first_cache.length - second - dropped);
+    edited_cache.length = gone_length + first_cache.length - dropped;
+    CHECK_EQUAL(SCAN_OK, scan_cached(ECHO_FIXTURE_DIR "/scan_music", &edited_cache, &second_cache,
+                                     &cached_output, &stats));
+    CHECK_EQUAL(files, stats.files);
+    CHECK_EQUAL(files - 1, stats.reused);
+    CHECK_EQUAL(first_cache.length, second_cache.length);
+    CHECK(memcmp(first_cache.bytes, second_cache.bytes, first_cache.length) == 0);
+    check_output(&cached_output, &stats, "scan_music.db");
+}
+
+static void a_damaged_cache_is_ignored(void)
+{
+    ScanStats stats;
+    first_scan(ECHO_FIXTURE_DIR "/tags", "tags_library.db", &stats);
+    edited_cache = first_cache;
+    edited_cache.bytes[0] = 3;
+    edited_cache.bytes[1] = 0;
+    CHECK_EQUAL(SCAN_OK, scan_cached(ECHO_FIXTURE_DIR "/tags", &edited_cache, &second_cache,
+                                     &cached_output, &stats));
+    CHECK_EQUAL(0, stats.reused);
+    CHECK_EQUAL(first_cache.length, second_cache.length);
+    check_output(&cached_output, &stats, "tags_library.db");
 }
 
 static void a_separate_listing_leaves_the_memory_to_the_builder(void)
@@ -473,6 +653,10 @@ int main(void)
         TEST_CASE(scanning_folders_and_playlists_matches_the_pc_indexer),
         TEST_CASE(a_missing_music_root_says_so),
         TEST_CASE(a_separate_listing_leaves_the_memory_to_the_builder),
+        TEST_CASE(a_second_scan_reads_no_unchanged_file),
+        TEST_CASE(a_changed_file_is_read_again),
+        TEST_CASE(removed_and_added_files_are_handled),
+        TEST_CASE(a_damaged_cache_is_ignored),
         TEST_CASE(a_folder_bigger_than_the_listing_is_read_in_batches),
         TEST_CASE(many_sibling_folders_fit_a_small_listing),
         TEST_CASE(a_big_folder_nested_in_big_folders_is_read_in_batches),

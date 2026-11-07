@@ -39,6 +39,7 @@ static bool next_entry(void *context, ScanEntry *entry)
         return false;
     }
     entry->directory = files->entry.directory;
+    entry->size = files->entry.size;
     entry->modified = files->entry.modified;
     memcpy(entry->name, files->entry.name, sizeof entry->name);
     return true;
