@@ -79,7 +79,7 @@ The indexer lists every format stock plays, `.flac`, `.ogg`, `.mp3`, `.m4a` and 
 
 An MP3 without ID3v2 uses its ID3v1 tag. The duration is the container's length rounded to the nearest millisecond (FLAC and DSF sample counts, Ogg's last granule (for Opus minus the header's pre-skip, at 48 kHz), an MP3's Xing/Info frame count or its bitrate, MP4's track duration, WAV data length, APE frame counts, ASF play duration minus preroll, DFF DSD data length). `tools/tag_fixture.py` writes one small file per format to `tests/fixtures/tags`, and both the Python indexer and the device reader (`src/library/track_tags`) are tested against them.
 
-On the device, `track_tags_read` reads through a `ByteSource` with small bounded reads, keeps the first 255 bytes of each value (UTF-8, trimmed as Python's `strip()` does; on both sides, invisible marks and control codes are dropped, bytes 0x80–0x9F read as Windows-1252, and the typographic spaces U+2000–U+200A, U+2028, U+2029, U+202F and U+205F become plain spaces, which the fonts can draw) and computes durations in double precision in the same order as mutagen, so the rounded milliseconds match. It also reports where the cover is: a front cover (picture type 3, or MP4's `covr`) wins over any other picture. For Ogg, the cover is the base64 `METADATA_BLOCK_PICTURE` text, and its offset counts bytes of the Ogg stream from the start of the comment packet's first page body, page headers excluded; the cover pass decodes that text as it reads it (see `docs/architecture.md`, Covers on the device). Known differences from the PC indexer: values aren't recomposed to NFC, and an ID3v2.3 tag with tag-wide unsynchronisation is read without undoing it.
+On the device, `track_tags_read` reads through a `ByteSource` with small bounded reads, keeps the first 255 bytes of each value (UTF-8, trimmed as Python's `strip()` does; on both sides, invisible marks and control codes are dropped, bytes 0x80–0x9F read as Windows-1252, and the typographic spaces U+2000–U+200A, U+2028, U+2029, U+202F and U+205F become plain spaces, which the fonts can draw) and computes durations in double precision in the same order as mutagen, so the rounded milliseconds match. It also reports where the cover is: a front cover (picture type 3, or MP4's `covr`) wins over any other picture. For Ogg, the cover is the base64 `METADATA_BLOCK_PICTURE` text, and its offset counts bytes of the Ogg stream from the start of the comment packet's first page body, page headers excluded; the cover pass decodes that text as it reads it. Known differences from the PC indexer: values aren't recomposed to NFC, and an ID3v2.3 tag with tag-wide unsynchronisation is read without undoing it.
 
 ## Building on the device
 
@@ -173,7 +173,7 @@ A folder key is the FNV-1a hash of the folder's library path: its name as the fi
 
 ## Clock record
 
-`/.rippl/clock.bin` (20 bytes, little-endian) is written by rippl-sync as the last step of a sync, so the player can set its clock chip from the computer's when the USB session ends (see `docs/architecture.md`, Clock). The player never writes it.
+`/.rippl/clock.bin` (20 bytes, little-endian) is written by rippl-sync as the last step of a sync, so the player can set its clock chip from the computer's when the USB session ends. The player never writes it.
 
 | Offset | Size | Field |
 |---|---|---|
@@ -190,7 +190,7 @@ The player accepts a record whose magic, version and checksum agree and whose ti
 
 ## Covers file
 
-The player builds `/.rippl/covers.bin` after every rescan (see `docs/architecture.md`, Covers on the device); `tools/cover_export.py` writes the same format on a PC. It's separate from the database, keyed by album key, so either file can be rebuilt on its own.
+The player builds `/.rippl/covers.bin` after every rescan; `tools/cover_export.py` writes the same format on a PC. It's separate from the database, keyed by album key, so either file can be rebuilt on its own.
 
 | Offset | Type | Field |
 |---|---|---|
@@ -204,7 +204,7 @@ The player builds `/.rippl/covers.bin` after every rescan (see `docs/architectur
 
 Each record is the full cover (112 × 112 pixels) followed by the half cover (56 × 56), as little-endian RGB565 rows, top to bottom. That's 31,360 bytes per album, so about 6.8 MB for 217 albums. Readers follow the record offsets, so records may start after a larger index: the player reserves index room for every album that fits the file before it knows how many have art.
 
-The player also keeps a stamp per cover so a rescan can reuse it (see `docs/architecture.md`, Covers on the device). For a file of `capacity` bytes it has room for `slots = (capacity − 16) / (8 + 4 + 31,360)` covers: the index area holds `slots` entries, the stamp table follows at `16 + slots × 8` with a `u32` stamp for each index entry in the same order, and record `n` starts at `16 + slots × 12 + n × 31,360`. Readers that don't use stamps ignore the table. A stamp of 0 means unknown: the player decodes that album again. `docs/architecture.md` (Covers on the device) defines the stamp.
+The player also keeps a stamp per cover so a rescan can reuse it. For a file of `capacity` bytes it has room for `slots = (capacity − 16) / (8 + 4 + 31,360)` covers: the index area holds `slots` entries, the stamp table follows at `16 + slots × 8` with a `u32` stamp for each index entry in the same order, and record `n` starts at `16 + slots × 12 + n × 31,360`. Readers that don't use stamps ignore the table. A stamp of 0 means unknown: the player decodes that album again. A stamp is FNV-1a over where the art came from (`/` plus the library path for embedded art, the folder plus the listed name for a cover file), then three little-endian `u32`s: for embedded art the track's size, the picture's length (for Ogg, the decoded image's length) and 1; for a cover file its size, its modification stamp (the music fingerprint's value, from the folder listing) and 2. An album whose stamp matches keeps its record without decoding; changed art is decoded again into the album's own record, and a new album takes the first free record. The header is zeroed before the first record is written and the sorted index, the stamps and the `EMCV` header go last, so an interrupted pass reads as no covers.
 
 rippl-sync (`encode_stamped`) writes this layout for the card's `covers.bin` size, with the stamps the player would compute: for embedded art from the track's size and the picture's length (the same bytes mutagen returns; for Ogg, the image inside the decoded `METADATA_BLOCK_PICTURE` block), for a cover file from its size and the card's modification stamp (`card_stamp`, as for the music fingerprint). It writes 0 for a cover file when the card isn't FAT or exFAT, since the time can't be matched. `tools/cover_export.py` on its own (`--output`) still writes the packed layout, with 0 at offset 12 and records right after the index; the player reads such a file normally and rebuilds every cover on its next rescan.
 
