@@ -8,7 +8,7 @@ enum {
     VERSION_FIELD = 4,
     COUNT_FIELD = 6,
     KEYS_FIELD = 8,
-    KEY_SIZE = 4,
+    KEY_SIZE = 8,
     CHECKSUM_SIZE = 4,
     BITS_PER_BYTE = 8
 };
@@ -37,7 +37,7 @@ static uint32_t get_u32(const uint8_t *bytes, uint32_t offset)
     return (uint32_t)get_u16(bytes, offset) | (uint32_t)get_u16(bytes, offset + 2) << 16;
 }
 
-static int find_key(const Favorites *favorites, uint32_t key)
+static int find_key(const Favorites *favorites, uint64_t key)
 {
     for (int index = 0; index < favorites->count; index++) {
         if (favorites->keys[index] == key) {
@@ -60,12 +60,12 @@ void favorites_clear(Favorites *favorites)
     favorites->count = 0;
 }
 
-bool favorites_contains(const Favorites *favorites, uint32_t key)
+bool favorites_contains(const Favorites *favorites, uint64_t key)
 {
     return find_key(favorites, key) >= 0;
 }
 
-bool favorites_toggle(Favorites *favorites, uint32_t key)
+bool favorites_toggle(Favorites *favorites, uint64_t key)
 {
     int position = find_key(favorites, key);
     if (position >= 0) {
@@ -88,7 +88,8 @@ uint32_t favorites_encode(const Favorites *favorites, uint8_t *bytes)
     put_u16(bytes, COUNT_FIELD, favorites->count);
     uint32_t offset = KEYS_FIELD;
     for (int index = 0; index < favorites->count; index++, offset += KEY_SIZE) {
-        put_u32(bytes, offset, favorites->keys[index]);
+        put_u32(bytes, offset, (uint32_t)favorites->keys[index]);
+        put_u32(bytes, offset + 4, (uint32_t)(favorites->keys[index] >> 32));
     }
     put_u32(bytes, offset, hash_update(HASH_START, bytes, offset));
     return offset + CHECKSUM_SIZE;
@@ -121,7 +122,8 @@ bool favorites_decode(const uint8_t *bytes, uint32_t length, Favorites *favorite
         return false;
     }
     for (uint16_t index = 0; index < count; index++) {
-        favorites->keys[index] = get_u32(bytes, KEYS_FIELD + (uint32_t)index * KEY_SIZE);
+        uint32_t field = KEYS_FIELD + (uint32_t)index * KEY_SIZE;
+        favorites->keys[index] = (uint64_t)get_u32(bytes, field + 4) << 32 | get_u32(bytes, field);
     }
     favorites->count = count;
     return true;
@@ -134,9 +136,32 @@ static void pause_between_albums(FavoritesCollector collector, uint32_t album)
     }
 }
 
+static uint16_t collect_by_key(const Favorites *favorites, const Library *library,
+                               FavoritesCollector collector)
+{
+    uint16_t found = 0;
+    for (uint16_t index = 0; index < favorites->count && found < collector.capacity; index++) {
+        uint32_t album = 0;
+        pause_between_albums(collector, index);
+        if (!library_find_album(library, favorites->keys[index], &album)) {
+            continue;
+        }
+        uint16_t position = found++;
+        while (position > 0 && collector.albums[position - 1] > album) {
+            collector.albums[position] = collector.albums[position - 1];
+            position--;
+        }
+        collector.albums[position] = album;
+    }
+    return found;
+}
+
 uint16_t favorites_collect(const Favorites *favorites, const Library *library,
                            FavoritesCollector collector)
 {
+    if (library->album_keys.count > 0) {
+        return collect_by_key(favorites, library, collector);
+    }
     uint16_t found = 0;
     uint32_t album_count = library_count(library, LIBRARY_ALBUMS);
     uint32_t wanted = favorites->count < collector.capacity ? favorites->count : collector.capacity;

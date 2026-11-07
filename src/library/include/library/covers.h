@@ -3,19 +3,21 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "library/byte_source.h"
+#include "library/segment_store.h"
 
 enum {
     COVER_FULL_SIZE = 112,
     COVER_HALF_SIZE = 56,
     COVER_FULL_PIXELS = COVER_FULL_SIZE * COVER_FULL_SIZE,
     COVER_HALF_PIXELS = COVER_HALF_SIZE * COVER_HALF_SIZE,
-    COVERS_VERSION = 1,
-    COVERS_HEADER_SIZE = 16,
-    COVERS_ENTRY_SIZE = 8,
-    COVERS_TOP_NODES = 64,
-    COVERS_CHUNK_ENTRIES = 64
+    COVER_FULL_BYTES = COVER_FULL_PIXELS * 2,
+    COVER_HALF_BYTES = COVER_HALF_PIXELS * 2,
+    COVER_RECORD_BYTES = COVER_FULL_BYTES + COVER_HALF_BYTES,
+    COVERS_PER_SEGMENT = SEGMENT_COVERS_SIZE / COVER_RECORD_BYTES,
+    COVER_ROW_BYTES = 8
 };
+
+#define COVER_NONE UINT32_C(0xFFFFFFFF)
 
 typedef enum CoverSize {
     COVER_FULL,
@@ -23,13 +25,13 @@ typedef enum CoverSize {
 } CoverSize;
 
 typedef struct Covers {
-    ByteSource source;
-    uint32_t size;
-    uint32_t count;
-    uint64_t known_nodes;
-    uint32_t top_keys[COVERS_TOP_NODES];
+    const SegmentStore *store;
+    uint8_t stream;
+    uint32_t albums;
+    uint32_t slots;
 } Covers;
 
-bool covers_open(Covers *covers, ByteSource source, uint32_t size);
-bool covers_find(Covers *covers, uint32_t key, uint32_t *record);
-bool covers_read(const Covers *covers, uint32_t record, CoverSize size, uint16_t *pixels);
+uint32_t covers_offset(uint32_t slot);
+bool covers_open(Covers *covers, const SegmentStore *store);
+bool covers_slot(const Covers *covers, uint32_t rank, uint32_t *slot);
+bool covers_read(const Covers *covers, uint32_t rank, CoverSize size, uint16_t *pixels);

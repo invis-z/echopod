@@ -189,6 +189,7 @@ set(RIPPL_OVERLAY_IMPORTS
     sd_read
     sd_sector_count
     sd_write
+    segment_store_read
     spoken_kind_of
     storage_reset
     string_builder_append

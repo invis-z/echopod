@@ -66,7 +66,7 @@ mkdir -p build/system
 ./build/dev/platform/sim/rippl_sim --card /path/to/music --system-dir build/system
 ```
 
-The simulator behaves like the player: on the first start it creates `covers.bin` and the save files in the system folder, scans the music folder (every format stock lists, plus `.m3u`/`.m3u8` playlists) into the library (segment files in `library/` and `manifest.bin`) and finds the album covers. Settings → Rescan library scans again. The music folder is only ever read.
+The simulator behaves like the player: on the first start it creates the save files in the system folder, scans the music folder (every format stock lists, plus `.m3u`/`.m3u8` playlists) into the library and finds the album covers (segment files in `library/` and `covers/`, and `manifest.bin`). Settings → Rescan library scans again. The music folder is only ever read.
 
 The PC tools (`tools/library_index.py`, `tools/cover_export.py` and **rippl-sync**) still write the old `library.db`, which the player no longer reads, so for now the player scans the card itself after a sync; Tide will replace them with the new format. **rippl-sync** builds the library, the covers and the music fingerprint (`scan.bin`) on a computer, straight into the card's `/.rippl` folder (`docs/user-guide.md`, Build the library on a computer). Each release carries it as one file for Windows, macOS (Apple silicon) and Linux, with nothing to install, built by `.github/workflows/rippl-sync.yml` with PyInstaller; from the source it's `tools/rippl_sync.py E:`. To build the file yourself: `python -m pip install -r tools/requirements.txt -r tools/requirements-build.txt`, then `python -m PyInstaller --onefile --name rippl-sync --paths tools tools/rippl_sync.py`.
 

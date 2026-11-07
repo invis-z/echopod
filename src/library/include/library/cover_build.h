@@ -3,14 +3,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "library/byte_source.h"
-#include "library/library_builder.h"
+#include "library/library.h"
 #include "library/library_scan.h"
-
-enum {
-    COVER_BUILD_RECORD_BYTES = (112 * 112 + 56 * 56) * 2,
-    COVER_BUILD_MAX_COVERS = 0xFFFF
-};
+#include "library/segment_store.h"
 
 typedef struct CoverProgress {
     void (*report)(void *context, uint32_t done, uint32_t total);
@@ -19,11 +14,8 @@ typedef struct CoverProgress {
 
 typedef struct CoverJob {
     ScanFileSystem files;
-    ByteSource library;
-    uint32_t library_size;
-    ByteSink sink;
-    ByteSource previous;
-    uint32_t capacity;
+    const Library *library;
+    SegmentStore *store;
     void *memory;
     uint32_t size;
     CoverProgress progress;

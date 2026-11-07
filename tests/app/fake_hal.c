@@ -126,7 +126,6 @@ typedef struct FakeHal {
     char dir_path[PATH_CAPACITY];
     int dir_index;
     int library_writes;
-    int covers_writes;
     const char *store_used[STORE_SLOTS];
     int scratch_outstanding;
     int presents_at_power_on;
@@ -161,8 +160,16 @@ typedef struct FakeHal {
 
 static FakeHal fake;
 
+static uint32_t file_reads;
+
+uint32_t fake_hal_file_read_count(void)
+{
+    return file_reads;
+}
+
 void fake_hal_reset(void)
 {
+    file_reads = 0;
     for (int index = 0; index < FILE_CAPACITY; index++) {
         free(owned_stores[index]);
         owned_stores[index] = NULL;
@@ -459,6 +466,7 @@ int fake_hal_open_files(void)
 
 bool hal_file_read(HalFile file, uint32_t offset, void *buffer, uint32_t length)
 {
+    file_reads++;
     if (file.handle < 0 || file.handle >= fake.file_count) {
         return false;
     }
@@ -1159,11 +1167,6 @@ bool fake_hal_lit_at_last_dir_open(void)
     return fake.lit_at_dir_open;
 }
 
-int fake_hal_covers_writes(void)
-{
-    return fake.covers_writes;
-}
-
 int fake_hal_library_writes(void)
 {
     return fake.library_writes;
@@ -1254,7 +1257,8 @@ static FakeFile *fake_file(const char *path)
 
 static bool is_segment_path(const char *path)
 {
-    return strncmp(path, "/.rippl/library/", 16) == 0 || strcmp(path, "/.rippl/manifest.bin") == 0;
+    return strncmp(path, "/.rippl/library/", 16) == 0 ||
+           strncmp(path, "/.rippl/covers/", 15) == 0 || strcmp(path, "/.rippl/manifest.bin") == 0;
 }
 
 static uint8_t *owned_store_for(FakeFile *file)
@@ -1312,7 +1316,6 @@ bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uin
         memcpy(store + offset, bytes, length);
     }
     fake.library_writes += strncmp(path, "/.rippl/library/", 16) == 0;
-    fake.covers_writes += strcmp(path, "/.rippl/covers.bin") == 0;
     return true;
 }
 

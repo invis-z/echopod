@@ -1,20 +1,20 @@
 #pragma once
 
+#include "library/cover_build.h"
 #include "library/library_scan.h"
 #include "library/segment_store.h"
-
-enum {
-    LIBRARY_STREAM_INDEX = 1,
-    LIBRARY_STREAM_RECORDS = 2,
-    LIBRARY_STREAM_OTHER_RECORDS = 3,
-    LIBRARY_STREAM_SCRATCH = 7,
-    LIBRARY_REGION_INDEX = 0,
-    LIBRARY_VALUE_RECORDS = 0
-};
+#include "library/store_layout.h"
 
 typedef struct RebuildJob {
     ScanJob scan;
     SegmentStore *store;
+    CoverProgress covers;
 } RebuildJob;
 
-ScanResult library_rebuild(const RebuildJob *job, ScanStats *stats);
+typedef struct RebuildStats {
+    ScanStats scan;
+    ScanResult cover_result;
+    CoverStats covers;
+} RebuildStats;
+
+ScanResult library_rebuild(const RebuildJob *job, RebuildStats *stats);

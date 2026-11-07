@@ -539,6 +539,14 @@ void segment_store_drop(SegmentStore *store, uint8_t stream)
     }
 }
 
+void segment_store_keep(SegmentStore *store, uint8_t stream)
+{
+    if (stream < SEGMENT_STREAM_COUNT) {
+        store->working.streams[stream] = store->committed.streams[stream];
+        store->shared[stream] = true;
+    }
+}
+
 uint32_t segment_store_working_length(const SegmentStore *store, uint8_t stream)
 {
     return stream < SEGMENT_STREAM_COUNT ? store->working.streams[stream].length : 0;

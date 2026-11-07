@@ -6,6 +6,8 @@
 #include "image/cover_image.h"
 #include "library/covers.h"
 #include "library/library.h"
+#include "library/segment_stream.h"
+#include "library/store_layout.h"
 #include "library/track_tags.h"
 #include "tags_internal.h"
 
@@ -15,32 +17,18 @@ enum {
     STEM_COUNT = 4,
     SUFFIX_COUNT = 3,
     MATCH_CAPACITY = 16,
-    FULL_BYTES = COVER_FULL_PIXELS * 2,
-    HALF_BYTES = COVER_HALF_PIXELS * 2,
-    INDEX_CHUNK = 64,
-    STAMP_FIELD = 12,
-    STAMP_BYTES = 4,
-    SLOT_BYTES = COVERS_ENTRY_SIZE + STAMP_BYTES + COVER_BUILD_RECORD_BYTES,
+    ROW_BYTES = COVER_ROW_BYTES,
+    ROWS_CHUNK = 64,
+    KEY_BYTES = LIBRARY_ID_SIZE,
     STAMP_NUMBERS = 3,
     ART_EMBEDDED = 1,
     ART_FILE = 2,
     ART_TRACKS = 4,
-    BITS_PER_BYTE = 8
+    GARBAGE_SHARE = 4
 };
 
 static const char *const STEMS[STEM_COUNT] = {"cover", "folder", "front", "albumart"};
 static const char *const SUFFIXES[SUFFIX_COUNT] = {".jpg", ".jpeg", ".png"};
-
-typedef struct CoverEntry {
-    uint32_t key;
-    uint32_t stamp;
-} CoverEntry;
-
-typedef struct CoverLayout {
-    uint32_t slots;
-    uint32_t stamps_start;
-    uint32_t records_start;
-} CoverLayout;
 
 typedef struct ArtFile {
     ByteSource source;
@@ -54,114 +42,51 @@ typedef struct CoverMatch {
     uint32_t modified;
 } CoverMatch;
 
-typedef struct CoverState {
+typedef struct Rows {
+    ByteSource source;
+    uint32_t start;
+    uint32_t count;
+    uint32_t size;
+    uint32_t first;
+    uint32_t filled;
+    uint8_t bytes[ROWS_CHUNK * KEY_BYTES];
+} Rows;
+
+typedef struct OldCovers {
     Library library;
+    SegmentStreamIo library_io;
+    SegmentStreamIo rows_io;
+    Rows keys;
+    Rows rows;
+    uint32_t position;
+    uint8_t stream;
+    uint32_t slots;
+} OldCovers;
+
+typedef struct CoverState {
+    const Library *library;
     TrackTags tags;
     TagPictureReader picture;
     ScanEntry entry;
     LibraryAlbum album;
-    uint32_t key;
     char path[SCAN_PATH_CAPACITY + 2];
     CoverMatch matches[STEM_COUNT];
     uint16_t full[COVER_FULL_PIXELS];
     uint16_t half[COVER_HALF_PIXELS];
     uint32_t folders[MAX_FOLDERS];
     uint32_t folder_count;
-    CoverLayout layout;
-    CoverEntry *index;
-    uint16_t *slots;
-    uint8_t *claimed;
-    uint8_t *used_slots;
-    uint32_t capacity;
-    uint32_t count;
-    uint32_t kept;
-    uint32_t next_slot;
+    OldCovers old;
+    SegmentStreamIo new_library_io;
+    Rows new_keys;
+    uint8_t out[ROWS_CHUNK * ROW_BYTES];
+    uint32_t out_used;
+    uint8_t stream;
+    uint32_t slots;
+    bool compact;
+    bool full_card;
     uint8_t *decode_memory;
     uint32_t decode_size;
 } CoverState;
-
-static uint8_t *take(uint8_t **cursor, uint8_t *end, uint32_t bytes)
-{
-    uintptr_t address = (uintptr_t)*cursor;
-    uint8_t *start = *cursor + (ALIGNMENT - address % ALIGNMENT) % ALIGNMENT;
-    if (start > end || (uint32_t)(end - start) < bytes) {
-        return NULL;
-    }
-    *cursor = start + bytes;
-    return start;
-}
-
-static void clear(uint8_t *bytes, uint32_t length)
-{
-    for (uint32_t index = 0; index < length; index++) {
-        bytes[index] = 0;
-    }
-}
-
-static uint32_t bit_bytes(uint32_t bits)
-{
-    return (bits + BITS_PER_BYTE - 1) / BITS_PER_BYTE;
-}
-
-static bool bit_set(const uint8_t *bits, uint32_t index)
-{
-    return ((uint32_t)bits[index / BITS_PER_BYTE] >> (index % BITS_PER_BYTE) & 1u) != 0;
-}
-
-static void set_bit(uint8_t *bits, uint32_t index)
-{
-    bits[index / BITS_PER_BYTE] |= (uint8_t)(1u << (index % BITS_PER_BYTE));
-}
-
-static CoverLayout layout_for(uint32_t capacity)
-{
-    uint32_t room = capacity > COVERS_HEADER_SIZE ? capacity - COVERS_HEADER_SIZE : 0;
-    uint32_t slots = room / SLOT_BYTES;
-    slots = slots < COVER_BUILD_MAX_COVERS ? slots : COVER_BUILD_MAX_COVERS;
-    uint32_t stamps_start = COVERS_HEADER_SIZE + slots * COVERS_ENTRY_SIZE;
-    return (CoverLayout){slots, stamps_start, stamps_start + slots * STAMP_BYTES};
-}
-
-static uint32_t index_capacity(CoverLayout layout, uint32_t albums, uint32_t previous)
-{
-    uint32_t limit = layout.slots < albums ? layout.slots : albums;
-    return limit > previous ? limit : previous;
-}
-
-static CoverState *prepare(const CoverJob *job, uint32_t albums, CoverLayout layout,
-                           uint32_t previous)
-{
-    uint8_t *cursor = job->memory;
-    uint8_t *end = cursor + job->size;
-    uint32_t capacity = index_capacity(layout, albums, previous);
-    CoverState *state = (CoverState *)take(&cursor, end, sizeof(CoverState));
-    CoverEntry *index =
-        (CoverEntry *)take(&cursor, end, capacity * (uint32_t)sizeof(CoverEntry) + 1);
-    uint16_t *slots = (uint16_t *)take(&cursor, end, capacity * (uint32_t)sizeof(uint16_t) + 1);
-    uint8_t *claimed = take(&cursor, end, bit_bytes(capacity) + 1);
-    uint8_t *used_slots = take(&cursor, end, bit_bytes(layout.slots) + 1);
-    if (state == NULL || index == NULL || slots == NULL || claimed == NULL || used_slots == NULL) {
-        return NULL;
-    }
-    clear(used_slots, bit_bytes(layout.slots));
-    state->layout = layout;
-    state->index = index;
-    state->slots = slots;
-    state->claimed = claimed;
-    state->used_slots = used_slots;
-    state->capacity = capacity;
-    state->count = 0;
-    state->kept = 0;
-    state->next_slot = 0;
-    state->decode_memory = cursor;
-    state->decode_size = (uint32_t)(end - cursor);
-    return state;
-}
-
-static bool write_bytes(const CoverJob *job, uint32_t offset, const void *bytes, uint32_t length)
-{
-    return job->sink.write(job->sink.context, offset, bytes, length);
-}
 
 static void put16(uint8_t *bytes, uint32_t value)
 {
@@ -200,145 +125,11 @@ static uint32_t art_stamp(const char *path, uint32_t first, uint32_t second, uin
     return hash_update(hash, numbers, sizeof numbers);
 }
 
-static bool slot_of(const CoverState *state, uint32_t offset, uint32_t *slot)
-{
-    const CoverLayout *layout = &state->layout;
-    if (offset < layout->records_start) {
-        return false;
-    }
-    uint32_t delta = offset - layout->records_start;
-    *slot = delta / COVER_BUILD_RECORD_BYTES;
-    return delta % COVER_BUILD_RECORD_BYTES == 0 && *slot < layout->slots;
-}
-
-static uint32_t offset_of(const CoverState *state, uint32_t position)
-{
-    return state->layout.records_start + state->slots[position] * COVER_BUILD_RECORD_BYTES;
-}
-
-static bool free_slot(CoverState *state, uint32_t *slot)
-{
-    while (state->next_slot < state->layout.slots && bit_set(state->used_slots, state->next_slot)) {
-        state->next_slot++;
-    }
-    *slot = state->next_slot;
-    return state->next_slot < state->layout.slots;
-}
-
-static void move_entry(CoverState *state, uint32_t from, uint32_t to)
-{
-    state->index[to] = state->index[from];
-    state->slots[to] = state->slots[from];
-}
-
-static uint32_t previous_count(const CoverJob *job, CoverLayout layout)
-{
-    uint8_t header[COVERS_HEADER_SIZE];
-    Covers covers;
-    if (job->previous.read == NULL || !covers_open(&covers, job->previous, job->capacity) ||
-        !job->previous.read(job->previous.context, 0, header, sizeof header)) {
-        return 0;
-    }
-    bool stamped = get32(header + STAMP_FIELD) == layout.stamps_start;
-    return stamped && covers.count <= layout.slots ? covers.count : 0;
-}
-
-static bool accept_entry(CoverState *state, CoverEntry entry, uint32_t offset)
-{
-    uint32_t slot = 0;
-    bool ordered = state->count == 0 || state->index[state->count - 1].key < entry.key;
-    if (!ordered || !slot_of(state, offset, &slot) || bit_set(state->used_slots, slot)) {
-        return false;
-    }
-    set_bit(state->used_slots, slot);
-    state->slots[state->count] = (uint16_t)slot;
-    state->index[state->count++] = entry;
-    return true;
-}
-
-static bool load_chunk(CoverState *state, const CoverJob *job, uint32_t first, uint32_t count)
-{
-    uint8_t entries[INDEX_CHUNK * COVERS_ENTRY_SIZE];
-    uint8_t stamps[INDEX_CHUNK * STAMP_BYTES];
-    ByteSource source = job->previous;
-    uint32_t entries_at = COVERS_HEADER_SIZE + first * COVERS_ENTRY_SIZE;
-    uint32_t stamps_at = state->layout.stamps_start + first * STAMP_BYTES;
-    if (!source.read(source.context, entries_at, entries, count * COVERS_ENTRY_SIZE) ||
-        !source.read(source.context, stamps_at, stamps, count * STAMP_BYTES)) {
-        return false;
-    }
-    for (uint32_t index = 0; index < count; index++) {
-        const uint8_t *entry = entries + index * COVERS_ENTRY_SIZE;
-        CoverEntry loaded = {get32(entry), get32(stamps + index * STAMP_BYTES)};
-        if (!accept_entry(state, loaded, get32(entry + 4))) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static void load_previous(CoverState *state, const CoverJob *job, uint32_t previous)
-{
-    bool loaded = true;
-    for (uint32_t first = 0; loaded && first < previous; first += INDEX_CHUNK) {
-        uint32_t count = previous - first < INDEX_CHUNK ? previous - first : INDEX_CHUNK;
-        loaded = load_chunk(state, job, first, count);
-    }
-    state->count = loaded ? state->count : 0;
-    state->kept = state->count;
-    clear(state->used_slots, bit_bytes(state->layout.slots));
-    clear(state->claimed, bit_bytes(state->count));
-}
-
-static bool find_kept(const CoverState *state, uint32_t key, uint32_t *position)
-{
-    uint32_t low = 0;
-    uint32_t high = state->kept;
-    while (low < high) {
-        uint32_t middle = low + (high - low) / 2;
-        uint32_t found = state->index[middle].key;
-        if (found == key) {
-            *position = middle;
-            return true;
-        }
-        low = found < key ? middle + 1 : low;
-        high = found < key ? high : middle;
-    }
-    return false;
-}
-
-static void drop_unclaimed(CoverState *state)
-{
-    uint32_t count = 0;
-    for (uint32_t index = 0; index < state->count; index++) {
-        if (bit_set(state->claimed, index)) {
-            move_entry(state, index, count++);
-        }
-    }
-    clear(state->claimed, bit_bytes(state->count));
-    state->count = count;
-}
-
-static void keep_present(CoverState *state, uint32_t albums)
-{
-    for (uint32_t album_index = 0; album_index < albums && state->kept > 0; album_index++) {
-        uint32_t position = 0;
-        if (find_kept(state, library_album_key(&state->library, album_index), &position)) {
-            set_bit(state->claimed, position);
-        }
-    }
-    drop_unclaimed(state);
-    state->kept = state->count;
-    for (uint32_t index = 0; index < state->count; index++) {
-        set_bit(state->used_slots, state->slots[index]);
-    }
-}
-
 static bool read_track_path(CoverState *state, uint32_t track_index, LibraryTrack *track)
 {
     state->path[0] = '/';
-    return library_read_track(&state->library, track_index, track) &&
-           library_read_string(&state->library, track->path, state->path + 1,
+    return library_read_track(state->library, track_index, track) &&
+           library_read_string(state->library, track->path, state->path + 1,
                                sizeof state->path - 1);
 }
 
@@ -538,148 +329,154 @@ static bool decode_art(CoverState *state, const ArtFile *art)
                               state->half) == COVER_IMAGE_OK;
 }
 
-static void pack_pixels(uint16_t *pixels, uint32_t count)
+static const uint8_t ZEROS[512] = {0};
+
+static bool appended(CoverState *state, SegmentStore *store, const void *bytes, uint32_t length)
 {
-    uint8_t *bytes = (uint8_t *)pixels;
-    for (uint32_t index = 0; index < count; index++) {
-        uint16_t value = pixels[index];
-        put16(bytes + index * 2, value);
-    }
+    SegmentResult result = segment_store_append(store, state->stream, bytes, length);
+    state->full_card |= result == SEGMENT_NO_SPACE || result == SEGMENT_FULL;
+    return result == SEGMENT_OK;
 }
 
-static bool write_record(CoverState *state, const CoverJob *job, uint32_t offset)
+static bool write_record(CoverState *state, SegmentStore *store, uint32_t slot)
 {
-    pack_pixels(state->full, COVER_FULL_PIXELS);
-    pack_pixels(state->half, COVER_HALF_PIXELS);
-    return write_bytes(job, offset, state->full, FULL_BYTES) &&
-           write_bytes(job, offset + FULL_BYTES, state->half, HALF_BYTES);
-}
-
-static bool record_slot(CoverState *state, bool known, uint32_t position, uint32_t *slot)
-{
-    if (known) {
-        *slot = state->slots[position];
-        return true;
-    }
-    return state->count < state->capacity && free_slot(state, slot);
-}
-
-static uint32_t append_entry(CoverState *state, uint32_t slot)
-{
-    uint32_t position = state->count++;
-    state->slots[position] = (uint16_t)slot;
-    set_bit(state->used_slots, slot);
-    return position;
-}
-
-static ScanResult place_cover(CoverState *state, const CoverJob *job, const ArtFile *art,
-                              CoverStats *stats)
-{
-    uint32_t position = 0;
-    uint32_t slot = 0;
-    bool known = find_kept(state, state->key, &position);
-    uint32_t stored = known ? state->index[position].stamp : 0;
-    if (stored != 0 && stored == art->stamp) {
-        set_bit(state->claimed, position);
-        stats->reused++;
-        return SCAN_OK;
-    }
-    if (!record_slot(state, known, position, &slot) || !decode_art(state, art)) {
-        stats->missing++;
-        return SCAN_OK;
-    }
-    if (!write_record(state, job, state->layout.records_start + slot * COVER_BUILD_RECORD_BYTES)) {
-        return SCAN_WRITE_FAILED;
-    }
-    position = known ? position : append_entry(state, slot);
-    state->index[position] = (CoverEntry){state->key, art->stamp};
-    set_bit(state->claimed, position);
-    return SCAN_OK;
-}
-
-static ScanResult cover_album(CoverState *state, const CoverJob *job, CoverStats *stats)
-{
-    ArtFile art;
-    if (!open_art(state, job, &art)) {
-        stats->missing++;
-        return SCAN_OK;
-    }
-    ScanResult result = place_cover(state, job, &art, stats);
-    job->files.close_file(job->files.context);
-    return result;
-}
-
-static bool already_placed(const CoverState *state, uint32_t key)
-{
-    uint32_t position = 0;
-    if (find_kept(state, key, &position)) {
-        return bit_set(state->claimed, position);
-    }
-    for (uint32_t index = state->kept; index < state->count; index++) {
-        if (state->index[index].key == key) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static void sort_index(CoverState *state)
-{
-    for (uint32_t index = 1; index < state->count; index++) {
-        CoverEntry entry = state->index[index];
-        uint16_t slot = state->slots[index];
-        uint32_t position = index;
-        while (position > 0 && state->index[position - 1].key > entry.key) {
-            move_entry(state, position - 1, position);
-            position--;
-        }
-        state->index[position] = entry;
-        state->slots[position] = slot;
-    }
-}
-
-static void pack_entry(const CoverState *state, uint32_t position, uint8_t *bytes, bool stamps)
-{
-    if (stamps) {
-        put32(bytes, state->index[position].stamp);
-        return;
-    }
-    put32(bytes, state->index[position].key);
-    put32(bytes + 4, offset_of(state, position));
-}
-
-static bool write_table(const CoverState *state, const CoverJob *job, bool stamps)
-{
-    uint8_t chunk[INDEX_CHUNK * COVERS_ENTRY_SIZE];
-    uint32_t width = stamps ? STAMP_BYTES : COVERS_ENTRY_SIZE;
-    uint32_t start = stamps ? state->layout.stamps_start : COVERS_HEADER_SIZE;
-    for (uint32_t first = 0; first < state->count; first += INDEX_CHUNK) {
-        uint32_t count = state->count - first < INDEX_CHUNK ? state->count - first : INDEX_CHUNK;
-        for (uint32_t index = 0; index < count; index++) {
-            pack_entry(state, first + index, chunk + index * width, stamps);
-        }
-        if (!write_bytes(job, start + first * width, chunk, count * width)) {
+    uint32_t offset = covers_offset(slot);
+    uint32_t length = segment_store_working_length(store, state->stream);
+    while (length < offset) {
+        uint32_t step = offset - length < sizeof ZEROS ? offset - length : sizeof ZEROS;
+        if (!appended(state, store, ZEROS, step)) {
             return false;
         }
+        length += step;
     }
-    return true;
+    uint8_t *full = (uint8_t *)state->full;
+    uint8_t *half = (uint8_t *)state->half;
+    for (uint32_t index = 0; index < COVER_FULL_PIXELS; index++) {
+        put16(full + index * 2, state->full[index]);
+    }
+    for (uint32_t index = 0; index < COVER_HALF_PIXELS; index++) {
+        put16(half + index * 2, state->half[index]);
+    }
+    return length == offset && appended(state, store, full, COVER_FULL_BYTES) &&
+           appended(state, store, half, COVER_HALF_BYTES);
 }
 
-static bool clear_header(const CoverJob *job)
+static bool copy_record(CoverState *state, SegmentStore *store, uint32_t from, uint32_t slot)
 {
-    uint8_t header[COVERS_HEADER_SIZE] = {0};
-    return write_bytes(job, 0, header, sizeof header);
+    uint32_t offset = covers_offset(from);
+    return segment_store_read(store, state->old.stream, offset, state->full, COVER_FULL_BYTES) &&
+           segment_store_read(store, state->old.stream, offset + COVER_FULL_BYTES, state->half,
+                              COVER_HALF_BYTES) &&
+           write_record(state, store, slot);
 }
 
-static bool write_header(const CoverState *state, const CoverJob *job)
+static uint8_t *take(uint8_t **cursor, uint8_t *end, uint32_t bytes)
 {
-    uint8_t header[COVERS_HEADER_SIZE] = {'E', 'M', 'C', 'V'};
-    put16(header + 4, COVERS_VERSION);
-    put16(header + 6, state->count);
-    put16(header + 8, COVER_FULL_SIZE);
-    put16(header + 10, COVER_HALF_SIZE);
-    put32(header + STAMP_FIELD, state->layout.stamps_start);
-    return write_bytes(job, 0, header, sizeof header);
+    uintptr_t address = (uintptr_t)*cursor;
+    uint8_t *start = *cursor + (ALIGNMENT - address % ALIGNMENT) % ALIGNMENT;
+    if (start > end || (uint32_t)(end - start) < bytes) {
+        return NULL;
+    }
+    *cursor = start + bytes;
+    return start;
+}
+
+static void rows_open(Rows *rows, ByteSource source, uint32_t start, uint32_t count, uint32_t size)
+{
+    *rows = (Rows){.source = source, .start = start, .count = count, .size = size};
+}
+
+static const uint8_t *row_at(Rows *rows, uint32_t index)
+{
+    if (index >= rows->count) {
+        return NULL;
+    }
+    if (index < rows->first || index >= rows->first + rows->filled) {
+        uint32_t left = rows->count - index;
+        uint32_t take_rows = left < ROWS_CHUNK ? left : ROWS_CHUNK;
+        if (!rows->source.read(rows->source.context, rows->start + index * rows->size, rows->bytes,
+                               take_rows * rows->size)) {
+            return NULL;
+        }
+        rows->first = index;
+        rows->filled = take_rows;
+    }
+    return rows->bytes + (index - rows->first) * rows->size;
+}
+
+static uint64_t key_of(const uint8_t *row)
+{
+    return (uint64_t)get32(row + 4) << 32 | get32(row);
+}
+
+static void open_old(CoverState *state, SegmentStore *store)
+{
+    OldCovers *old = &state->old;
+    SegmentRegion library = segment_store_region(store, LIBRARY_REGION_INDEX);
+    SegmentRegion table = segment_store_region(store, LIBRARY_REGION_ALBUM_COVERS);
+    uint32_t stream = segment_store_value(store, LIBRARY_VALUE_COVERS);
+    old->stream = (uint8_t)stream;
+    old->slots = segment_store_value(store, LIBRARY_VALUE_COVER_SLOTS);
+    old->library_io = (SegmentStreamIo){.store = store, .stream = LIBRARY_STREAM_INDEX};
+    old->rows_io = (SegmentStreamIo){.store = store, .stream = LIBRARY_STREAM_ALBUM_COVERS};
+    rows_open(&old->keys, segment_stream_source(&old->library_io), 0, 0, KEY_BYTES);
+    rows_open(&old->rows, segment_stream_source(&old->rows_io), 0, 0, ROW_BYTES);
+    old->position = 0;
+    bool usable = library.stream == LIBRARY_STREAM_INDEX && segment_store_found(store) &&
+                  table.stream == LIBRARY_STREAM_ALBUM_COVERS &&
+                  (stream == LIBRARY_STREAM_COVERS || stream == LIBRARY_STREAM_OTHER_COVERS) &&
+                  library_open(&old->library, segment_stream_source(&old->library_io),
+                               library.length) == LIBRARY_OK &&
+                  table.length == old->library.album_keys.count * ROW_BYTES;
+    if (!usable) {
+        old->stream = LIBRARY_STREAM_COVERS;
+        old->slots = 0;
+        return;
+    }
+    rows_open(&old->keys, old->library.source, old->library.album_keys.offset,
+              old->library.album_keys.count, KEY_BYTES);
+    rows_open(&old->rows, segment_stream_source(&old->rows_io), 0, old->library.album_keys.count,
+              ROW_BYTES);
+}
+
+static bool old_cover(CoverState *state, uint64_t key, uint32_t *slot, uint32_t *stamp)
+{
+    OldCovers *old = &state->old;
+    const uint8_t *row = row_at(&old->keys, old->position);
+    while (row != NULL && key_of(row) < key) {
+        row = row_at(&old->keys, ++old->position);
+    }
+    if (row == NULL || key_of(row) != key) {
+        return false;
+    }
+    const uint8_t *cover = row_at(&old->rows, old->position);
+    if (cover == NULL) {
+        return false;
+    }
+    *slot = get32(cover);
+    *stamp = get32(cover + 4);
+    return *slot < old->slots && *stamp != 0;
+}
+
+static ScanResult flush_rows(CoverState *state, SegmentStore *store)
+{
+    SegmentResult result =
+        state->out_used == 0
+            ? SEGMENT_OK
+            : segment_store_append(store, LIBRARY_STREAM_ALBUM_COVERS, state->out, state->out_used);
+    state->out_used = 0;
+    if (result == SEGMENT_NO_SPACE || result == SEGMENT_FULL) {
+        return SCAN_NO_ROOM;
+    }
+    return result == SEGMENT_OK ? SCAN_OK : SCAN_WRITE_FAILED;
+}
+
+static ScanResult put_row(CoverState *state, SegmentStore *store, uint32_t slot, uint32_t stamp)
+{
+    put32(state->out + state->out_used, slot);
+    put32(state->out + state->out_used + 4, stamp);
+    state->out_used += ROW_BYTES;
+    return state->out_used == sizeof state->out ? flush_rows(state, store) : SCAN_OK;
 }
 
 static void report(const CoverJob *job, uint32_t done, uint32_t total)
@@ -689,71 +486,141 @@ static void report(const CoverJob *job, uint32_t done, uint32_t total)
     }
 }
 
-static ScanResult build_albums(CoverState *state, const CoverJob *job, CoverStats *stats)
+static bool new_slot(CoverState *state, uint32_t *slot)
 {
-    for (uint32_t album_index = 0; album_index < stats->albums; album_index++) {
-        report(job, album_index, stats->albums);
-        state->key = library_album_key(&state->library, album_index);
-        if (!library_read_album(&state->library, album_index, &state->album) ||
-            already_placed(state, state->key)) {
-            continue;
+    if (state->full_card) {
+        return false;
+    }
+    *slot = state->slots++;
+    return true;
+}
+
+static bool place(CoverState *state, const CoverJob *job, const ArtFile *art, uint64_t key,
+                  uint32_t *slot, CoverStats *stats)
+{
+    uint32_t old_slot = 0;
+    uint32_t old_stamp = 0;
+    if (old_cover(state, key, &old_slot, &old_stamp) && old_stamp == art->stamp) {
+        stats->reused++;
+        if (!state->compact) {
+            *slot = old_slot;
+            return true;
         }
-        ScanResult result = cover_album(state, job, stats);
+        return new_slot(state, slot) && copy_record(state, job->store, old_slot, *slot);
+    }
+    return decode_art(state, art) && new_slot(state, slot) &&
+           write_record(state, job->store, *slot);
+}
+
+static void cover_album(CoverState *state, const CoverJob *job, uint32_t album, uint64_t key,
+                        uint32_t row[2], CoverStats *stats)
+{
+    ArtFile art;
+    row[0] = COVER_NONE;
+    row[1] = 0;
+    if (library_read_album(state->library, album, &state->album) && open_art(state, job, &art)) {
+        if (place(state, job, &art, key, &row[0], stats)) {
+            row[1] = art.stamp;
+            stats->covers++;
+        } else {
+            row[0] = COVER_NONE;
+        }
+        job->files.close_file(job->files.context);
+    }
+    stats->missing += row[0] == COVER_NONE;
+}
+
+static ScanResult walk(CoverState *state, const CoverJob *job, CoverStats *stats)
+{
+    uint64_t last_key = 0;
+    uint32_t row[2] = {COVER_NONE, 0};
+    for (uint32_t position = 0; position < state->new_keys.count; position++) {
+        report(job, position, stats->albums);
+        const uint8_t *entry = row_at(&state->new_keys, position);
+        if (entry == NULL) {
+            return SCAN_WRITE_FAILED;
+        }
+        uint64_t key = key_of(entry);
+        if (position == 0 || key != last_key) {
+            cover_album(state, job, get32(entry + 8), key, row, stats);
+        }
+        ScanResult result = put_row(state, job->store, row[0], row[1]);
         if (result != SCAN_OK) {
             return result;
         }
+        last_key = key;
     }
     report(job, stats->albums, stats->albums);
-    return SCAN_OK;
+    return flush_rows(state, job->store);
 }
 
-static ScanResult finish(CoverState *state, const CoverJob *job, CoverStats *stats,
-                         ScanResult result)
+static CoverState *prepare(const CoverJob *job)
 {
-    drop_unclaimed(state);
-    sort_index(state);
-    stats->covers = state->count;
-    if (result == SCAN_OK && (!write_table(state, job, false) || !write_table(state, job, true) ||
-                              !write_header(state, job))) {
-        result = SCAN_WRITE_FAILED;
+    uint8_t *cursor = job->memory;
+    uint8_t *end = cursor + job->size;
+    CoverState *state = (CoverState *)take(&cursor, end, sizeof(CoverState));
+    if (state == NULL) {
+        return NULL;
     }
-    return result;
-}
-
-static CoverState *start(const CoverJob *job, uint32_t albums, CoverLayout layout)
-{
-    uint32_t previous = previous_count(job, layout);
-    CoverState *state = prepare(job, albums, layout, previous);
-    if (state == NULL && previous > 0) {
-        previous = 0;
-        state = prepare(job, albums, layout, previous);
-    }
-    if (state != NULL) {
-        load_previous(state, job, previous);
-    }
+    state->library = job->library;
+    state->decode_memory = cursor;
+    state->decode_size = (uint32_t)(end - cursor);
+    state->out_used = 0;
+    state->full_card = false;
     return state;
+}
+
+static void choose_stream(CoverState *state, SegmentStore *store)
+{
+    uint32_t live = state->old.library.album_keys.count;
+    uint32_t garbage = state->old.slots > live ? state->old.slots - live : 0;
+    state->compact = state->old.slots > 0 && garbage * GARBAGE_SHARE > state->old.slots;
+    state->stream = state->old.stream;
+    state->slots = state->old.slots;
+    if (state->compact || state->old.slots == 0) {
+        state->stream = state->old.stream == LIBRARY_STREAM_COVERS ? LIBRARY_STREAM_OTHER_COVERS
+                                                                   : LIBRARY_STREAM_COVERS;
+        state->slots = 0;
+        segment_store_start(store, state->stream, SEGMENT_POOL_COVERS);
+    }
+}
+
+static void undo(SegmentStore *store)
+{
+    segment_store_keep(store, LIBRARY_STREAM_COVERS);
+    segment_store_keep(store, LIBRARY_STREAM_OTHER_COVERS);
+    segment_store_start(store, LIBRARY_STREAM_ALBUM_COVERS, SEGMENT_POOL_LIBRARY);
+    segment_store_set_region(store, LIBRARY_REGION_ALBUM_COVERS,
+                             (SegmentRegion){.stream = LIBRARY_STREAM_ALBUM_COVERS});
 }
 
 ScanResult cover_build(const CoverJob *job, CoverStats *stats)
 {
     *stats = (CoverStats){.albums = 0, .covers = 0, .reused = 0, .missing = 0};
-    Library probe;
-    if (library_open(&probe, job->library, job->library_size) != LIBRARY_OK) {
-        return SCAN_NO_MUSIC_ROOT;
-    }
-    stats->albums = library_count(&probe, LIBRARY_ALBUMS);
-    CoverLayout layout = layout_for(job->capacity);
-    CoverState *state = start(job, stats->albums, layout);
+    CoverState *state = prepare(job);
     if (state == NULL) {
         return SCAN_OUT_OF_MEMORY;
     }
-    if (layout.slots == 0 && stats->albums > 0) {
-        return SCAN_NO_ROOM;
+    SegmentStore *store = job->store;
+    stats->albums = library_count(job->library, LIBRARY_ALBUMS);
+    rows_open(&state->new_keys, job->library->source, job->library->album_keys.offset,
+              job->library->album_keys.count, KEY_BYTES);
+    open_old(state, store);
+    choose_stream(state, store);
+    segment_store_start(store, LIBRARY_STREAM_ALBUM_COVERS, SEGMENT_POOL_LIBRARY);
+    ScanResult result = walk(state, job, stats);
+    if (result != SCAN_OK) {
+        undo(store);
+        return result;
     }
-    state->library = probe;
-    keep_present(state, stats->albums);
-    if (!clear_header(job)) {
-        return SCAN_WRITE_FAILED;
+    if (state->stream != state->old.stream) {
+        segment_store_drop(store, state->old.stream);
     }
-    return finish(state, job, stats, build_albums(state, job, stats));
+    segment_store_set_region(store, LIBRARY_REGION_ALBUM_COVERS,
+                             (SegmentRegion){.stream = LIBRARY_STREAM_ALBUM_COVERS,
+                                             .offset = 0,
+                                             .length = stats->albums * ROW_BYTES});
+    segment_store_set_value(store, LIBRARY_VALUE_COVERS, state->stream);
+    segment_store_set_value(store, LIBRARY_VALUE_COVER_SLOTS, state->slots);
+    return state->full_card ? SCAN_NO_ROOM : SCAN_OK;
 }

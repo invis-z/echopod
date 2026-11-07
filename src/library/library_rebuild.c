@@ -31,8 +31,33 @@ static ScanResult store_result(ScanResult result, const SegmentResult *results, 
     return result;
 }
 
-ScanResult library_rebuild(const RebuildJob *job, ScanStats *stats)
+static bool read_working(void *context, uint32_t offset, void *buffer, uint32_t length)
 {
+    return segment_store_read_working(context, LIBRARY_STREAM_INDEX, offset, buffer, length);
+}
+
+static ScanResult build_covers(const RebuildJob *job, RebuildStats *stats)
+{
+    Library library;
+    SegmentStore *store = job->store;
+    ByteSource source = {read_working, store};
+    if (library_open(&library, source, stats->scan.length) != LIBRARY_OK) {
+        return SCAN_WRITE_FAILED;
+    }
+    CoverJob covers = {.files = job->scan.files,
+                       .library = &library,
+                       .store = store,
+                       .memory = job->scan.memory,
+                       .size = job->scan.size,
+                       .progress = job->covers};
+    return cover_build(&covers, &stats->covers);
+}
+
+ScanResult library_rebuild(const RebuildJob *job, RebuildStats *rebuild)
+{
+    ScanStats *stats = &rebuild->scan;
+    rebuild->cover_result = SCAN_OK;
+    rebuild->covers = (CoverStats){.albums = 0};
     SegmentStore *store = job->store;
     uintptr_t start = (uintptr_t)job->scan.memory;
     uint32_t skip = (uint32_t)((ALIGNMENT - start % ALIGNMENT) % ALIGNMENT);
@@ -73,6 +98,7 @@ ScanResult library_rebuild(const RebuildJob *job, ScanStats *stats)
             (SegmentRegion){.stream = LIBRARY_STREAM_INDEX, .offset = 0, .length = stats->length});
         segment_store_set_value(store, LIBRARY_VALUE_RECORDS, next);
         segment_store_drop(store, previous);
+        rebuild->cover_result = build_covers(job, rebuild);
         results[3] = segment_store_commit(store);
         result = results[3] == SEGMENT_OK ? SCAN_OK : SCAN_WRITE_FAILED;
     }

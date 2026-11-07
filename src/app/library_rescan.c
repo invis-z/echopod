@@ -2,7 +2,6 @@
 
 #include <stddef.h>
 
-#include "card_files.h"
 #include "core/i18n.h"
 #include "core/string_builder.h"
 #include "cover_cache.h"
@@ -26,19 +25,16 @@ enum {
     TIME_LIST,
     TIME_OPEN,
     TIME_READ,
-    TIME_WRITE,
     TIME_TOTAL,
     TIME_KINDS,
-    RESCAN_PASSES = 2,
-    TIME_SLOTS = RESCAN_PASSES * TIME_KINDS
+    TIME_SLOTS = TIME_KINDS
 };
 
 static uint32_t spent[TIME_SLOTS * 2];
-static uint32_t pass;
 
 static void spend(uint32_t kind, uint32_t since)
 {
-    uint32_t slot = pass * TIME_KINDS + kind;
+    uint32_t slot = kind;
     spent[slot] += hal_clock_microseconds() - since;
     spent[TIME_SLOTS + slot]++;
 }
@@ -46,7 +42,6 @@ static void spend(uint32_t kind, uint32_t since)
 typedef struct RescanFiles {
     HalDir dir;
     HalFile file;
-    HalFile covers;
     HalDirEntry entry;
     RescanProgress progress;
     const char *folder;
@@ -122,14 +117,6 @@ static void close_file(void *context)
     hal_file_close(&files->file);
 }
 
-static bool timed_write(const char *path, uint32_t offset, const void *bytes, uint32_t length)
-{
-    uint32_t since = hal_clock_microseconds();
-    bool written = hal_file_write_at(path, offset, bytes, length);
-    spend(TIME_WRITE, since);
-    return written;
-}
-
 static void report(void *context, uint32_t files, uint32_t tracks)
 {
     RescanFiles *rescan = context;
@@ -139,13 +126,6 @@ static void report(void *context, uint32_t files, uint32_t tracks)
     }
 }
 
-static bool write_covers(void *context, uint32_t offset, const void *bytes, uint32_t length)
-{
-    (void)context;
-    hal_system_keep_alive();
-    return timed_write(COVER_CACHE_PATH, offset, bytes, length);
-}
-
 static void report_covers(void *context, uint32_t done, uint32_t total)
 {
     RescanFiles *rescan = context;
@@ -153,22 +133,6 @@ static void report_covers(void *context, uint32_t done, uint32_t total)
     if (rescan->progress.covers != NULL) {
         rescan->progress.covers(done, total);
     }
-}
-
-static uint32_t reserved_size_of(const char *path)
-{
-    HalFile file;
-    if (!hal_file_open(&file, path)) {
-        return 0;
-    }
-    uint32_t size = file.size;
-    hal_file_close(&file);
-    return size;
-}
-
-static ScanResult unopened(const char *path)
-{
-    return card_files_reserve(path) == HAL_RESERVE_NO_SPACE ? SCAN_NO_ROOM : SCAN_CARD_UNREADABLE;
 }
 
 static bool music_root_exists(void)
@@ -181,66 +145,18 @@ static bool music_root_exists(void)
     return true;
 }
 
-static bool read_library(void *context, uint32_t offset, void *buffer, uint32_t length)
-{
-    hal_system_keep_alive();
-    uint32_t since = hal_clock_microseconds();
-    bool read = segment_store_read(context, LIBRARY_STREAM_INDEX, offset, buffer, length);
-    spend(TIME_READ, since);
-    return read;
-}
-
-static ScanResult build_covers(const LibraryScanEntry *entry, const ScanJob *scan,
-                               SegmentStore *store, CoverStats *stats)
-{
-    RescanFiles *files = scan->files.context;
-    uint32_t capacity = reserved_size_of(COVER_CACHE_PATH);
-    *stats = (CoverStats){.albums = 0, .covers = 0, .reused = 0, .missing = 0};
-    if (capacity == 0) {
-        return unopened(COVER_CACHE_PATH);
-    }
-    ByteSource source = {read_library, store};
-    uint32_t size = segment_store_region(store, LIBRARY_REGION_INDEX).length;
-    Library library;
-    if (library_open(&library, source, size) == LIBRARY_OK) {
-        card_files_fit_covers(library_count(&library, LIBRARY_ALBUMS));
-        capacity = reserved_size_of(COVER_CACHE_PATH);
-    }
-    bool previous = hal_file_open(&files->covers, COVER_CACHE_PATH);
-    CoverJob job = {
-        .files = scan->files,
-        .library = source,
-        .library_size = size,
-        .sink = {write_covers, NULL},
-        .previous = {previous ? read_handle : NULL, &files->covers},
-        .capacity = capacity,
-        .memory = scan->memory,
-        .size = scan->size,
-        .progress = {report_covers, files},
-    };
-    ScanResult result = entry->covers(&job, stats);
-    if (previous) {
-        hal_file_close(&files->covers);
-    }
-    return result;
-}
-
 static void run_passes(const LibraryScanEntry *entry, const RebuildJob *job, RescanOutcome *outcome)
 {
     for (uint32_t slot = 0; slot < TIME_SLOTS * 2; slot++) {
         spent[slot] = 0;
     }
-    pass = 0;
     uint32_t since = hal_clock_microseconds();
-    outcome->result =
-        job->scan.memory != NULL ? entry->rebuild(job, &outcome->stats) : SCAN_NO_SCRATCH;
+    RebuildStats stats = {.cover_result = SCAN_OK};
+    outcome->result = job->scan.memory != NULL ? entry->rebuild(job, &stats) : SCAN_NO_SCRATCH;
     spend(TIME_TOTAL, since);
-    if (outcome->result == SCAN_OK) {
-        pass = 1;
-        since = hal_clock_microseconds();
-        outcome->cover_result = build_covers(entry, &job->scan, job->store, &outcome->covers);
-        spend(TIME_TOTAL, since);
-    }
+    outcome->stats = stats.scan;
+    outcome->cover_result = stats.cover_result;
+    outcome->covers = stats.covers;
     (void)hal_file_write(RESCAN_TIMES_PATH, spent, sizeof spent);
 }
 
@@ -281,6 +197,7 @@ RescanOutcome library_rescan_run(LibraryStore *store, RescanProgress progress)
                 .progress = {report, &files},
             },
         .store = &store->segments,
+        .covers = {report_covers, &files},
     };
     run_passes(entry, &job, &outcome);
     hal_system_return_scratch();

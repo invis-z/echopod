@@ -52,15 +52,16 @@ static void a_full_list_refuses_new_favorites(void)
 static void favorites_survive_a_round_trip(void)
 {
     Favorites *list = empty_favorites();
-    favorites_toggle(list, 0xDEADBEEFu);
+    favorites_toggle(list, UINT64_C(0xDEADBEEF01234567));
     favorites_toggle(list, 7);
     uint8_t bytes[FAVORITES_FILE_CAPACITY];
     uint32_t length = favorites_encode(list, bytes);
-    CHECK_EQUAL(HEADER_BYTES + 2 * 4 + 4, length);
+    CHECK_EQUAL(HEADER_BYTES + 2 * 8 + 4, length);
     Favorites decoded;
     CHECK(favorites_decode(bytes, length, &decoded));
     CHECK_EQUAL(2, decoded.count);
-    CHECK(favorites_contains(&decoded, 0xDEADBEEFu));
+    CHECK(favorites_contains(&decoded, UINT64_C(0xDEADBEEF01234567)));
+    CHECK(!favorites_contains(&decoded, 0x01234567u));
     CHECK(favorites_contains(&decoded, 7));
 }
 

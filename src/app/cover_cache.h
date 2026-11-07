@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 #include "gfx/image.h"
-#include "hal/storage.h"
 #include "library/covers.h"
 #include "library/library.h"
 #include "ui/cover_flow.h"
@@ -28,7 +27,6 @@ typedef struct CoverSlot {
 
 typedef struct CoverCache {
     const Library *library;
-    HalFile file;
     Covers covers;
     bool available;
     CoverSlot halves[COVER_CACHE_SLOTS];
@@ -37,9 +35,7 @@ typedef struct CoverCache {
     Color full[COVER_FULL_PIXELS];
 } CoverCache;
 
-extern const char COVER_CACHE_PATH[];
-
-void cover_cache_open(CoverCache *cache, const Library *library);
+void cover_cache_open(CoverCache *cache, const Library *library, const SegmentStore *store);
 void cover_cache_close(CoverCache *cache);
 CoverState cover_cache_half(const CoverCache *cache, int position, uint32_t album, Image *image);
 CoverState cover_cache_full(const CoverCache *cache, uint32_t album, Image *image);

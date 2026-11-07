@@ -3,10 +3,13 @@
 #include <string.h>
 
 #include "check.h"
+#include "fake_card.h"
 #include "library/cover_build.h"
 #include "library/covers.h"
 #include "library/library.h"
+#include "library/library_rebuild.h"
 #include "library/library_scan.h"
+#include "library/segment_stream.h"
 
 enum {
     MAX_FILES = 24,
@@ -16,10 +19,6 @@ enum {
     PNG_RAW = COVER_SIDE * PNG_ROW,
     PNG_CAPACITY = PNG_RAW + 128,
     MEMORY_SIZE = 384 * 1024,
-    LIBRARY_CAPACITY = 4 * 1024 * 1024,
-    COVERS_CAPACITY = 1024 * 1024,
-    SCRATCH_SIZE = 16 * 1024 * 1024,
-    RECORD_SLOT = 8 + 4 + COVER_BUILD_RECORD_BYTES,
     MAX_OGGS = 14,
     OGG_CAPACITY = 128 * 1024,
     PAGE_SEGMENTS = 4,
@@ -72,16 +71,9 @@ typedef struct OggWriter {
     uint32_t sequence;
 } OggWriter;
 
-typedef struct Buffer {
-    uint8_t *bytes;
-    uint32_t capacity;
-} Buffer;
-
 static Card card;
-static Buffer library_file;
-static Buffer covers_file;
-static Buffer scratch_file;
-static uint32_t covers_capacity = COVERS_CAPACITY;
+static FakeCard segment_card;
+static SegmentStore store;
 
 static bool child_of(const char *dir, const char *path, char *name, bool *directory)
 {
@@ -171,26 +163,6 @@ static bool card_open_file(void *context, const char *path, ByteSource *source, 
 static void card_close_file(void *context)
 {
     (void)context;
-}
-
-static bool buffer_read(void *context, uint32_t offset, void *bytes, uint32_t length)
-{
-    const Buffer *buffer = context;
-    if (offset > buffer->capacity || length > buffer->capacity - offset) {
-        return false;
-    }
-    memcpy(bytes, buffer->bytes + offset, length);
-    return true;
-}
-
-static bool buffer_write(void *context, uint32_t offset, const void *bytes, uint32_t length)
-{
-    Buffer *buffer = context;
-    if (offset > buffer->capacity || length > buffer->capacity - offset) {
-        return false;
-    }
-    memcpy(buffer->bytes + offset, bytes, length);
-    return true;
 }
 
 static uint8_t *put_be32(uint8_t *at, uint32_t value)
@@ -455,55 +427,45 @@ static void reset(void)
 {
     if (card.flac == NULL) {
         card.flac = read_fixture("tags/untagged.flac", &card.flac_size);
-        library_file = (Buffer){calloc(LIBRARY_CAPACITY, 1), LIBRARY_CAPACITY};
-        covers_file = (Buffer){calloc(COVERS_CAPACITY, 1), COVERS_CAPACITY};
-        scratch_file = (Buffer){calloc(SCRATCH_SIZE, 1), SCRATCH_SIZE};
+    } else {
+        fake_card_free(&segment_card);
     }
+    fake_card_init(&segment_card, UINT64_MAX);
     card.count = 0;
     card.png_count = 0;
     card.ogg_count = 0;
-    covers_capacity = COVERS_CAPACITY;
-    memset(covers_file.bytes, 0, COVERS_CAPACITY);
 }
 
-static ScanResult rescan(bool keep, CoverStats *stats)
+static ScanResult rescan(CoverStats *stats)
 {
     static uint8_t memory[MEMORY_SIZE];
     ScanFileSystem files = {card_open_dir,  card_next_entry, card_close_dir,
                             card_open_file, card_close_file, NULL};
-    ScanStats scan_stats;
-    memset(library_file.bytes, 0, LIBRARY_CAPACITY);
-    ScanJob scan = {.files = files,
-                    .memory = memory,
-                    .size = sizeof memory,
-                    .scratch = {buffer_read, buffer_write, &scratch_file, SCRATCH_SIZE},
-                    .sink = {buffer_write, &library_file},
-                    .capacity = LIBRARY_CAPACITY};
-    CHECK_EQUAL(SCAN_OK, library_scan(&scan, &scan_stats));
-    covers_file.capacity = covers_capacity;
-    CoverJob job = {.files = files,
-                    .library = {buffer_read, &library_file},
-                    .library_size = LIBRARY_CAPACITY,
-                    .sink = {buffer_write, &covers_file},
-                    .previous = {keep ? buffer_read : NULL, &covers_file},
-                    .capacity = covers_capacity,
-                    .memory = memory,
-                    .size = sizeof memory};
-    return cover_build(&job, stats);
+    segment_store_open(&store, fake_card_files(&segment_card));
+    RebuildJob job = {.scan = {.files = files, .memory = memory, .size = sizeof memory},
+                      .store = &store};
+    RebuildStats rebuild;
+    ScanResult result = library_rebuild(&job, &rebuild);
+    *stats = rebuild.covers;
+    return result == SCAN_OK ? rebuild.cover_result : result;
 }
 
-static uint32_t album_key(const char *title)
+static SegmentStreamIo library_io;
+static Library library;
+
+static uint32_t album_named(const char *title)
 {
-    Library library;
+    SegmentRegion region = segment_store_region(&store, LIBRARY_REGION_INDEX);
+    library_io = (SegmentStreamIo){.store = &store, .stream = region.stream};
     CHECK_EQUAL(LIBRARY_OK,
-                library_open(&library, (ByteSource){buffer_read, &library_file}, LIBRARY_CAPACITY));
+                library_open(&library, segment_stream_source(&library_io), region.length));
     for (uint32_t index = 0; index < library_count(&library, LIBRARY_ALBUMS); index++) {
         LibraryAlbum album;
         char text[PATH_CAPACITY];
         CHECK(library_read_album(&library, index, &album));
         CHECK(library_read_string(&library, album.title, text, sizeof text));
         if (strcmp(text, title) == 0) {
-            return library_album_key(&library, index);
+            return index;
         }
     }
     CHECK(false);
@@ -513,14 +475,20 @@ static uint32_t album_key(const char *title)
 static uint16_t cover_pixel(const char *title)
 {
     static uint16_t pixels[COVER_FULL_PIXELS];
+    uint32_t album = album_named(title);
+    uint32_t rank = 0;
     Covers covers;
-    uint32_t record = 0;
-    CHECK(covers_open(&covers, (ByteSource){buffer_read, &covers_file}, covers_capacity));
-    if (!covers_find(&covers, album_key(title), &record)) {
+    CHECK(covers_open(&covers, &store));
+    CHECK(library_album_rank(&library, album, &rank));
+    if (!covers_read(&covers, rank, COVER_FULL, pixels)) {
         return 0;
     }
-    CHECK(covers_read(&covers, record, COVER_FULL, pixels));
     return pixels[COVER_FULL_PIXELS / 2];
+}
+
+static uint32_t cover_stream(void)
+{
+    return segment_store_value(&store, LIBRARY_VALUE_COVERS);
 }
 
 static void three_albums(void)
@@ -535,7 +503,7 @@ static void the_first_build_decodes_every_album(void)
 {
     CoverStats stats;
     three_albums();
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(3u, stats.albums);
     CHECK_EQUAL(3u, stats.covers);
     CHECK_EQUAL(0u, stats.reused);
@@ -548,8 +516,8 @@ static void an_unchanged_card_reuses_every_cover(void)
 {
     CoverStats stats;
     three_albums();
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(3u, stats.covers);
     CHECK_EQUAL(3u, stats.reused);
     CHECK_EQUAL(0u, stats.missing);
@@ -562,9 +530,9 @@ static void a_new_album_is_the_only_one_decoded(void)
 {
     CoverStats stats;
     three_albums();
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     add_album("Delta", WHITE);
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(4u, stats.covers);
     CHECK_EQUAL(3u, stats.reused);
     CHECK_EQUAL(WHITE.pixel, cover_pixel("Delta"));
@@ -575,25 +543,23 @@ static void replaced_art_is_decoded_again(void)
 {
     CoverStats stats;
     three_albums();
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     replace_cover("Beta", WHITE);
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(3u, stats.covers);
     CHECK_EQUAL(2u, stats.reused);
     CHECK_EQUAL(WHITE.pixel, cover_pixel("Beta"));
     CHECK_EQUAL(RED.pixel, cover_pixel("Alpha"));
 }
 
-static void a_removed_album_frees_its_place_for_a_new_one(void)
+static void a_removed_album_loses_its_cover_and_keeps_the_others(void)
 {
     CoverStats stats;
     three_albums();
-    covers_capacity = COVERS_HEADER_SIZE + 3 * RECORD_SLOT;
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
-    CHECK_EQUAL(3u, stats.covers);
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     remove_album("Beta");
     add_album("Delta", WHITE);
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(3u, stats.covers);
     CHECK_EQUAL(2u, stats.reused);
     CHECK_EQUAL(0u, stats.missing);
@@ -602,75 +568,57 @@ static void a_removed_album_frees_its_place_for_a_new_one(void)
     CHECK_EQUAL(BLUE.pixel, cover_pixel("Gamma"));
 }
 
-static void a_grown_file_is_built_again_with_room_for_every_album(void)
+static void replaced_covers_are_compacted_without_decoding(void)
 {
     CoverStats stats;
     three_albums();
-    covers_capacity = COVERS_HEADER_SIZE + 2 * RECORD_SLOT;
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
-    CHECK_EQUAL(2u, stats.covers);
-    CHECK_EQUAL(1u, stats.missing);
-    covers_capacity = COVERS_CAPACITY;
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
-    CHECK_EQUAL(3u, stats.covers);
-    CHECK_EQUAL(0u, stats.reused);
-    CHECK_EQUAL(0u, stats.missing);
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
+    uint32_t first = cover_stream();
+    replace_cover("Beta", WHITE);
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
+    CHECK_EQUAL(first, cover_stream());
+    CHECK_EQUAL(4u, segment_store_value(&store, LIBRARY_VALUE_COVER_SLOTS));
+    replace_cover("Gamma", RED);
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
+    CHECK_EQUAL(5u, segment_store_value(&store, LIBRARY_VALUE_COVER_SLOTS));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
+    CHECK(cover_stream() != first);
+    CHECK_EQUAL(3u, stats.reused);
+    CHECK_EQUAL(3u, segment_store_value(&store, LIBRARY_VALUE_COVER_SLOTS));
     CHECK_EQUAL(RED.pixel, cover_pixel("Alpha"));
+    CHECK_EQUAL(WHITE.pixel, cover_pixel("Beta"));
+    CHECK_EQUAL(RED.pixel, cover_pixel("Gamma"));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
+    CHECK_EQUAL(3u, stats.reused);
+    CHECK_EQUAL(3u, segment_store_value(&store, LIBRARY_VALUE_COVER_SLOTS));
+}
+
+static void a_full_card_keeps_the_old_library_and_its_covers(void)
+{
+    CoverStats stats;
+    three_albums();
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
+    add_album("Delta", WHITE);
+    segment_card.free_bytes = 0;
+    CHECK_EQUAL(SCAN_NO_ROOM, rescan(&stats));
+    segment_store_open(&store, fake_card_files(&segment_card));
+    CHECK_EQUAL(RED.pixel, cover_pixel("Alpha"));
+    CHECK_EQUAL(3u, library_count(&library, LIBRARY_ALBUMS));
     CHECK_EQUAL(GREEN.pixel, cover_pixel("Beta"));
     CHECK_EQUAL(BLUE.pixel, cover_pixel("Gamma"));
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
-    CHECK_EQUAL(3u, stats.reused);
 }
 
 static void an_album_without_art_loses_its_cover(void)
 {
     CoverStats stats;
     three_albums();
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     remove_album("Beta");
     add_file("/Beta/01.flac", card.flac, card.flac_size);
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(2u, stats.covers);
     CHECK_EQUAL(1u, stats.missing);
     CHECK_EQUAL(0u, cover_pixel("Beta"));
-}
-
-static void a_file_without_stamps_is_built_again(void)
-{
-    CoverStats stats;
-    three_albums();
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
-    memset(covers_file.bytes + 12, 0, 4);
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
-    CHECK_EQUAL(3u, stats.covers);
-    CHECK_EQUAL(0u, stats.reused);
-    CHECK_EQUAL(GREEN.pixel, cover_pixel("Beta"));
-}
-
-static void a_damaged_index_is_ignored(void)
-{
-    CoverStats stats;
-    uint8_t first[8];
-    three_albums();
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
-    memcpy(first, covers_file.bytes + COVERS_HEADER_SIZE, sizeof first);
-    memcpy(covers_file.bytes + COVERS_HEADER_SIZE, covers_file.bytes + COVERS_HEADER_SIZE + 8, 8);
-    memcpy(covers_file.bytes + COVERS_HEADER_SIZE + 8, first, sizeof first);
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
-    CHECK_EQUAL(3u, stats.covers);
-    CHECK_EQUAL(0u, stats.reused);
-    CHECK_EQUAL(RED.pixel, cover_pixel("Alpha"));
-    CHECK_EQUAL(GREEN.pixel, cover_pixel("Beta"));
-}
-
-static void without_a_previous_file_everything_is_decoded(void)
-{
-    CoverStats stats;
-    three_albums();
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
-    CHECK_EQUAL(SCAN_OK, rescan(false, &stats));
-    CHECK_EQUAL(3u, stats.covers);
-    CHECK_EQUAL(0u, stats.reused);
 }
 
 static void opus_art_is_decoded_and_kept(void)
@@ -680,11 +628,11 @@ static void opus_art_is_decoded_and_kept(void)
     reset();
     add_opus("/Opus/01.opus", "Opus", 1, pictures, 2);
     add_png("/Opus/cover.png", BLUE);
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(1u, stats.covers);
     CHECK_EQUAL(0u, stats.missing);
     CHECK_EQUAL(RED.pixel, cover_pixel("Opus"));
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(1u, stats.reused);
     CHECK_EQUAL(RED.pixel, cover_pixel("Opus"));
 }
@@ -712,7 +660,7 @@ static void albums_sharing_a_folder_find_art_in_later_tracks(void)
     add_opus("/Mixed/e1.opus", "E", 1, &broken_image, 1);
     add_opus("/Mixed/e2.opus", "E", 2, &red, 1);
     add_png("/Mixed/cover.png", WHITE);
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(5u, stats.albums);
     CHECK_EQUAL(4u, stats.covers);
     CHECK_EQUAL(1u, stats.missing);
@@ -721,7 +669,7 @@ static void albums_sharing_a_folder_find_art_in_later_tracks(void)
     CHECK_EQUAL(WHITE.pixel, cover_pixel("C"));
     CHECK_EQUAL(WHITE.pixel, cover_pixel("D"));
     CHECK_EQUAL(0u, cover_pixel("E"));
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(4u, stats.reused);
 }
 
@@ -749,10 +697,10 @@ static void a_card_written_on_a_mac_keeps_the_covers_the_computer_made(void)
 {
     CoverStats stats;
     three_albums();
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(3u, stats.covers);
     mac_litter();
-    CHECK_EQUAL(SCAN_OK, rescan(true, &stats));
+    CHECK_EQUAL(SCAN_OK, rescan(&stats));
     CHECK_EQUAL(3u, stats.albums);
     CHECK_EQUAL(3u, stats.covers);
     CHECK_EQUAL(3u, stats.reused);
@@ -770,12 +718,10 @@ int main(void)
         TEST_CASE(an_unchanged_card_reuses_every_cover),
         TEST_CASE(a_new_album_is_the_only_one_decoded),
         TEST_CASE(replaced_art_is_decoded_again),
-        TEST_CASE(a_removed_album_frees_its_place_for_a_new_one),
-        TEST_CASE(a_grown_file_is_built_again_with_room_for_every_album),
+        TEST_CASE(a_removed_album_loses_its_cover_and_keeps_the_others),
+        TEST_CASE(replaced_covers_are_compacted_without_decoding),
+        TEST_CASE(a_full_card_keeps_the_old_library_and_its_covers),
         TEST_CASE(an_album_without_art_loses_its_cover),
-        TEST_CASE(a_file_without_stamps_is_built_again),
-        TEST_CASE(a_damaged_index_is_ignored),
-        TEST_CASE(without_a_previous_file_everything_is_decoded),
         TEST_CASE(opus_art_is_decoded_and_kept),
         TEST_CASE(albums_sharing_a_folder_find_art_in_later_tracks),
     };

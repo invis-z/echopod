@@ -79,15 +79,12 @@ typedef struct ScanJob {
 
 #define LIBRARY_SCAN_MAGIC 0x4E414353u
 
-struct CoverJob;
-struct CoverStats;
 struct RebuildJob;
+struct RebuildStats;
 
 typedef struct LibraryScanEntry {
     uint32_t magic;
-    ScanResult (*scan)(const ScanJob *job, ScanStats *stats);
-    ScanResult (*covers)(const struct CoverJob *job, struct CoverStats *stats);
-    ScanResult (*rebuild)(const struct RebuildJob *job, ScanStats *stats);
+    ScanResult (*rebuild)(const struct RebuildJob *job, struct RebuildStats *stats);
 } LibraryScanEntry;
 
 extern const LibraryScanEntry LIBRARY_SCAN_ENTRY;

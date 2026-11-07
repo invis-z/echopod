@@ -70,12 +70,16 @@ rippl_add_unit_test(NAME test_equalizer
 rippl_add_unit_test(NAME test_equalizer_file SOURCES sound/test_equalizer_file.c LIBRARIES rippl_sound)
 rippl_add_unit_test(NAME test_equalizer_text SOURCES sound/test_equalizer_text.c LIBRARIES rippl_sound)
 
-foreach(library_test block_cache library library_browse favorites covers sort_key track_fields playlist_reader music_fingerprint music_folders mp4_chapters)
+foreach(library_test block_cache library library_browse favorites sort_key track_fields playlist_reader music_fingerprint music_folders mp4_chapters)
     rippl_add_unit_test(NAME test_${library_test}
         SOURCES library/test_${library_test}.c
         LIBRARIES rippl_library_fixtures
     )
 endforeach()
+rippl_add_unit_test(NAME test_covers
+    SOURCES library/test_covers.c library/fake_card.c
+    LIBRARIES rippl_library_fixtures
+)
 rippl_add_unit_test(NAME test_segment_store
     SOURCES library/test_segment_store.c library/fake_card.c
     LIBRARIES rippl_library
@@ -114,7 +118,7 @@ rippl_add_unit_test(NAME test_track_tags
 )
 target_compile_definitions(test_track_tags PRIVATE RIPPL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 rippl_add_unit_test(NAME test_cover_build
-    SOURCES library/test_cover_build.c
+    SOURCES library/test_cover_build.c library/fake_card.c
     LIBRARIES rippl_library_scan
 )
 target_compile_definitions(test_cover_build PRIVATE RIPPL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
@@ -518,11 +522,6 @@ if(EXISTS ${RIPPL_TOOLS_PYTHON})
             --catalogue ${PROJECT_SOURCE_DIR}/src/core/include/core
             --languages ${PROJECT_SOURCE_DIR}/assets/lang
             --output ${PROJECT_SOURCE_DIR}/src/lang/packs
-            --check
-    )
-    add_test(NAME cover_fixture_up_to_date
-        COMMAND ${RIPPL_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/cover_fixture.py
-            --output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/small_covers.bin
             --check
     )
     add_test(NAME tags_library_up_to_date

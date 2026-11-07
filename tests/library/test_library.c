@@ -248,7 +248,7 @@ static void playlists_link_to_their_tracks_in_order(void)
 static void album_keys_are_stable_and_distinct(void)
 {
     Library *library = fixture_library_open(&fixture);
-    uint32_t first = library_album_key(library, 0);
+    uint64_t first = library_album_key(library, 0);
     CHECK(first != 0);
     CHECK_EQUAL(first, library_album_key(library, 0));
     for (uint32_t album = 1; album < FIXTURE_ALBUMS; album++) {
