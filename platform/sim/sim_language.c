@@ -6,7 +6,7 @@
 
 enum {
     PATH_CAPACITY = 1024,
-    PACK_LIMIT = 0x3000
+    PACK_LIMIT = 0x4000
 };
 
 static const char PACK_PATHS[] = RIPPL_LANGUAGE_PACK_PATHS;
