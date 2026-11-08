@@ -33,7 +33,7 @@ const char *hal_system_version(void)
 
 uint32_t hal_system_build_day(void)
 {
-    uint32_t date = ECHO_SIM_BUILD_DATE;
+    uint32_t date = RIPPL_SIM_BUILD_DATE;
     return wall_clock_days_from_civil(date / BUILD_YEAR_DIVISOR,
                                       date / BUILD_MONTH_DIVISOR % BUILD_MONTH_DIVISOR,
                                       date % BUILD_MONTH_DIVISOR);

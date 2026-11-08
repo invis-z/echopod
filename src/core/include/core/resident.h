@@ -1,7 +1,7 @@
 #pragma once
 
-#ifdef ECHO_RESIDENT_TABLES
-#define ECHO_RESIDENT __attribute__((section(".resident")))
+#ifdef RIPPL_RESIDENT_TABLES
+#define RIPPL_RESIDENT __attribute__((section(".resident")))
 #else
-#define ECHO_RESIDENT
+#define RIPPL_RESIDENT
 #endif

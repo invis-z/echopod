@@ -50,7 +50,7 @@ bool sim_display_open(int scale)
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
     display.scale = scale;
     display.window =
-        SDL_CreateWindow("EchoPod", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        SDL_CreateWindow("Rippl", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                          display.width * scale, display.height * scale, SDL_WINDOW_SHOWN);
     if (display.window == NULL) {
         return false;

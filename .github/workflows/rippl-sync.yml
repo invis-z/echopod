@@ -1,4 +1,4 @@
-name: echo-sync
+name: rippl-sync
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
     tags: ["v*"]
     paths:
       - "tools/**"
-      - ".github/workflows/echo-sync.yml"
+      - ".github/workflows/rippl-sync.yml"
   pull_request:
     paths:
       - "tools/**"
-      - ".github/workflows/echo-sync.yml"
+      - ".github/workflows/rippl-sync.yml"
   workflow_dispatch:
 
 permissions:
@@ -23,14 +23,14 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            asset: echo-sync-windows-x64.exe
-            built: dist/echo-sync.exe
+            asset: rippl-sync-windows-x64.exe
+            built: dist/rippl-sync.exe
           - os: macos-latest
-            asset: echo-sync-macos-arm64
-            built: dist/echo-sync
+            asset: rippl-sync-macos-arm64
+            built: dist/rippl-sync
           - os: ubuntu-22.04
-            asset: echo-sync-linux-x64
-            built: dist/echo-sync
+            asset: rippl-sync-linux-x64
+            built: dist/rippl-sync
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -46,13 +46,13 @@ jobs:
         run: python -m unittest discover -s tools/tests
       - name: Build one file
         run: >
-          python -m PyInstaller --onefile --console --name echo-sync
+          python -m PyInstaller --onefile --console --name rippl-sync
           --paths tools --distpath dist --workpath build/pyinstaller --specpath build/pyinstaller
-          tools/echo_sync.py
+          tools/rippl_sync.py
       - name: Smoke test
         run: |
           ${{ matrix.built }} --help
-          mkdir -p smoke/.echo smoke/Artist/Album
+          mkdir -p smoke/.rippl smoke/Artist/Album
           python -c "import sys; sys.path[:0] = ['tools', 'tools/tests']; from pathlib import Path; from test_library_index import write_silent_flac; write_silent_flac(Path('smoke/Artist/Album/01 - Song.flac'), 1)"
           ${{ matrix.built }} smoke --dry-run
       - name: Name the file for its platform

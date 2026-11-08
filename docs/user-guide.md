@@ -1,15 +1,15 @@
-# EchoPod user guide
+# Rippl user guide
 
-EchoPod is a replacement firmware for the Snowsky (FiiO) Echo Mini music player. It has a Cover Flow album browser, a music library built on the player, favorites, playlists and an Up Next queue. It is not made or supported by FiiO.
+Rippl is a replacement firmware for the Snowsky (FiiO) Echo Mini music player. It has a Cover Flow album browser, a music library built on the player, favorites, playlists and an Up Next queue. It is not made or supported by FiiO.
 
-Read `docs/known-issues.md` before you install. EchoPod has been tested on one player so far.
+Read `docs/known-issues.md` before you install. Rippl has been tested on one player so far.
 
-**Use it at your own risk.** EchoPod comes with no warranty (see `LICENSE`). Replacing a player's firmware can leave it unable to start; during development that happened, and the player was brought back through maskrom (`docs/device-recovery.md`). Only install it if you're prepared to do that.
+**Use it at your own risk.** Rippl comes with no warranty (see `LICENSE`). Replacing a player's firmware can leave it unable to start; during development that happened, and the player was brought back through maskrom (`docs/device-recovery.md`). Only install it if you're prepared to do that.
 
 ## Which players
 
 - **Echo Mini 8 GB: supported.** Its FiiO update file is called `HIFIECnn.IMG`.
-- **Echo Mini 512 MB: not supported.** Its FiiO update file is called `MINIVnnn.IMG`. Its firmware ignores EchoPod's file, and EchoPod refuses its firmware.
+- **Echo Mini 512 MB: not supported.** Its FiiO update file is called `MINIVnnn.IMG`. Its firmware ignores Rippl's file, and Rippl refuses its firmware.
 
 Tested starting points: FiiO firmware 3.7.0, 3.9.0 and 4.0.0 (Settings → About on the player shows yours).
 
@@ -17,7 +17,7 @@ Tested starting points: FiiO firmware 3.7.0, 3.9.0 and 4.0.0 (Settings → About
 
 1. Copy anything you want to keep off the player's internal storage.
 2. Charge the battery.
-3. Download `HIFIEC90.IMG` and `SHA256SUMS.txt` from the [EchoPod releases](https://github.com/BasilSkyWalk/echopod/releases), and check the file:
+3. Download `HIFIEC90.IMG` and `SHA256SUMS.txt` from the [Rippl releases](https://github.com/invis-z/rippl/releases), and check the file:
    - Windows (PowerShell): `Get-FileHash HIFIEC90.IMG`
    - macOS or Linux: `shasum -a 256 HIFIEC90.IMG`
 
@@ -29,21 +29,21 @@ Tested starting points: FiiO firmware 3.7.0, 3.9.0 and 4.0.0 (Settings → About
 2. Copy `HIFIEC90.IMG` to the top level of that drive, not into a folder. Delete any other `HIFIECnn.IMG` or `ECHOMINI.IMG` file there first: the player installs the one with the highest number.
 3. Eject the drive (Windows: Safely Remove; macOS: Eject), then unplug.
 4. Take the microSD card out.
-5. Switch the player off and on again. It shows "Updating, Don't power off" for about a minute or two. Leave it alone until EchoPod starts.
-6. Put the microSD card back. On the first start with a card, EchoPod builds its library and album covers, which takes a minute or two (about 1 minute 45 seconds for 1,563 tracks and 144 albums).
+5. Switch the player off and on again. It shows "Updating, Don't power off" for about a minute or two. Leave it alone until Rippl starts.
+6. Put the microSD card back. On the first start with a card, Rippl builds its library and album covers, which takes a minute or two (about 1 minute 45 seconds for 1,563 tracks and 144 albums).
 
 If "Updating" flashes for under a second and FiiO's firmware comes back, the install didn't happen. See "If something goes wrong" below. One tester whose FiiO firmware kept refusing the file got it to install after first updating to FiiO's 3.8 firmware.
 
 ## Your music
 
 - Put music on a microSD card formatted FAT32 or exFAT, in any folder layout.
-- EchoPod plays FLAC, ALAC (Apple Lossless `.m4a`), AAC (`.m4a`), Opus (`.opus`), MP3 and WAV, up to 192 kHz. HE-AAC isn't supported yet. It lists the other formats FiiO lists, and says when it can't play one.
+- Rippl plays FLAC, ALAC (Apple Lossless `.m4a`), AAC (`.m4a`), Opus (`.opus`), MP3 and WAV, up to 192 kHz. HE-AAC isn't supported yet. It lists the other formats FiiO lists, and says when it can't play one.
 - Album covers come from art inside one of each album's first four tracks (Ogg and Opus pictures included), or from a `cover`, `folder`, `front` or `albumart` JPEG or PNG next to the tracks.
 - `.m3u` and `.m3u8` playlists anywhere on the card appear under Music → Playlists.
 - Libraries of many thousands of tracks work; `docs/known-issues.md` lists the sizes tested so far.
-- EchoPod keeps its own files in a hidden `/.echo` folder on the card, about 110 MB of them. Don't delete it unless you want the library rebuilt.
+- Rippl keeps its own files in a hidden `/.rippl` folder on the card, about 110 MB of them. Don't delete it unless you want the library rebuilt.
 - A card is needed: the library, your settings, favorites and resume points are all saved there. Without one, Home shows "No microSD card" and a changed setting isn't kept ("Insert a microSD card to save settings"). Put a card in and restart the player.
-- Music can also go on the player's internal storage (the drive called ECHO MINI, about 8 GB on the 8 GB model). The library always holds the music of both: albums, artists, genres, songs and playlists mix the two, and under Folders the internal storage is one more folder, **Internal storage**, next to the card's own folders. Firmware images (`HIFIECnn.IMG`) and other files that aren't music or playlists are ignored. An SD card is still needed, because the library and EchoPod's other files stay in `/.echo` on the card; the player never writes to internal storage. To leave internal storage's music out, untick its folders in Settings → Library → Music folders (below). Audiobooks and podcasts on internal storage play as music: the Audiobooks and Podcasts shelves only read the card's top-level `Audiobooks` and `Podcasts` folders.
+- Music can also go on the player's internal storage (the drive called ECHO MINI, about 8 GB on the 8 GB model). The library always holds the music of both: albums, artists, genres, songs and playlists mix the two, and under Folders the internal storage is one more folder, **Internal storage**, next to the card's own folders. Firmware images (`HIFIECnn.IMG`) and other files that aren't music or playlists are ignored. An SD card is still needed, because the library and Rippl's other files stay in `/.rippl` on the card; the player never writes to internal storage. To leave internal storage's music out, untick its folders in Settings → Library → Music folders (below). Audiobooks and podcasts on internal storage play as music: the Audiobooks and Podcasts shelves only read the card's top-level `Audiobooks` and `Podcasts` folders.
 - If the same album is on the card and on internal storage, both copies are in the library, and with the same album and album artist they show as one album with every track twice. Untick one copy's folder in Settings → Library → Music folders to keep only the other.
 
 ### Music folders
@@ -55,8 +55,8 @@ Settings → Library → **Music folders** lists the top-level folders of the ca
 - Hidden folders (a name starting with `.`, or the hidden attribute) and `System Volume Information` aren't listed.
 - The internal storage's top-level folders follow the card's, as **Internal storage/**name. Music directly in the internal storage's root, like music in the card's root, isn't listed and stays in the library.
 - Up to 32 folders are listed (fewer if their names are very long: the screen keeps about 500 bytes of names). Folders beyond that aren't listed and stay in the library.
-- The choice is kept by folder name in `/.echo/folders.bin` on the card, so a folder you add later is ticked, and a renamed folder counts as a new one. A folder that is gone keeps its choice for when it comes back.
-- echo-sync reads the same file and leaves the same folders out (see Build the library on a computer).
+- The choice is kept by folder name in `/.rippl/folders.bin` on the card, so a folder you add later is ticked, and a renamed folder counts as a new one. A folder that is gone keeps its choice for when it comes back.
+- rippl-sync reads the same file and leaves the same folders out (see Build the library on a computer).
 
 ## Copying music over USB
 
@@ -80,54 +80,54 @@ During a long copy the screen goes dark after 30 seconds; any button lights it a
 
 1. On the player, Settings → System → USB mode → DAC.
 2. Plug in the USB cable. The player shows "USB DAC". No driver is needed on Windows 10 and later, macOS, Linux, Android or iOS (phones need a USB-C or Lightning adapter that passes data).
-3. On the computer, choose EchoPod as the sound output (Windows: the speaker icon in the taskbar; macOS: System Settings → Sound → Output). The player shows the format, for example "Playing from computer · 48 kHz 24-bit".
+3. On the computer, choose Rippl as the sound output (Windows: the speaker icon in the taskbar; macOS: System Settings → Sound → Output). The player shows the format, for example "Playing from computer · 48 kHz 24-bit".
 4. Use the computer's volume, the player's volume keys, or both. DAC mode has its own volume, separate from music: it starts at 30 of 50, the screen shows it ("48 kHz 24-bit · Volume 30"), and the player remembers it for next time. Start low. The volume buttons work as on Now Playing: a tap changes the volume, and right after a tap holding the rocker keeps changing it; your Swap volume buttons, Volume buttons and orientation settings apply.
 5. The player's buttons control the computer's player, like a headset: ▶ is play/pause, holding + or − for a second is next or previous (or a tap, with Volume buttons set to *Tap: skip, hold: volume*), and Menu is next when it's set to Next track. Whether the app reacts depends on it, as with a keyboard's media keys.
 6. Unplug when you're done, or hold Back for a second to go back to the player's own music (it keeps charging).
 
 The screen also shows the battery and whether it's charging, and four counters: *Missed*, *dropped*, *repeated* and *restarts*. They update when the music stops (pause on the computer) and whenever you press a volume button. *Missed* and *restarts* should stay at 0 while the music plays. The clocks of the computer and the player drift apart slowly, so either *dropped* or *repeated* grows by up to a few hundred a minute, in short bursts, and that's normal. If *Missed* goes up when you press a button, or the counters climb while the music is still, please report them.
 
-The player accepts 16 or 24-bit at 44.1 and 48 kHz; the computer picks one (on Windows: Sound settings → EchoPod → Properties → Advanced). The volume is applied in the player's software while it's a DAC (the chip's own volume stays at the top), so very low levels keep a little less resolution than music does. Music on the player stops while it's a DAC, and your drives don't appear: set USB mode back to Storage to copy music. The setting takes effect the next time you plug in, unless **Ask when connected** is on (the default): then plugging into a computer asks *Storage*, *DAC* or *Charge only* each time, with the saved mode selected, and goes with the saved mode after 5 seconds or when you press Back. *Charge only* keeps playing and charging without connecting. A charger never asks.
+The player accepts 16 or 24-bit at 44.1 and 48 kHz; the computer picks one (on Windows: Sound settings → Rippl → Properties → Advanced). The volume is applied in the player's software while it's a DAC (the chip's own volume stays at the top), so very low levels keep a little less resolution than music does. Music on the player stops while it's a DAC, and your drives don't appear: set USB mode back to Storage to copy music. The setting takes effect the next time you plug in, unless **Ask when connected** is on (the default): then plugging into a computer asks *Storage*, *DAC* or *Charge only* each time, with the saved mode selected, and goes with the saved mode after 5 seconds or when you press Back. *Charge only* keeps playing and charging without connecting. A charger never asks.
 
 ## Build the library on a computer
 
 Rebuilding on the player takes a minute or two (1,563 tracks and 144 albums take about 1 minute 45 seconds). A computer can build the same library and album covers instead, straight onto the card, and tell the player that the card has already been scanned.
 
-The tool is called **echo-sync**. Download it from the release page, under Assets; it's one file, with nothing to install:
+The tool is called **rippl-sync**. Download it from the release page, under Assets; it's one file, with nothing to install:
 
 | Computer | File |
 |---|---|
-| Windows | `echo-sync-windows-x64.exe` |
-| Mac with Apple silicon (M1 and later) | `echo-sync-macos-arm64` |
-| Linux (x86-64) | `echo-sync-linux-x64` |
+| Windows | `rippl-sync-windows-x64.exe` |
+| Mac with Apple silicon (M1 and later) | `rippl-sync-macos-arm64` |
+| Linux (x86-64) | `rippl-sync-linux-x64` |
 
 **Windows**
 
 1. Copy your music to the card, in the player over USB or in a card reader.
-2. Double-click `echo-sync-windows-x64.exe`. Windows may say it "protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
+2. Double-click `rippl-sync-windows-x64.exe`. Windows may say it "protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 3. It finds a card the player has used and asks "Card to sync [E:\]": press Enter. For another card, type its drive letter (or drag the drive onto the window) and press Enter.
 4. When it says "Done", press Enter to close it, eject the card (in the player: both drives), and put it back in the player or unplug.
 
-From a command prompt, `echo-sync-windows-x64.exe E:` does the same without asking.
+From a command prompt, `rippl-sync-windows-x64.exe E:` does the same without asking.
 
 **Mac**
 
 1. Copy your music to the card.
-2. In Terminal, allow the downloaded file to run once: `chmod +x ~/Downloads/echo-sync-macos-arm64 && xattr -d com.apple.quarantine ~/Downloads/echo-sync-macos-arm64`.
-3. Run `~/Downloads/echo-sync-macos-arm64` and press Enter to use the card it finds, or drag the card from the desktop into the window first. You can also give it straight away: `~/Downloads/echo-sync-macos-arm64 /Volumes/CARD`.
+2. In Terminal, allow the downloaded file to run once: `chmod +x ~/Downloads/rippl-sync-macos-arm64 && xattr -d com.apple.quarantine ~/Downloads/rippl-sync-macos-arm64`.
+3. Run `~/Downloads/rippl-sync-macos-arm64` and press Enter to use the card it finds, or drag the card from the desktop into the window first. You can also give it straight away: `~/Downloads/rippl-sync-macos-arm64 /Volumes/CARD`.
 4. Eject the card.
 
 **Linux**
 
-`chmod +x echo-sync-linux-x64`, then `./echo-sync-linux-x64 /media/you/CARD` (the card's mount point), then eject the card.
+`chmod +x rippl-sync-linux-x64`, then `./rippl-sync-linux-x64 /media/you/CARD` (the card's mount point), then eject the card.
 
-**Intel Macs, other computers, or from the source.** Install Python 3, then the tools' packages once with `python3 -m pip install -r tools/requirements.txt`, and run `python3 tools/echo_sync.py /Volumes/CARD`. On Windows, `tools\echo_sync.bat E:` finds Python for you.
+**Intel Macs, other computers, or from the source.** Install Python 3, then the tools' packages once with `python3 -m pip install -r tools/requirements.txt`, and run `python3 tools/rippl_sync.py /Volumes/CARD`. On Windows, `tools\rippl_sync.bat E:` finds Python for you.
 
-It reads the whole card, as the player does, and writes `library.db`, `covers.bin` and `scan.bin` into the card's `/.echo` folder. If the player has never used the card, it asks before creating `/.echo` (`--yes` creates it without asking). Files the player made are overwritten in place and keep their size; missing ones are made at the player's sizes (4 MB, 80 MB and 4 KB). It then prints what it found, for example "1,402 tracks, 120 albums, 3 playlists" and "115 covers, 5 without art".
+It reads the whole card, as the player does, and writes `library.db`, `covers.bin` and `scan.bin` into the card's `/.rippl` folder. If the player has never used the card, it asks before creating `/.rippl` (`--yes` creates it without asking). Files the player made are overwritten in place and keep their size; missing ones are made at the player's sizes (4 MB, 80 MB and 4 KB). It then prints what it found, for example "1,402 tracks, 120 albums, 3 playlists" and "115 covers, 5 without art".
 
-**Music folders.** echo-sync reads Settings → Library → Music folders from the card (`/.echo/folders.bin`) and leaves the same top-level folders out of the library and the fingerprint, saying how many ("Leaving out 2 top-level folders"). Changes inside a left-out folder don't make the player rescan.
+**Music folders.** rippl-sync reads Settings → Library → Music folders from the card (`/.rippl/folders.bin`) and leaves the same top-level folders out of the library and the fingerprint, saying how many ("Leaving out 2 top-level folders"). Changes inside a left-out folder don't make the player rescan.
 
-**Internal storage.** The player's library also holds the music on internal storage, so echo-sync looks for it too: with the card in the connected player, it finds the internal storage by its drive name, ECHO MINI, and prints both drives it reads ("EchoPod sync: E:\ (exFAT)" and "and the internal storage F:\ (FAT32)"). If you renamed that drive, give it with `--internal`: `echo-sync-windows-x64.exe E: --internal F:` (on a Mac, for example `--internal "/Volumes/MY PLAYER"`). If it isn't found (for example with the card in a card reader), echo-sync says so, builds the library from the card only, and the player rescans after the sync to add internal storage's music.
+**Internal storage.** The player's library also holds the music on internal storage, so rippl-sync looks for it too: with the card in the connected player, it finds the internal storage by its drive name, ECHO MINI, and prints both drives it reads ("Rippl sync: E:\ (exFAT)" and "and the internal storage F:\ (FAT32)"). If you renamed that drive, give it with `--internal`: `rippl-sync-windows-x64.exe E: --internal F:` (on a Mac, for example `--internal "/Volumes/MY PLAYER"`). If it isn't found (for example with the card in a card reader), rippl-sync says so, builds the library from the card only, and the player rescans after the sync to add internal storage's music.
 
 **Why the player doesn't rescan.** After a USB session the player checks for changes: it compares the names, sizes and modification times of the music, playlists and cover images on the card with a fingerprint it keeps in `scan.bin`. The computer writes the same fingerprint, so the check finds nothing new and the player keeps the computer's library. With a card reader there's no USB session, so the player uses the new library straight away.
 
@@ -139,7 +139,7 @@ It reads the whole card, as the player does, and writes `library.db`, `covers.bi
 - the card has folders more than 31 levels deep or paths longer than 1,023 bytes (the player can't fingerprint those);
 - a name was saved decomposed (for example by Linux) and read on a Mac, or only as an old DOS short name with accented letters.
 
-To see whether it works on your card, let the player scan it once, then run echo-sync with `--check` without changing anything (for example `echo-sync-windows-x64.exe E: --check`). "They match" means the player won't rescan after the next sync.
+To see whether it works on your card, let the player scan it once, then run rippl-sync with `--check` without changing anything (for example `rippl-sync-windows-x64.exe E: --check`). "They match" means the player won't rescan after the next sync.
 
 **After a firmware update** the player checks the music once when it first starts ("Checking for changes"), and rescans only if the music changed, or if it can't read the library on the card (as after updating to 0.2.0, which changed the library format). `scan.bin` remembers the firmware version; the computer keeps it. A `scan.bin` the computer had to create has no version yet, so the player checks once on its next start too.
 
@@ -152,7 +152,7 @@ To see whether it works on your card, let the player scan it once, then run echo
 | `--internal DRIVE` | The player's internal storage drive, when it isn't found by its name, ECHO MINI (see above) |
 | `--no-clock` | Don't write `clock.bin`, so the player keeps its own time (see Clock below) |
 | `--check` | Only compare the computer's fingerprint with the player's |
-| `--yes` | Create `/.echo` without asking |
+| `--yes` | Create `/.rippl` without asking |
 | `--verbose` | List the albums without art |
 | `--history` | Also add the songs the player played to `.scrobbler.log` (see Listen history and Last.fm) |
 
@@ -194,14 +194,14 @@ The file must be UTF-8 (with or without a BOM); other encodings, such as the GBK
 
 ## Clock
 
-The player has a clock chip that keeps time while it's off. EchoPod reads it when it starts and every ten minutes, and sets it in two ways:
+The player has a clock chip that keeps time while it's off. Rippl reads it when it starts and every ten minutes, and sets it in two ways:
 
-- **echo-sync** writes the computer's time and time zone to the card (`/.echo/clock.bin`) at the end of every sync, and the player takes it when the USB session ends (eject the card safely, or unplug): a toast says "Clock set from the computer". The clock then matches the computer's to within the seconds between the end of the sync and the eject. A card synced in a card reader doesn't set the clock, because the player can't tell how long ago that was; sync with the player plugged in, or set the time by hand. `--no-clock` leaves the clock alone.
+- **rippl-sync** writes the computer's time and time zone to the card (`/.rippl/clock.bin`) at the end of every sync, and the player takes it when the USB session ends (eject the card safely, or unplug): a toast says "Clock set from the computer". The clock then matches the computer's to within the seconds between the end of the sync and the eject. A card synced in a card reader doesn't set the clock, because the player can't tell how long ago that was; sync with the player plugged in, or set the time by hand. `--no-clock` leaves the clock alone.
 - **Settings → System → Date & time** sets it by hand: vol± choose a row (year, month, day, hour, minute, time zone), ▶ starts changing it (vol± change the value, ▶ finishes), Back leaves and sets the clock. The time zone is only used to date the listen history (below); the clock itself shows the local time you set.
 
 **Settings → Display → Clock** (Off by default) shows the time, `HH:MM`, in the status bar next to the play icon. In portrait, when the time and the battery percentage don't both fit, the percentage is left out. Until the clock has been set, the status bar shows no time and Date & time says "Not set". A clock that says it's earlier than the day before the firmware was built counts as not set too, so a chip that was never set properly doesn't put wrong dates in the listen history.
 
-**After installing a new firmware**, if the clock isn't set, the player asks once, after the start-up screen and the music check: "Set the date and time?" → **Set now** opens Date & time (starting from the date the firmware was built), **Later** (or Back) leaves it; it doesn't ask again until the next firmware. Syncing with echo-sync with the player plugged in sets it too. Diagnostics → Clock shows what the chip itself holds, with ` VL` while it has never been set.
+**After installing a new firmware**, if the clock isn't set, the player asks once, after the start-up screen and the music check: "Set the date and time?" → **Set now** opens Date & time (starting from the date the firmware was built), **Later** (or Back) leaves it; it doesn't ask again until the next firmware. Syncing with rippl-sync with the player plugged in sets it too. Diagnostics → Clock shows what the chip itself holds, with ` VL` while it has never been set.
 
 Whether the chip keeps time on every player hasn't been confirmed yet; if yours loses the time when switched off, set it again or sync.
 
@@ -227,7 +227,7 @@ Open it from Settings → Equalizer, or hold ≡ on Now Playing.
 - **Custom:** press ▶ on Custom to open a 7-band equalizer (63 Hz, 160 Hz, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz and 16 kHz). Vol+ and Vol− move between the bands. Press ▶ to grab the highlighted band (its column turns blue); Vol+ and Vol− then raise and lower it by 1 dB (hold to keep going), from −12 to +12 dB. Press ▶ or ↩ to let go and pick another band. Hold ▶ to set a band back to 0 dB, and press ↩ with no band grabbed to leave. Changes play straight away; they reach your ears after a fraction of a second, because the player keeps that much music ready ahead.
 - When a band is boosted, the player lowers the overall level by the largest boost (shown as "Preamp") so loud music doesn't distort. Turn the volume up a little to make up for it.
 
-The player remembers the equalizer you used last, including your Custom bands and the name of a preset file, in `/.echo/equalizer.bin`. If that preset file is gone at the next start, the equalizer is Off. The equalizer also applies to Bluetooth headphones. For FLAC and ALAC the second processor does the equalizing and runs at full speed while the equalizer is on, which costs a little battery; if you switch the equalizer on or off in the middle of a FLAC track, that change of processor happens from the next track. It's off for 176.4 and 192 kHz tracks (the screen says so) and in USB DAC mode.
+The player remembers the equalizer you used last, including your Custom bands and the name of a preset file, in `/.rippl/equalizer.bin`. If that preset file is gone at the next start, the equalizer is Off. The equalizer also applies to Bluetooth headphones. For FLAC and ALAC the second processor does the equalizing and runs at full speed while the equalizer is on, which costs a little battery; if you switch the equalizer on or off in the middle of a FLAC track, that change of processor happens from the next track. It's off for 176.4 and 192 kHz tracks (the screen says so) and in USB DAC mode.
 
 ## Charging
 
@@ -268,31 +268,31 @@ Podcasts/
 
 - **Audiobooks** lists your books, each with "3 chapters", "Chapter 2 of 12" or "Finished". ▶ on a book carries on where you stopped (or starts a finished book again). Hold ▶ on a book to see its chapters.
 - **Podcasts** lists your shows; open one to see its episodes, each with "23:10 left" or "Played".
-- Every book and every episode remembers its own place, even when you play music in between or turn the player off. The places are saved in `/.echo/bookmarks.bin` (the last 128 books and episodes).
+- Every book and every episode remembers its own place, even when you play music in between or turn the player off. The places are saved in `/.rippl/bookmarks.bin` (the last 128 books and episodes).
 - Books and shows always play in order: shuffle doesn't apply to them, and your shuffle setting for music stays as it was.
 - On Now Playing, holding Vol+ jumps 30 s forward and holding Vol− jumps 15 s back. Jumping past the end of a chapter goes to the next one. To pick another chapter, use the book's chapter list.
 - An episode or book counts as finished once it played to its last tenth (at most its last 30 s).
 - These folders still appear under Music (Albums, Artists, Folders and so on), as all tracks on the card do. Give them a genre such as "Audiobook" if you want to find them there.
 - Playback speed can't be changed yet.
-- To see on a computer which episodes and books you finished (for example to delete played podcasts in a sync script), run `python tools/echo_bookmarks.py E:\ --finished` with the card's drive or mount folder. It prints one path per line. Without `--finished` it lists every bookmark with its position; `--json` prints them all as JSON.
+- To see on a computer which episodes and books you finished (for example to delete played podcasts in a sync script), run `python tools/rippl_bookmarks.py E:\ --finished` with the card's drive or mount folder. It prints one path per line. Without `--finished` it lists every bookmark with its position; `--json` prints them all as JSON.
 
 ## Listen history and Last.fm
 
-The player keeps a log of the songs you play in `/.echo/history.bin` on the card (the last 2,000 or so), so you can add them to Last.fm or ListenBrainz from a computer. It's on by default; Settings → Library → Listen history turns it off (the log already on the card stays until you delete it, and no `.scrobbler.log` is written while it's off). Audiobooks and podcasts are never logged.
+The player keeps a log of the songs you play in `/.rippl/history.bin` on the card (the last 2,000 or so), so you can add them to Last.fm or ListenBrainz from a computer. It's on by default; Settings → Library → Listen history turns it off (the log already on the card stays until you delete it, and no `.scrobbler.log` is written while it's off). Audiobooks and podcasts are never logged.
 
 1. Connect the player to a computer over USB. As it connects, the player adds the songs played since the last time to `.scrobbler.log` at the root of the card, the "Rockbox" or "old iPod" log that scrobbler uploaders read. If there's no log (your uploader deleted it), it makes a new one with only the new plays.
 2. Upload `.scrobbler.log` with a tool that submits Rockbox scrobbler logs to Last.fm or ListenBrainz (for example rb-scrobbler). Such tools usually delete or rename the log after uploading; if a log is already there, the player adds to it.
 
 - A song counts as listened (`L`), as Last.fm defines it, when it's longer than 30 s and you listened to at least half of it or 4 minutes. Pauses and skipped-over parts don't count. Like Rockbox, the player also writes the other plays, marked as skipped (`S`); uploaders leave those out.
 - A song you stopped halfway, by connecting USB or turning the player off, and carried on later counts once.
-- Dates: while the clock is set and has a time zone (a sync sets both; Date & time asks for the zone), each play is dated exactly. Plays from a start before the clock was set are placed just before the next start that had it: the player doesn't know how long it was off in between, so they can show up later than you really played them. Plays the player can't date at all, because the clock has never been set since, stay off the log until it is; `tools/echo_history.py` can write them now (below).
+- Dates: while the clock is set and has a time zone (a sync sets both; Date & time asks for the zone), each play is dated exactly. Plays from a start before the clock was set are placed just before the next start that had it: the player doesn't know how long it was off in between, so they can show up later than you really played them. Plays the player can't date at all, because the clock has never been set since, stay off the log until it is; `tools/rippl_history.py` can write them now (below).
 
-`python tools/echo_history.py E:\` (with the player's card drive or mount folder) does the same on a computer, and is optional. It shares the record of what was exported with the player (`/.echo/history-exported.txt`), so neither adds a play twice; it writes only listened plays unless you add `--include-skipped`. If you sync with echo-sync, `--history` runs it at the end of a sync. Without a set clock it works out the dates when it runs:
+`python tools/rippl_history.py E:\` (with the player's card drive or mount folder) does the same on a computer, and is optional. It shares the record of what was exported with the player (`/.rippl/history-exported.txt`), so neither adds a play twice; it writes only listened plays unless you add `--include-skipped`. If you sync with rippl-sync, `--history` runs it at the end of a sync. Without a set clock it works out the dates when it runs:
 
 - Run the tool while the player is still connected. Plays since the player was last switched on get their exact time. For plays before a power-off, the tool doesn't know how long the player was off, so it places them just before the next start: they can show up later in the day than you really played them. `--now <unix time>` sets the reference time if you run the tool later with a card reader.
 - `--output <file>` writes the log somewhere else, `--all` exports every play on the card again, and `--json` prints the new plays instead of writing anything.
 
-## Updating EchoPod
+## Updating Rippl
 
 1. Copy the new `HIFIEC90.IMG` to the top level of internal storage.
 2. Eject both drives. The player checks the file and shows "Installing update", then "Update installed".
@@ -302,13 +302,13 @@ The player keeps a log of the songs you play in `/.echo/history.bin` on the card
 
 1. Download FiiO's firmware for the **8 GB** Echo Mini from FiiO's website and unzip it.
 2. Delete `HIFIEC90.IMG` from internal storage if it's still there.
-3. Copy FiiO's `HIFIECnn.IMG` (for example `HIFIEC40.IMG`) to the top level of internal storage, unchanged. Don't copy the `MINIVnnn.IMG` file from the same zip: that one is for the 512 MB model, and EchoPod refuses it.
+3. Copy FiiO's `HIFIECnn.IMG` (for example `HIFIEC40.IMG`) to the top level of internal storage, unchanged. Don't copy the `MINIVnnn.IMG` file from the same zip: that one is for the 512 MB model, and Rippl refuses it.
 4. Eject both drives. The player checks the file (this takes a while) and shows "Installing FiiO firmware", then "FiiO firmware installed".
 5. Unplug, take the microSD card out, hold Power to turn the player off, and switch it on. FiiO's firmware starts, shows "Updating" once more for a minute or two while it installs the same file, and deletes it.
 
 ## If something goes wrong
 
-- **"isn't a valid image for this player" when going back to FiiO:** check that you copied the `HIFIECnn.IMG` file, not `MINIVnnn.IMG`, and that it's unchanged (its hash matches the one in FiiO's zip). EchoPod 0.2.0 and earlier also refuse FiiO's 4.0.0 firmware: update EchoPod first, or install FiiO 3.9.0 (`HIFIEC39.IMG`) and then FiiO's own update to 4.0.0. To switch to another custom firmware, go back to FiiO's first: EchoPod only installs its own images and FiiO's.
+- **"isn't a valid image for this player" when going back to FiiO:** check that you copied the `HIFIECnn.IMG` file, not `MINIVnnn.IMG`, and that it's unchanged (its hash matches the one in FiiO's zip). Rippl 0.2.0 and earlier also refuse FiiO's 4.0.0 firmware: update Rippl first, or install FiiO 3.9.0 (`HIFIEC39.IMG`) and then FiiO's own update to 4.0.0. To switch to another custom firmware, go back to FiiO's first: Rippl only installs its own images and FiiO's.
 - **The install doesn't take** (FiiO's firmware comes back after a short "Updating"): copy the file again, check its hash on the player's drive, and make sure it's the only `HIFIECnn.IMG` there. If it keeps failing, the only other way in is maskrom (below).
 - **The player doesn't start at all:** every case so far was recovered through the chip's maskrom mode, which writes FiiO's firmware back from a computer over USB. It needs a patched `rkdeveloptool` and some care; the steps are in `docs/device-recovery.md`.
 - **A "STALL" or "FAULT" screen** (white text on black with PC and LR lines): photograph it, then press the small RST hole rather than holding Power. RST keeps the player's memory, so Home → Diagnostics → Last start and Last stack still show what stopped; holding Power on battery wipes it.

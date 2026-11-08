@@ -1,10 +1,10 @@
-# EchoPod roadmap
+# Rippl roadmap
 
 Status: `device` (works on the player) · `sim` (works in the simulator only) · `in progress` · `todo`
 
 ## Where it stands
 
-Version 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in place and makes menus, Cover Flow and FAT32 reads smoother; 0.11.0 adds listen history for Last.fm, a clock, music on internal storage, grouped settings, lyrics and a light theme, with battery, Bluetooth, USB and SD card fixes; 0.10.0 adds Play all / Shuffle all, button and colour settings, Russian and Ukrainian, and fixes for the way back to FiiO; 0.9.1 adds Filter and Balance settings, quieter low volume steps and a Bluetooth volume curve; 0.9.0 adds 14 languages (Settings → Language) and draws Cyrillic, Greek and extended Latin letters in track names; 0.8.1 fixes 176.4 kHz playing 0.28 % slow and makes menus quicker; 0.8.0 added portrait mode (Settings → Orientation); 0.7.1 fixed a first start that stayed black with FAT32 cards; 0.7.0 added an equalizer (FiiO's presets and a 7-band Custom EQ) and ALAC, AAC and Opus playback; 0.6.0 made Bluetooth connect within seconds and added Random album and album grouping across featured artists; 0.5.0 added Bluetooth headphones, a charge screen and a steadier battery percent; 0.4.0 showed Chinese, Japanese and Korean names; 0.3.0 made USB DAC mode play on more computers and phones, accepted FiiO's 4.0.0 firmware for the way back, added gapless MP3 and kept covers across rescans; 0.2.0 added audiobooks and podcasts, USB DAC mode and echo-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
+Version 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in place and makes menus, Cover Flow and FAT32 reads smoother; 0.11.0 adds listen history for Last.fm, a clock, music on internal storage, grouped settings, lyrics and a light theme, with battery, Bluetooth, USB and SD card fixes; 0.10.0 adds Play all / Shuffle all, button and colour settings, Russian and Ukrainian, and fixes for the way back to FiiO; 0.9.1 adds Filter and Balance settings, quieter low volume steps and a Bluetooth volume curve; 0.9.0 adds 14 languages (Settings → Language) and draws Cyrillic, Greek and extended Latin letters in track names; 0.8.1 fixes 176.4 kHz playing 0.28 % slow and makes menus quicker; 0.8.0 added portrait mode (Settings → Orientation); 0.7.1 fixed a first start that stayed black with FAT32 cards; 0.7.0 added an equalizer (FiiO's presets and a 7-band Custom EQ) and ALAC, AAC and Opus playback; 0.6.0 made Bluetooth connect within seconds and added Random album and album grouping across featured artists; 0.5.0 added Bluetooth headphones, a charge screen and a steadier battery percent; 0.4.0 showed Chinese, Japanese and Korean names; 0.3.0 made USB DAC mode play on more computers and phones, accepted FiiO's 4.0.0 firmware for the way back, added gapless MP3 and kept covers across rescans; 0.2.0 added audiobooks and podcasts, USB DAC mode and rippl-sync (`docs/release-notes.md`). Everything marked `device` below works on the one Echo Mini 8 GB it has been tested on. `docs/known-issues.md` lists what's missing or unproven.
 
 ## Features
 
@@ -22,7 +22,7 @@ Version 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in pl
 | M3U and M3U8 playlists | device | Including MusicBee's Windows paths |
 | Album favorites | device | Hold Play on an album |
 | Audiobooks and podcasts | device | `Audiobooks` and `Podcasts` folders on Home, kept out of Music; a bookmark per book and episode, in-order play, hold vol± jumps 30 s / 15 s (shelves checked on the player, bookmarks and jumps in the simulator) |
-| Library and covers built on a computer | device | echo-sync, one file for Windows, macOS and Linux, writes `library.db`, `covers.bin` and the scan fingerprint so the player doesn't rescan; 1,563 tracks in 2 min on Windows (macOS and Linux untested on a card) |
+| Library and covers built on a computer | device | rippl-sync, one file for Windows, macOS and Linux, writes `library.db`, `covers.bin` and the scan fingerprint so the player doesn't rescan; 1,563 tracks in 2 min on Windows (macOS and Linux untested on a card) |
 | Screen-off controls | device | Pause, volume and track skip with the screen off |
 | Portrait mode | device | Settings → Orientation: Portrait or Portrait, flipped, with portrait layouts for Home, Now Playing, Cover Flow, the Custom EQ and lists; the volume rocker turns with the screen |
 | Languages | installed once; not checked screen by screen | Settings → Language, 16 languages in packs loaded at start; no native speaker has reviewed the translations yet (the Chinese starts from a contributor's text); Cyrillic, Greek and extended Latin letters in track names draw |
@@ -31,7 +31,7 @@ Version 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in pl
 | Bluetooth headphones | device | Pair, remember up to six, auto-reconnect, switch and disconnect; headphone controls; tested with OnePlus Buds 3 |
 | USB mass storage | device | Internal storage and the SD card, read/write, at high speed; SD card reads at about 3.9 MB/s |
 | USB DAC mode | device | Settings → USB mode → DAC: a USB Audio Class 1.0 sound card, 16 or 24-bit at 44.1 or 48 kHz, with its own remembered volume; played on the player from Windows 11 (all four formats) and an Android phone |
-| Updates and the way back to FiiO | device | EchoPod installs its own updates and FiiO's 8 GB firmware from a file copy |
+| Updates and the way back to FiiO | device | Rippl installs its own updates and FiiO's 8 GB firmware from a file copy |
 | Configurable start screen | sim | Works in the simulator; not yet checked on the player |
 
 ## Next
@@ -44,7 +44,7 @@ Version 0.11.1 plays 192 kHz FLAC cleanly again, keeps the landscape clock in pl
 | Check the post-0.1.0 fixes and audiobook bookmarks on hardware | in progress |
 | Faster cover decoding on the player (about 0.5 s per album) | todo |
 | Browse while covers are built | todo |
-| echo-sync on a Mac and on Linux with a real card | todo |
+| rippl-sync on a Mac and on Linux with a real card | todo |
 | Firmware images in GitHub releases | todo |
 | Playback speed for audiobooks and podcasts | todo |
 | Installing from a Mac through FiiO's updater | todo |

@@ -109,23 +109,18 @@ static void the_stock_presets_keep_their_bands(void)
     CHECK_EQUAL(5, equalizer_file_curve(&choice).band_count);
 }
 
-static void a_version_one_file_still_loads(void)
+static void another_version_is_rejected(void)
 {
-    uint8_t bytes[20] = {'E', 'M', 'E', 'Q'};
-    bytes[4] = 1;
-    bytes[6] = EQUALIZER_PRESET_CUSTOM;
-    bytes[GAINS_FIELD] = 0;
-    bytes[GAINS_FIELD + 6] = 7;
-    uint32_t checksum = hash_update(HASH_START, bytes, 16);
-    for (int index = 0; index < 4; index++) {
-        bytes[16 + index] = (uint8_t)(checksum >> (8 * index));
+    EqualizerChoice choice = custom_choice();
+    uint8_t bytes[EQUALIZER_FILE_SIZE];
+    equalizer_file_encode(&choice, bytes);
+    CHECK_EQUAL(1, bytes[4]);
+    for (uint8_t version = 2; version <= 3; version++) {
+        bytes[4] = version;
+        rewrite_checksum(bytes);
+        EqualizerChoice loaded = equalizer_file_defaults();
+        CHECK(!equalizer_file_decode(bytes, sizeof bytes, &loaded));
     }
-    EqualizerChoice loaded = equalizer_file_defaults();
-    CHECK(equalizer_file_decode(bytes, sizeof bytes, &loaded));
-    CHECK_EQUAL(EQUALIZER_PRESET_CUSTOM, loaded.preset);
-    CHECK_EQUAL('\0', loaded.preset_name[0]);
-    CHECK_EQUAL(-12, loaded.custom_gains[0]);
-    CHECK_EQUAL(-5, loaded.custom_gains[6]);
 }
 
 int main(void)
@@ -137,7 +132,7 @@ int main(void)
         TEST_CASE(out_of_range_values_are_rejected),
         TEST_CASE(the_custom_curve_uses_seven_bands_from_63_hz_to_16_khz),
         TEST_CASE(the_stock_presets_keep_their_bands),
-        TEST_CASE(a_version_one_file_still_loads),
+        TEST_CASE(another_version_is_rejected),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

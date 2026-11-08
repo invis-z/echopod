@@ -1,4 +1,4 @@
-# EchoPod release notes
+# Rippl release notes
 
 ## 0.11.1
 
@@ -26,11 +26,11 @@ This release answers most of the requests from GitHub and Reddit: listen history
 
 ### New
 
-- **Listen history for Last.fm and ListenBrainz** (issue 38). Each time you connect to a computer, the player adds what you played to `/.scrobbler.log` on the card, the file Rockbox-style uploaders read (for example rb-scrobbler). `tools/echo_history.py` can also write it. A play counts when the track is over 30 s and you heard half of it or 4 minutes. Audiobooks and podcasts aren't logged. Settings → Listen history turns it off.
-- **A clock** (issue 23). EchoPod reads the player's clock chip at start, sets it from your computer at the end of every echo-sync, and Settings → Date & time sets it by hand. Settings → Clock shows the time in the status bar. Listen history uses it for real play times; without a set clock, times are estimated by counting back from when you connect. A clock dated before this firmware was built counts as not set, and the first start after installing asks once to set it. Diagnostics → Clock shows what the chip holds.
+- **Listen history for Last.fm and ListenBrainz** (issue 38). Each time you connect to a computer, the player adds what you played to `/.scrobbler.log` on the card, the file Rockbox-style uploaders read (for example rb-scrobbler). `tools/rippl_history.py` can also write it. A play counts when the track is over 30 s and you heard half of it or 4 minutes. Audiobooks and podcasts aren't logged. Settings → Listen history turns it off.
+- **A clock** (issue 23). Rippl reads the player's clock chip at start, sets it from your computer at the end of every rippl-sync, and Settings → Date & time sets it by hand. Settings → Clock shows the time in the status bar. Listen history uses it for real play times; without a set clock, times are estimated by counting back from when you connect. A clock dated before this firmware was built counts as not set, and the first start after installing asks once to set it. Diagnostics → Clock shows what the chip holds.
 - **USB DAC mode:** play/pause, next and previous reach the computer; volume keys no longer crackle; the DAC screen shows the battery; Swap volume buttons and portrait apply.
 - **Ask when connected:** plugging into a computer asks Storage, DAC or Charge only (issue 5). Settings → Ask when connected turns it off.
-- **Music on internal storage** (issue 36). Music on the player's own storage is in the library too, as an "Internal storage" folder; Settings → Music folders leaves its folders out. echo-sync finds the player's internal storage drive by itself. The library files stay on the microSD card.
+- **Music on internal storage** (issue 36). Music on the player's own storage is in the library too, as an "Internal storage" folder; Settings → Music folders leaves its folders out. rippl-sync finds the player's internal storage drive by itself. The library files stay on the microSD card.
 - **Settings are grouped** into Sound, Display, Library, Buttons and System.
 - **Settings → Music folders:** untick top-level folders to leave them out of the library.
 - **Cover Flow for folders and playlists** (issue 17): Settings → Folders & playlists → Cover Flow. **Settings → Cover Flow** shows 5 or 3 covers, and the outer covers are smaller.
@@ -64,7 +64,7 @@ This release answers most of the requests from GitHub and Reddit: listen history
 - Your library and settings stay as they are. Going back to 0.10 or earlier resets settings to defaults.
 - After an update installs, restart the player before connecting it to a computer again.
 - Delete the update file from the player once it has installed, or it installs again.
-- Set the clock after installing (Settings → Date & time) or sync with echo-sync. A clock dated before the firmware was built counts as not set, and the player asks once after the update.
+- Set the clock after installing (Settings → Date & time) or sync with rippl-sync. A clock dated before the firmware was built counts as not set, and the player asks once after the update.
 
 ## 0.10.1
 
@@ -95,7 +95,7 @@ This release answers most of the open GitHub issues.
 - **Settings → Artist albums → Cover Flow** opens an artist, album artist or genre as a Cover Flow of only their albums (issue 27).
 - **Start screen** can also be Album Artists, Genres, Folders or All Songs (issue 22).
 - **Russian and Ukrainian** interface languages (issue 21). Not yet checked by a native speaker; corrections are welcome.
-- **`tools/echo_bookmarks.py`** lists the audiobook and podcast bookmarks on a card, or with `--finished` prints the finished episodes one per line for sync scripts (issue 16).
+- **`tools/rippl_bookmarks.py`** lists the audiobook and podcast bookmarks on a card, or with `--finished` prints the finished episodes one per line for sync scripts (issue 16).
 - **Diagnostics → Panel** shows the screen's ID, which says which of the two screen start-up sequences the player uses (issue 15).
 
 ### Fixed
@@ -103,7 +103,7 @@ This release answers most of the open GitHub issues.
 - **Turning off with the screen off now shows "Goodbye"** (issue 5). Before, the player switched off silently, so it looked like nothing happened. The sleep timer and auto off still turn off without lighting the screen.
 - **Fast scroll no longer races through the alphabet** (issue 5): after 3 s of holding it moves one letter every 0.45 s instead of one every 0.12 s.
 - **Holding the rocker in Cover Flow speeds up**, up to 4 albums a step (issue 5).
-- **A "?" at the end of some titles** (issue 21): invisible characters such as a stray byte-order mark, zero-width spaces and control codes are dropped, and bytes 0x80–0x9F in Latin-1 tags are read as Windows-1252 (curly quotes, dashes, "…"). Rescan the library to apply it. echo-sync does the same.
+- **A "?" at the end of some titles** (issue 21): invisible characters such as a stray byte-order mark, zero-width spaces and control codes are dropped, and bytes 0x80–0x9F in Latin-1 tags are read as Windows-1252 (curly quotes, dashes, "…"). Rescan the library to apply it. rippl-sync does the same.
 - **The Bluetooth icon is a crisp 5 × 9 drawing** instead of thin diagonals that blurred at status-bar size (issue 21).
 - **Going back to FiiO's firmware** (issue 1):
   - The search for the second firmware slot prefers the copy that matches the first slot, so an old leftover firmware header can no longer make the slot look too small.
@@ -134,11 +134,11 @@ Most of this comes from a comparison with FiiO's 4.0.0 firmware that velppa's Cl
 
 - **The quietest volume steps are quieter.** Step 1 starts at FiiO's quietest level and the first three steps rise smoothly from it. Before, step 1 was about −60 dB, which was loud with sensitive in-ear monitors.
 - **Bluetooth has its own volume curve**, 6.5 dB quieter than wired, as in FiiO's firmware.
-- **The screen type is read from the panel** (READ ID) instead of assumed, so a unit with the other panel gets its own start-up sequence. Tested only on a panel that uses the one EchoPod already used.
+- **The screen type is read from the panel** (READ ID) instead of assumed, so a unit with the other panel gets its own start-up sequence. Tested only on a panel that uses the one Rippl already used.
 - **The headphone-jack detect pins get their pull settings at start-up**, as in FiiO's firmware, not only when audio goes to Bluetooth.
 - **Turning off while music plays powers the DAC down first**, which should avoid a pop.
 - **The updater also installs `ECHOMINI.IMG`**, checked before `HIFIEC00.IMG` to `HIFIEC97.IMG`.
-- **The second firmware slot is found by its header** when it isn't where EchoPod assumed it, so internal-storage writes are fenced to the real slots. On the tested unit nothing changes.
+- **The second firmware slot is found by its header** when it isn't where Rippl assumed it, so internal-storage writes are fenced to the real slots. On the tested unit nothing changes.
 
 ### When you update
 
@@ -206,7 +206,7 @@ Most of this comes from a comparison with FiiO's 4.0.0 firmware that velppa's Cl
 - **Equalizer.** Settings → Equalizer, or hold ≡ on Now Playing. It has the presets from FiiO's firmware (Retro, Bass, Heavy, Pop, Jazz, Unique) and a 7-band Custom EQ (63 Hz to 16 kHz, ±12 dB): Vol± pick a band, ▶ grabs it and Vol± set its level. You hear each preset as you scroll to it, and the player remembers the last one you used. Boosts lower the overall level a little so loud music doesn't distort. The equalizer works for tracks up to 96 kHz, and through Bluetooth; it is off for 176.4 and 192 kHz tracks and in USB DAC mode. For FLAC and ALAC it runs on the second core, which then runs at full speed, so the screen stays smooth on hi-res tracks; that uses a little more battery while the equalizer is on.
 - **ALAC (Apple Lossless) plays.** `.m4a` files in Apple Lossless now play, at 16, 20 or 24 bits, mono or stereo, at the same rates as FLAC (44.1 to 192 kHz), with seeking and gapless playback. Now Playing shows ALAC with the bit depth and rate.
 - **AAC plays.** `.m4a` files in AAC (the kind iTunes and most phones make) now play, mono or stereo, with seeking and gapless playback (the encoder's lead-in is trimmed). Now Playing shows AAC with the bitrate. HE-AAC files (often used for podcasts and radio) still say they aren't supported. AAC and Opus run the second core at full speed, so they may use a little more battery than FLAC or MP3.
-- **Opus plays.** `.opus` files now show up in the library (with their tags and length) and play, mono or stereo, with seeking that lands on the exact spot and gapless playback. Now Playing shows Opus with the bitrate. Rescan the library (Settings → Rescan library) or run echo-sync again to see Opus files you already have.
+- **Opus plays.** `.opus` files now show up in the library (with their tags and length) and play, mono or stereo, with seeking that lands on the exact spot and gapless playback. Now Playing shows Opus with the bitrate. Rescan the library (Settings → Rescan library) or run rippl-sync again to see Opus files you already have.
 
 ### Faster
 
@@ -216,7 +216,7 @@ Most of this comes from a comparison with FiiO's 4.0.0 firmware that velppa's Cl
 
 ### New
 
-- **Albums stay together when some tracks feature another artist.** When files have no album-artist tag, a track by "The Weeknd & Justice" used to split off from the rest of "Hurry Up Tomorrow" by The Weeknd. Tracks without that tag that share a folder and album name are now one album, under the artist most of them share. Rescan the library (Settings → Rescan library) or run echo-sync again to see it.
+- **Albums stay together when some tracks feature another artist.** When files have no album-artist tag, a track by "The Weeknd & Justice" used to split off from the rest of "Hurry Up Tomorrow" by The Weeknd. Tracks without that tag that share a folder and album name are now one album, under the artist most of them share. Rescan the library (Settings → Rescan library) or run rippl-sync again to see it.
 - **Random album.** Cover Flow starts with a Random album tile (a shuffle mark as its cover), just before the first album. Press Play on it to hear a random album from its first track, in order.
 
 ### Fixed
@@ -237,7 +237,7 @@ Most of this comes from a comparison with FiiO's 4.0.0 firmware that velppa's Cl
 
 - **Switching off on a cable.** Holding Power with a charger or computer plugged in left the screen black and the player unresponsive until the reset button: the cable kept it powered. It now shows the charge screen.
 - **Battery percent** ([#4](https://github.com/BasilSkyWalk/echopod/issues/4)). The level dropped a few points whenever playback or the screen briefly loaded the battery, and could show 98 % on the charger when the battery held less, which then looked like drain while off. It now averages about a minute of readings, never shows more than 99 % while charging, and settles to the true level within a minute of unplugging.
-- **Start-up.** The screen stays dark until EchoPod's first frame, so the panel's noise no longer flashes in the corner.
+- **Start-up.** The screen stays dark until Rippl's first frame, so the panel's noise no longer flashes in the corner.
 - **Dark screen during USB.** A message shown with the screen off (such as "Computer found") could stay almost black for the whole USB session; it now lights fully.
 
 ### Known limits
@@ -258,14 +258,14 @@ Most of this comes from a comparison with FiiO's 4.0.0 firmware that velppa's Cl
 
 ### Fixed
 
-- **Going back to FiiO's firmware 4.0.0.** EchoPod refused FiiO's newest 8 GB firmware (`HIFIEC40.IMG`) as "isn't a valid image for this player": it told the 8 GB and 512 MB models apart by a size field that FiiO changed in 4.0.0. It now looks for the update file name each FiiO image is built to look for (`HIFIECnn.IMG` on the 8 GB model, `MINIVnnn.IMG` on the 512 MB one), checked against FiiO's 3.7.0 to 4.0.0 images, and still refuses the 512 MB model's firmware. Tested on the player: 0.3.0 installed FiiO 4.0.0, and FiiO 4.0.0 installed 0.3.0 again. On 0.2.0, install FiiO 3.9.0 first and update to 4.0.0 from there.
+- **Going back to FiiO's firmware 4.0.0.** Rippl refused FiiO's newest 8 GB firmware (`HIFIEC40.IMG`) as "isn't a valid image for this player": it told the 8 GB and 512 MB models apart by a size field that FiiO changed in 4.0.0. It now looks for the update file name each FiiO image is built to look for (`HIFIECnn.IMG` on the 8 GB model, `MINIVnnn.IMG` on the 512 MB one), checked against FiiO's 3.7.0 to 4.0.0 images, and still refuses the 512 MB model's firmware. Tested on the player: 0.3.0 installed FiiO 4.0.0, and FiiO 4.0.0 installed 0.3.0 again. On 0.2.0, install FiiO 3.9.0 first and update to 4.0.0 from there.
 - **USB DAC plays on more computers and phones.** Android always picked 96 kHz, and some computers pick 88.2 or 96 kHz too, but this chip can't take packets that large, so those hosts showed the format and played nothing. DAC mode now offers 44.1 and 48 kHz (16 or 24-bit), and no longer depends on the order in which the computer sets the format and the rate. All four formats played on the player from Windows 11, and it played from an Android phone; Linux hasn't been tried yet. If you set your computer to 88.2 or 96 kHz before, pick 48 kHz.
 - **Gapless MP3.** MP3s made with LAME or ffmpeg now play without a gap between tracks: the player reads the encoder delay and padding from the file's LAME tag and drops the silence the encoder added at each end.
 
 ### Faster
 
 - **Rescans keep the covers.** A rescan no longer decodes every album's picture again: covers whose art is unchanged are kept, and only new albums and changed art are decoded (about half a second each). The first rescan after updating still decodes them all, once. The covers file now has room for 2,673 albums instead of 2,674.
-- **echo-sync's covers are kept too.** echo-sync now writes `covers.bin` in the player's layout with the same art stamps, so when the player does rescan (say after you add an album), it keeps the covers the computer made and decodes only what's new. Download echo-sync again to get this.
+- **rippl-sync's covers are kept too.** rippl-sync now writes `covers.bin` in the player's layout with the same art stamps, so when the player does rescan (say after you add an album), it keeps the covers the computer made and decodes only what's new. Download rippl-sync again to get this.
 - JPEG covers decode slightly faster (about 5–8 % on a PC).
 
 ## 0.2.0
@@ -274,13 +274,13 @@ Most of this comes from a comparison with FiiO's 4.0.0 firmware that velppa's Cl
 
 - **Audiobooks and podcasts.** Put books in an `Audiobooks` folder and shows in a `Podcasts` folder at the top of the card. Home gets an Audiobooks and a Podcasts shelf. Each book and episode remembers where it stopped, books always play in order (even with shuffle on), and holding vol± jumps 30 s forward or 15 s back instead of skipping. Books and episodes stay out of Music: they never show up in Cover Flow, Albums, Artists, Genres, Songs or shuffle.
 - **USB DAC mode.** Settings → USB mode → DAC turns the player into a USB sound card (USB Audio Class 1.0, 16 or 24-bit up to 96 kHz). It has its own volume, remembered between sessions (vol± changes it, hold to repeat), and the screen shows the format and volume.
-- **echo-sync: build the library on a computer.** One file for Windows, macOS (Apple silicon) or Linux, nothing to install. It reads the music on the player's card (in Storage mode or a card reader) and writes the library, covers and scan fingerprint, so the player starts without scanning. 1,563 tracks take about 2 minutes. See "Build the library on a computer" in `docs/user-guide.md`.
+- **rippl-sync: build the library on a computer.** One file for Windows, macOS (Apple silicon) or Linux, nothing to install. It reads the music on the player's card (in Storage mode or a card reader) and writes the library, covers and scan fingerprint, so the player starts without scanning. 1,563 tracks take about 2 minutes. See "Build the library on a computer" in `docs/user-guide.md`.
 
 ### Faster
 
 - **USB storage reads:** about 3.9 MB/s instead of 1.3 MB/s on Windows (one multi-block card read per request).
 - **Library rebuild on the player:** writes of whole sectors go to the card in one command without reading them first, folder listings are read 4 KB at a time, and opening the tracks of one album no longer walks the card from the top for each one. A 1,563-track, 144-album card now rebuilds in about 1 minute 45 seconds, covers included; the faster file lookups alone took its track scan from 61 s to 19 s.
-- **echo-sync** skips embedded pictures and padding when it reads tags: 2 minutes instead of 22 for the same card.
+- **rippl-sync** skips embedded pictures and padding when it reads tags: 2 minutes instead of 22 for the same card.
 
 ### Fixed
 
@@ -289,12 +289,12 @@ Most of this comes from a comparison with FiiO's 4.0.0 firmware that velppa's Cl
 - Favorites no longer makes the music repeat a beat while the list opens.
 - Sound comes back after using USB, without a restart.
 - The battery level no longer drops by about 10 % when the charger is plugged in, and doesn't jump when it's unplugged.
-- After echo-sync, the player no longer rescans exFAT cards: both sides now compare file times in UTC.
+- After rippl-sync, the player no longer rescans exFAT cards: both sides now compare file times in UTC.
 
 ### Good to know when updating
 
-- **The library format changed (version 3).** After updating, the player rebuilds its library once, even if the music didn't change. echo-sync files from before 0.2.0 write the old format: download echo-sync again.
-- **Rescan timings.** Each rebuild saves where its time went to `/.echo/rescan_times.bin` on the card. If a rebuild seems slow, send that file with your report.
+- **The library format changed (version 3).** After updating, the player rebuilds its library once, even if the music didn't change. rippl-sync files from before 0.2.0 write the old format: download rippl-sync again.
+- **Rescan timings.** Each rebuild saves where its time went to `/.rippl/rescan_times.bin` on the card. If a rebuild seems slow, send that file with your report.
 - Everything else that's missing or unproven is in `docs/known-issues.md`.
 
 ## 0.1.0

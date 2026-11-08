@@ -1,4 +1,4 @@
-add_library(echo_image STATIC
+add_library(rippl_image STATIC
     cover_grid.c
     cover_image.c
     image_arena.c
@@ -9,8 +9,8 @@ add_library(echo_image STATIC
     jpeg_entropy.c
     png.c
 )
-target_include_directories(echo_image PUBLIC include)
-target_link_libraries(echo_image
-    PUBLIC echo_core
-    PRIVATE echo_options
+target_include_directories(rippl_image PUBLIC include)
+target_link_libraries(rippl_image
+    PUBLIC rippl_core
+    PRIVATE rippl_options
 )

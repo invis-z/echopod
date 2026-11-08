@@ -3,7 +3,7 @@
 #include "core/hash.h"
 #include "hal/storage.h"
 
-const char LISTEN_HISTORY_PATH[] = "/.echo/history.bin";
+const char LISTEN_HISTORY_PATH[] = "/.rippl/history.bin";
 
 _Static_assert(sizeof(HistoryRecord) == HISTORY_TEXT_AT - HISTORY_FIELDS_AT,
                "a record's fields fill the bytes before its texts");

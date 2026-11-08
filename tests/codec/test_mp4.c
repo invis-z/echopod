@@ -407,7 +407,7 @@ static void a_file_without_sound_is_refused(void)
 static Buffer load_fixture(const char *name)
 {
     char path[512];
-    snprintf(path, sizeof path, "%s/tags/%s", ECHO_FIXTURE_DIR, name);
+    snprintf(path, sizeof path, "%s/tags/%s", RIPPL_FIXTURE_DIR, name);
     Buffer buffer = {NULL, 0};
     FILE *file = fopen(path, "rb");
     if (file == NULL) {

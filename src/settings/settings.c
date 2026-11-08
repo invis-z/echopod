@@ -5,39 +5,27 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 9,
-    FIRST_VERSION = 1,
-    AUTO_OFF_VERSION = 2,
-    USB_MODE_VERSION = 3,
-    DAC_VOLUME_VERSION = 4,
-    ORIENTATION_VERSION = 5,
-    LANGUAGE_VERSION = 6,
-    DAC_VERSION = 7,
-    OPTIONS_VERSION = 8,
-    WIDE_VERSION = 9,
+    VERSION = 1,
     FILTER_SHIFT = 5,
     BALANCE_MASK = 0x1F,
     MAGIC_SIZE = 4,
     VERSION_FIELD = 4,
-    BRIGHTNESS_FIELD = 6,
-    TIMEOUT_FIELD = 7,
-    GAIN_FIELD = 8,
-    OUTPUT_FIELD = 9,
-    START_FIELD = 10,
-    SHUFFLE_FIELD = 11,
-    REPEAT_FIELD = 12,
-    VOLUME_FIELD = 13,
-    AUTO_OFF_FIELD = 14,
-    USB_MODE_FIELD = 15,
-    DAC_VOLUME_FIELD = 16,
-    ORIENTATION_FIELD = 17,
-    LANGUAGE_FIELD = 18,
-    DAC_FIELD = 19,
-    OLD_CHECKSUM_FIELD = 20,
-    OPTIONS_FIELD = 20,
-    V8_OPTION_COUNT = 8,
-    V8_CHECKSUM_FIELD = OPTIONS_FIELD + V8_OPTION_COUNT,
-    CHECKSUM_FIELD = SETTINGS_FILE_SIZE - 4,
+    BRIGHTNESS_FIELD = 5,
+    TIMEOUT_FIELD = 6,
+    GAIN_FIELD = 7,
+    OUTPUT_FIELD = 8,
+    START_FIELD = 9,
+    SHUFFLE_FIELD = 10,
+    REPEAT_FIELD = 11,
+    VOLUME_FIELD = 12,
+    AUTO_OFF_FIELD = 13,
+    USB_MODE_FIELD = 14,
+    DAC_VOLUME_FIELD = 15,
+    ORIENTATION_FIELD = 16,
+    LANGUAGE_FIELD = 17,
+    DAC_FIELD = 18,
+    OPTIONS_FIELD = 19,
+    CHECKSUM_FIELD = OPTIONS_FIELD + SETTINGS_OPTION_COUNT,
     DEFAULT_BRIGHTNESS = 7,
     DEFAULT_TIMEOUT_OPTION = 2,
     DEFAULT_VOLUME = 12,
@@ -71,13 +59,10 @@ static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
     [OPTION_THEME] = 2,
     [OPTION_LYRICS] = 2,
     [OPTION_FOLDER_VIEW] = 2,
-    [OPTION_RETIRED_INTERNAL_STORAGE] = 2,
     [OPTION_STATUS_BAR] = 2,
     [OPTION_POWER_ON] = 2};
 
-_Static_assert(OPTIONS_FIELD + SETTINGS_OPTION_COUNT <= CHECKSUM_FIELD,
-               "the options must fit the file");
-_Static_assert(V8_CHECKSUM_FIELD + 4 == SETTINGS_V8_FILE_SIZE, "version 8 files are 32 bytes");
+_Static_assert(CHECKSUM_FIELD + 4 == SETTINGS_FILE_SIZE, "the checksum ends the file");
 
 Settings settings_defaults(void)
 {
@@ -137,23 +122,9 @@ uint8_t settings_option_count(SettingOption option)
     return option < SETTINGS_OPTION_COUNT ? OPTION_COUNTS[option] : 0;
 }
 
-static int checksum_field_of(uint8_t version)
-{
-    return version < OPTIONS_VERSION ? OLD_CHECKSUM_FIELD
-           : version < WIDE_VERSION  ? V8_CHECKSUM_FIELD
-                                     : CHECKSUM_FIELD;
-}
-
-static int option_count_of(uint8_t version)
-{
-    return version < OPTIONS_VERSION ? 0
-           : version < WIDE_VERSION  ? V8_OPTION_COUNT
-                                     : SETTINGS_OPTION_COUNT;
-}
-
 static uint32_t checksum_of(const uint8_t *bytes)
 {
-    return hash_update(HASH_START, bytes, (size_t)checksum_field_of(bytes[VERSION_FIELD]));
+    return hash_update(HASH_START, bytes, CHECKSUM_FIELD);
 }
 
 static void put_u32(uint8_t *bytes, int offset, uint32_t value)
@@ -205,15 +176,13 @@ static bool header_valid(const uint8_t *bytes, uint32_t length)
             return false;
         }
     }
-    uint8_t version = bytes[VERSION_FIELD];
-    return version >= FIRST_VERSION && version <= VERSION && bytes[VERSION_FIELD + 1] == 0 &&
-           (uint32_t)checksum_field_of(version) + 4 <= length &&
-           get_u32(bytes, checksum_field_of(version)) == checksum_of(bytes);
+    return length >= SETTINGS_FILE_SIZE && bytes[VERSION_FIELD] == VERSION &&
+           get_u32(bytes, CHECKSUM_FIELD) == checksum_of(bytes);
 }
 
 static bool options_valid(const uint8_t *bytes)
 {
-    for (int option = 0; option < option_count_of(bytes[VERSION_FIELD]); option++) {
+    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
         if (bytes[OPTIONS_FIELD + option] >= OPTION_COUNTS[option]) {
             return false;
         }
@@ -232,17 +201,14 @@ static bool values_valid(const uint8_t *bytes)
            bytes[AUTO_OFF_FIELD] < AUTO_OFF_OPTION_COUNT &&
            bytes[USB_MODE_FIELD] < USB_MODE_COUNT &&
            bytes[DAC_VOLUME_FIELD] <= SETTINGS_VOLUME_MAX &&
-           bytes[ORIENTATION_FIELD] < ORIENTATION_COUNT &&
-           (bytes[VERSION_FIELD] < LANGUAGE_VERSION || bytes[LANGUAGE_FIELD] < LANGUAGE_COUNT) &&
-           (bytes[VERSION_FIELD] < DAC_VERSION ||
-            ((bytes[DAC_FIELD] >> FILTER_SHIFT) < DAC_FILTER_COUNT &&
-             (bytes[DAC_FIELD] & BALANCE_MASK) < SETTINGS_BALANCE_STEPS)) &&
-           options_valid(bytes);
+           bytes[ORIENTATION_FIELD] < ORIENTATION_COUNT && bytes[LANGUAGE_FIELD] < LANGUAGE_COUNT &&
+           (bytes[DAC_FIELD] >> FILTER_SHIFT) < DAC_FILTER_COUNT &&
+           (bytes[DAC_FIELD] & BALANCE_MASK) < SETTINGS_BALANCE_STEPS && options_valid(bytes);
 }
 
 bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
 {
-    if (length < SETTINGS_V8_FILE_SIZE || !header_valid(bytes, length) || !values_valid(bytes)) {
+    if (!header_valid(bytes, length) || !values_valid(bytes)) {
         return false;
     }
     *settings = (Settings){
@@ -254,23 +220,15 @@ bool settings_decode(const uint8_t *bytes, uint32_t length, Settings *settings)
         .shuffle = (ShuffleMode)bytes[SHUFFLE_FIELD],
         .repeat = (RepeatMode)bytes[REPEAT_FIELD],
         .volume = bytes[VOLUME_FIELD],
-        .auto_off = bytes[VERSION_FIELD] < AUTO_OFF_VERSION ? (uint8_t)DEFAULT_AUTO_OFF_OPTION
-                                                            : bytes[AUTO_OFF_FIELD],
-        .usb_mode = bytes[VERSION_FIELD] < USB_MODE_VERSION ? USB_MODE_STORAGE
-                                                            : (UsbMode)bytes[USB_MODE_FIELD],
-        .dac_volume = bytes[VERSION_FIELD] < DAC_VOLUME_VERSION
-                          ? (uint8_t)SETTINGS_DEFAULT_DAC_VOLUME
-                          : bytes[DAC_VOLUME_FIELD],
-        .orientation = bytes[VERSION_FIELD] < ORIENTATION_VERSION
-                           ? ORIENTATION_LANDSCAPE
-                           : (Orientation)bytes[ORIENTATION_FIELD],
-        .language = bytes[VERSION_FIELD] < LANGUAGE_VERSION ? LANGUAGE_ENGLISH
-                                                            : (Language)bytes[LANGUAGE_FIELD],
-        .filter = bytes[VERSION_FIELD] < DAC_VERSION ? 0 : bytes[DAC_FIELD] >> FILTER_SHIFT,
-        .balance = bytes[VERSION_FIELD] < DAC_VERSION ? SETTINGS_BALANCE_CENTER
-                                                      : bytes[DAC_FIELD] & BALANCE_MASK,
+        .auto_off = bytes[AUTO_OFF_FIELD],
+        .usb_mode = (UsbMode)bytes[USB_MODE_FIELD],
+        .dac_volume = bytes[DAC_VOLUME_FIELD],
+        .orientation = (Orientation)bytes[ORIENTATION_FIELD],
+        .language = (Language)bytes[LANGUAGE_FIELD],
+        .filter = bytes[DAC_FIELD] >> FILTER_SHIFT,
+        .balance = bytes[DAC_FIELD] & BALANCE_MASK,
     };
-    for (int option = 0; option < option_count_of(bytes[VERSION_FIELD]); option++) {
+    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
         settings->options[option] = bytes[OPTIONS_FIELD + option];
     }
     return true;

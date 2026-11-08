@@ -4,7 +4,7 @@
 
 #include "hal/storage.h"
 
-const char FOLDERS_STORE_PATH[] = "/.echo/folders.bin";
+const char FOLDERS_STORE_PATH[] = "/.rippl/folders.bin";
 
 void folders_store_load(MusicFolders *folders)
 {

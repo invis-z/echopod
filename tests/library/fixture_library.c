@@ -25,7 +25,7 @@ const uint8_t *fixture_bytes(uint32_t *size)
 {
     if (fixture_size == 0) {
         fixture_size =
-            load_fixture(ECHO_FIXTURE_DIR "/small_library.db", fixture_data, sizeof fixture_data);
+            load_fixture(RIPPL_FIXTURE_DIR "/small_library.db", fixture_data, sizeof fixture_data);
     }
     *size = fixture_size;
     return fixture_data;
@@ -35,7 +35,7 @@ const uint8_t *fixture_covers_bytes(uint32_t *size)
 {
     if (covers_size == 0) {
         covers_size =
-            load_fixture(ECHO_FIXTURE_DIR "/small_covers.bin", covers_data, sizeof covers_data);
+            load_fixture(RIPPL_FIXTURE_DIR "/small_covers.bin", covers_data, sizeof covers_data);
     }
     *size = covers_size;
     return covers_data;

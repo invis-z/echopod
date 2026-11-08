@@ -9,7 +9,7 @@ enum {
 
 static bool parse(char **given, int count, SimOptions *options)
 {
-    char *arguments[MAX_ARGUMENTS] = {"echo_sim"};
+    char *arguments[MAX_ARGUMENTS] = {"rippl_sim"};
     for (int index = 0; index < count; index++) {
         arguments[index + 1] = given[index];
     }

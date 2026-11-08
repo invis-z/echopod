@@ -55,7 +55,7 @@ static bool expand(SparseCard *card, const uint8_t *data, long size)
 bool sparse_card_load(SparseCard *card, const char *name)
 {
     char path[1024];
-    snprintf(path, sizeof path, "%s/cards/%s.sparse", ECHO_FIXTURE_DIR, name);
+    snprintf(path, sizeof path, "%s/cards/%s.sparse", RIPPL_FIXTURE_DIR, name);
     *card = (SparseCard){.bytes = NULL};
     uint8_t *data = NULL;
     long size = 0;

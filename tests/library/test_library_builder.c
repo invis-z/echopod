@@ -137,7 +137,7 @@ static void add_fixture_tracks(LibraryBuilder *builder)
 static uint8_t *read_fixture(const char *name, uint32_t *size)
 {
     char path[512];
-    snprintf(path, sizeof path, "%s/%s", ECHO_FIXTURE_DIR, name);
+    snprintf(path, sizeof path, "%s/%s", RIPPL_FIXTURE_DIR, name);
     FILE *file = fopen(path, "rb");
     CHECK(file != NULL);
     fseek(file, 0, SEEK_END);

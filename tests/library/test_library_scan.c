@@ -139,7 +139,7 @@ static void report(void *context, uint32_t files, uint32_t tracks)
 static uint8_t *read_fixture(const char *name, uint32_t *size)
 {
     char path[512];
-    snprintf(path, sizeof path, "%s/%s", ECHO_FIXTURE_DIR, name);
+    snprintf(path, sizeof path, "%s/%s", RIPPL_FIXTURE_DIR, name);
     FILE *file = fopen(path, "rb");
     CHECK(file != NULL);
     fseek(file, 0, SEEK_END);
@@ -174,7 +174,7 @@ static void scanning_the_tag_fixtures_matches_the_pc_indexer(void)
     static Output output;
     Progress progress = {.calls = 0};
     ScanStats stats;
-    CHECK_EQUAL(SCAN_OK, scan_folder(ECHO_FIXTURE_DIR "/tags", &output, &progress, &stats));
+    CHECK_EQUAL(SCAN_OK, scan_folder(RIPPL_FIXTURE_DIR "/tags", &output, &progress, &stats));
     CHECK_EQUAL(13u, stats.tracks);
     CHECK_EQUAL(13u, progress.last_tracks);
     CHECK_EQUAL(0u, progress.last_files);
@@ -191,7 +191,7 @@ static void scanning_folders_and_playlists_matches_the_pc_indexer(void)
     static Output output;
     Progress progress = {.calls = 0};
     ScanStats stats;
-    CHECK_EQUAL(SCAN_OK, scan_folder(ECHO_FIXTURE_DIR "/scan_music", &output, &progress, &stats));
+    CHECK_EQUAL(SCAN_OK, scan_folder(RIPPL_FIXTURE_DIR "/scan_music", &output, &progress, &stats));
     CHECK_EQUAL(8u, stats.tracks);
     uint32_t expected_size = 0;
     uint8_t *expected = read_fixture("scan_music.db", &expected_size);
@@ -204,8 +204,8 @@ static void internal_storage_scans_as_one_more_root_folder_like_the_pc_indexer(v
     static uint8_t memory[MEMORY_SIZE];
     static HostFiles files;
     static Output output;
-    sim_storage_configure(ECHO_FIXTURE_DIR "/scan_music", NULL);
-    sim_storage_configure_internal(ECHO_FIXTURE_DIR "/tags");
+    sim_storage_configure(RIPPL_FIXTURE_DIR "/scan_music", NULL);
+    sim_storage_configure_internal(RIPPL_FIXTURE_DIR "/tags");
     output.length = 0;
     ScanJob job = {
         .files = {open_dir, next_entry, close_dir, open_file, close_file, &files},
@@ -242,7 +242,7 @@ static void left_out_folders_match_the_pc_indexer(void)
     MusicFolders folders = fixture_folders();
     CHECK_EQUAL(2u, folders.count);
     host_skip = &folders;
-    ScanResult result = scan_folder(ECHO_FIXTURE_DIR "/scan_music", &output, &progress, &stats);
+    ScanResult result = scan_folder(RIPPL_FIXTURE_DIR "/scan_music", &output, &progress, &stats);
     host_skip = NULL;
     CHECK_EQUAL(SCAN_OK, result);
     CHECK_EQUAL(3u, stats.tracks);
@@ -258,7 +258,7 @@ static void a_separate_listing_leaves_the_memory_to_the_builder(void)
     static _Alignas(8) uint8_t listing[16 * 1024];
     static HostFiles files;
     static Output output;
-    sim_storage_configure(ECHO_FIXTURE_DIR "/scan_music", NULL);
+    sim_storage_configure(RIPPL_FIXTURE_DIR "/scan_music", NULL);
     output.length = 0;
     ScanJob job = {
         .files = {open_dir, next_entry, close_dir, open_file, close_file, &files},
@@ -283,7 +283,7 @@ static void a_missing_music_root_says_so(void)
     Progress progress = {.calls = 0};
     ScanStats stats;
     CHECK_EQUAL(SCAN_NO_MUSIC_ROOT,
-                scan_folder(ECHO_FIXTURE_DIR "/no such folder", &output, &progress, &stats));
+                scan_folder(RIPPL_FIXTURE_DIR "/no such folder", &output, &progress, &stats));
 }
 
 enum {

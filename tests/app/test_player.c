@@ -354,7 +354,7 @@ static void a_session_from_another_library_is_ignored(void)
     ResumeState foreign = {.library_fingerprint = 1, .plan = {.source = back_in_black()}};
     uint8_t bytes[RESUME_STATE_SIZE];
     resume_state_encode(&foreign, bytes);
-    hal_file_write("/.echo/resume.bin", bytes, sizeof bytes);
+    hal_file_write("/.rippl/resume.bin", bytes, sizeof bytes);
     CHECK(!player_restore(&player));
     CHECK_EQUAL(PLAYER_IDLE, player_status(&player).state);
 }

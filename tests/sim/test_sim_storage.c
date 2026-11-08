@@ -28,7 +28,7 @@ static Found find(const char *path, const char *name)
 
 static void the_card_root_lists_its_folders(void)
 {
-    sim_storage_configure(ECHO_FIXTURE_DIR, NULL);
+    sim_storage_configure(RIPPL_FIXTURE_DIR, NULL);
     Found flac = find("/", "flac");
     CHECK(flac.found);
     CHECK(flac.entry.directory);
@@ -36,7 +36,7 @@ static void the_card_root_lists_its_folders(void)
 
 static void a_folder_lists_its_files_with_sizes(void)
 {
-    sim_storage_configure(ECHO_FIXTURE_DIR, NULL);
+    sim_storage_configure(RIPPL_FIXTURE_DIR, NULL);
     Found file = find("/flac", "big_blocks_16.flac");
     CHECK(file.found);
     CHECK(!file.entry.directory);
@@ -47,7 +47,7 @@ static void a_folder_lists_its_files_with_sizes(void)
 
 static void a_missing_folder_does_not_open(void)
 {
-    sim_storage_configure(ECHO_FIXTURE_DIR, NULL);
+    sim_storage_configure(RIPPL_FIXTURE_DIR, NULL);
     HalDir dir;
     CHECK(!hal_dir_open(&dir, "/no such folder"));
     CHECK(!hal_dir_open(&dir, "/small_library.db"));
@@ -55,12 +55,12 @@ static void a_missing_folder_does_not_open(void)
 
 static void a_read_after_an_overwrite_sees_the_new_bytes(void)
 {
-    static const char PATH[] = "/.echo/overwritten.bin";
+    static const char PATH[] = "/.rippl/overwritten.bin";
     static const uint8_t FRESH[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
     static uint8_t zeros[8192];
     uint8_t seen[sizeof FRESH];
     HalFile file;
-    sim_storage_configure(ECHO_FIXTURE_DIR, ECHO_TEST_OUTPUT_DIR);
+    sim_storage_configure(RIPPL_FIXTURE_DIR, RIPPL_TEST_OUTPUT_DIR);
     CHECK(hal_file_write(PATH, zeros, sizeof zeros));
     CHECK(hal_file_open(&file, PATH));
     CHECK(hal_file_read(file, 4096, seen, sizeof seen));
@@ -72,17 +72,17 @@ static void a_read_after_an_overwrite_sees_the_new_bytes(void)
 
 static void a_file_grows_and_keeps_its_bytes(void)
 {
-    static const char PATH[] = "/.echo/grown.bin";
+    static const char PATH[] = "/.rippl/grown.bin";
     static const uint8_t FRESH[4] = {9, 8, 7, 6};
     static uint8_t zeros[4096];
     uint8_t seen[sizeof FRESH];
     HalFile file;
-    sim_storage_configure(ECHO_FIXTURE_DIR, ECHO_TEST_OUTPUT_DIR);
+    sim_storage_configure(RIPPL_FIXTURE_DIR, RIPPL_TEST_OUTPUT_DIR);
     CHECK(hal_file_write(PATH, zeros, sizeof zeros));
     CHECK(hal_file_write_at(PATH, 100, FRESH, sizeof FRESH));
     CHECK_EQUAL(HAL_RESERVE_EXISTS, hal_file_grow(PATH, sizeof zeros));
     CHECK_EQUAL(HAL_RESERVE_CREATED, hal_file_grow(PATH, 3 * sizeof zeros));
-    CHECK_EQUAL(HAL_RESERVE_FAILED, hal_file_grow("/.echo/never made.bin", 10));
+    CHECK_EQUAL(HAL_RESERVE_FAILED, hal_file_grow("/.rippl/never made.bin", 10));
     CHECK(hal_file_open(&file, PATH));
     CHECK_EQUAL(3 * sizeof zeros, file.size);
     CHECK(hal_file_read(file, 100, seen, sizeof seen));
@@ -92,8 +92,8 @@ static void a_file_grows_and_keeps_its_bytes(void)
 
 static void use_both_drives(void)
 {
-    sim_storage_configure(ECHO_FIXTURE_DIR "/scan_music", ECHO_TEST_OUTPUT_DIR);
-    sim_storage_configure_internal(ECHO_FIXTURE_DIR "/tags");
+    sim_storage_configure(RIPPL_FIXTURE_DIR "/scan_music", RIPPL_TEST_OUTPUT_DIR);
+    sim_storage_configure_internal(RIPPL_FIXTURE_DIR "/tags");
 }
 
 static void internal_storage_is_the_last_folder_of_the_card_root(void)
@@ -141,12 +141,12 @@ static void the_player_never_writes_to_internal_storage(void)
     use_both_drives();
     CHECK(!hal_file_write("/:internal/new.bin", BYTES, sizeof BYTES));
     CHECK(!hal_file_write_at("/:internal/tagged.flac", 0, BYTES, sizeof BYTES));
-    CHECK_EQUAL(HAL_RESERVE_FAILED, hal_file_reserve("/:internal/.echo/x.bin", 4096));
+    CHECK_EQUAL(HAL_RESERVE_FAILED, hal_file_reserve("/:internal/.rippl/x.bin", 4096));
 }
 
 static void without_internal_storage_nothing_is_listed(void)
 {
-    sim_storage_configure(ECHO_FIXTURE_DIR "/scan_music", NULL);
+    sim_storage_configure(RIPPL_FIXTURE_DIR "/scan_music", NULL);
     HalDir dir;
     CHECK(!find("/", VOLUME_INTERNAL_NAME).found);
     CHECK(!hal_dir_open(&dir, "/:internal"));

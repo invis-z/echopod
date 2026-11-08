@@ -2,7 +2,7 @@
 
 #include "hal/storage.h"
 
-const char UPDATE_RECORD_PATH[] = "/.echo/update.bin";
+const char UPDATE_RECORD_PATH[] = "/.rippl/update.bin";
 
 enum {
     RECORD_MAGIC = 0x44505545,

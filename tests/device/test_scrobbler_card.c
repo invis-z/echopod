@@ -88,7 +88,7 @@ void hal_system_keep_alive(void)
 static uint32_t read_fixture(const char *name, void *buffer, uint32_t capacity)
 {
     char path[512];
-    snprintf(path, sizeof path, "%s/history/%s", ECHO_FIXTURE_DIR, name);
+    snprintf(path, sizeof path, "%s/history/%s", RIPPL_FIXTURE_DIR, name);
     FILE *file = fopen(path, "rb");
     CHECK(file != NULL);
     size_t length = fread(buffer, 1, capacity, file);

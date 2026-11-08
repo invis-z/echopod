@@ -35,7 +35,7 @@ static void start_card(void)
     start_empty();
     add_folder("/", "Rock");
     add_folder("/", "Jazz");
-    add_folder("/", ".echo");
+    add_folder("/", ".rippl");
     add_folder("/", "Audiobooks");
     add_folder("/", "podcast");
     add_folder("/", "System Volume Information");

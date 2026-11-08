@@ -3,7 +3,7 @@
 #include "core/i18n.h"
 #include "hal/storage.h"
 
-const char FAVORITES_STORE_PATH[] = "/.echo/favorites.bin";
+const char FAVORITES_STORE_PATH[] = "/.rippl/favorites.bin";
 
 static bool read_favorites(uint8_t *bytes, uint32_t *length)
 {

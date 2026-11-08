@@ -93,8 +93,8 @@ static void music_card(void)
     add("/AC DC/Back In Black", "02 - Shoot to Thrill.flac", false, 29000000, 101);
     add("/AC DC/Back In Black", "cover.jpg", false, 80000, 102);
     add("/", "Mix.m3u8", false, 400, 3);
-    add("/", ".echo", true, 0, 4);
-    add("/.echo", "library.db", false, 4194304, 5);
+    add("/", ".rippl", true, 0, 4);
+    add("/.rippl", "library.db", false, 4194304, 5);
 }
 
 static MusicFingerprint fingerprint(void)

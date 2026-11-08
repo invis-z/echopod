@@ -1,9 +1,11 @@
-# EchoPod
+# Rippl
 
 Replacement firmware for the Snowsky (FiiO) Echo Mini 8 GB music player. It has an iPod-style Cover Flow browser, a music library built on the player, album favorites, M3U playlists and an Up Next queue. It isn't made or supported by FiiO.
 
+It's a fork of EchoPod (github.com/BasilSkyWalk/echopod), from EchoPod 0.11.1.
+
 - **Installing and using it:** `docs/user-guide.md`.
-- **Read first:** `docs/known-issues.md`. EchoPod is early, and has been tested on one player.
+- **Read first:** `docs/known-issues.md`. Rippl is early, and has been tested on one player.
 - **What's new:** `docs/release-notes.md`.
 
 The hardware knowledge it relies on comes largely from the [ReChord](https://github.com/brnomt/ReChord) project's research (`docs/hardware.md`, `CREDITS.md`).
@@ -12,7 +14,7 @@ The hardware knowledge it relies on comes largely from the [ReChord](https://git
 
 - **Plays** FLAC, ALAC, MP3, AAC, Opus and WAV, from 8 to 192 kHz with 24-bit output, gapless.
 - **Cover Flow**, with every album and a Random album tile, and **Now Playing** with the cover, progress and seeking.
-- **A library built on the player:** Artists, Album Artists, Albums, Genres, Folders, All Songs, Playlists (M3U and M3U8) and Favorites, with fast scroll and letter jumps. Or build it on a computer with **echo-sync**.
+- **A library built on the player:** Artists, Album Artists, Albums, Genres, Folders, All Songs, Playlists (M3U and M3U8) and Favorites, with fast scroll and letter jumps. Or build it on a computer with **rippl-sync**.
 - **Queue and modes:** shuffle songs or albums, repeat, and Up Next (Play Next, Add to Up Next). The queue and position come back after power-off.
 - **Equalizer:** FiiO's presets and a 7-band Custom EQ.
 - **Portrait mode:** Settings → Orientation turns the screen upright either way, with layouts made for it. The volume rocker turns with it.
@@ -33,7 +35,7 @@ python3 -m venv .venv && .venv/bin/pip install -r tools/requirements.txt
 cmake --preset dev
 cmake --build --preset dev
 ctest --preset dev
-./build/dev/platform/sim/echo_sim
+./build/dev/platform/sim/rippl_sim
 ```
 
 `ctest` also builds the firmware, which needs an `arm-none-eabi-gcc` with newlib's headers. Homebrew's `arm-none-eabi-gcc` formula has none (`math.h: No such file or directory`); Arm's toolchain (`gcc-arm-embedded`) has them. Uninstall the formula first if it's there, so the two don't clash.
@@ -61,18 +63,18 @@ This writes `build/release/HIFIEC90.IMG`. The `device` preset builds the same im
 
 ```sh
 mkdir -p build/system
-./build/dev/platform/sim/echo_sim --card /path/to/music --system-dir build/system
+./build/dev/platform/sim/rippl_sim --card /path/to/music --system-dir build/system
 ```
 
 The simulator behaves like the player: on the first start it creates `library.db`, `covers.bin` and the save files in the system folder, scans the music folder (every format stock lists, plus `.m3u`/`.m3u8` playlists) and finds the album covers. Settings → Rescan library scans again. The music folder is only ever read.
 
-The PC tools still work and write the same formats (`tools/library_index.py`, `tools/cover_export.py`), but the player doesn't need them. To skip the scan on the player, **echo-sync** builds the library, the covers and the music fingerprint (`scan.bin`) on a computer, straight into the card's `/.echo` folder, so the player's check after USB finds nothing to rescan (`docs/user-guide.md`, Build the library on a computer). Each release carries it as one file for Windows, macOS (Apple silicon) and Linux, with nothing to install, built by `.github/workflows/echo-sync.yml` with PyInstaller; from the source it's `tools/echo_sync.py E:`. To build the file yourself: `python -m pip install -r tools/requirements.txt -r tools/requirements-build.txt`, then `python -m PyInstaller --onefile --name echo-sync --paths tools tools/echo_sync.py`.
+The PC tools still work and write the same formats (`tools/library_index.py`, `tools/cover_export.py`), but the player doesn't need them. To skip the scan on the player, **rippl-sync** builds the library, the covers and the music fingerprint (`scan.bin`) on a computer, straight into the card's `/.rippl` folder, so the player's check after USB finds nothing to rescan (`docs/user-guide.md`, Build the library on a computer). Each release carries it as one file for Windows, macOS (Apple silicon) and Linux, with nothing to install, built by `.github/workflows/rippl-sync.yml` with PyInstaller; from the source it's `tools/rippl_sync.py E:`. To build the file yourself: `python -m pip install -r tools/requirements.txt -r tools/requirements-build.txt`, then `python -m PyInstaller --onefile --name rippl-sync --paths tools tools/rippl_sync.py`.
 
 ## Testing on a player
 
 1. Install the firmware (`docs/user-guide.md`, or `docs/device-install.md` for development builds).
 2. Put music on a microSD card (FAT32 or exFAT), in any folder layout, and insert it.
-3. Switch on. The player creates `/.echo` on the card, scans it ("Scanning library", then "Finding covers") and shows "Library: N tracks, M covers".
+3. Switch on. The player creates `/.rippl` on the card, scans it ("Scanning library", then "Finding covers") and shows "Library: N tracks, M covers".
 4. After copying music over USB, eject both drives: the player rescans by itself. Settings → Rescan library does it on demand.
 
 Nothing else on the card needs a computer. Covers come from art embedded in one of each album's first four tracks (FLAC, MP3/WAV/DSF/DFF ID3, MP4, APE, WMA, Ogg Vorbis and Opus) or a `cover`/`folder`/`front`/`albumart` JPEG or PNG next to the tracks.
@@ -97,7 +99,7 @@ Nothing else on the card needs a computer. Covers come from art embedded in one 
 | `--headless` | No window |
 | `--screenshot FILE.bmp` | Save the last frame on exit |
 | `--card DIR` | Use DIR as the card root (read only) |
-| `--system-dir DIR` | Read and write `/.echo/` (library database, resume, settings, favorites) in DIR |
+| `--system-dir DIR` | Read and write `/.rippl/` (library database, resume, settings, favorites) in DIR |
 | `--battery N` | Report N % battery in the header (default 80) |
 | `--charging` | Report the battery as charging |
 | `--clock-date YYYY-MM-DD` | Start the clock chip on that date (at the host's time of day) |
@@ -119,7 +121,7 @@ The screen turns off after the screen timeout or a tap of Power. With the screen
 
 Home also lists Audiobooks and Podcasts when the card has an `Audiobooks` or `Podcasts` folder: every book and episode remembers where you stopped, plays in order, and hold vol± jumps 30 s forward or 15 s back. Books and episodes stay out of the Music lists (`docs/user-guide.md`).
 
-Settings: Shuffle (Off / Songs / Albums), Repeat (Off / One / All), Sleep timer, Screen timeout, Brightness, Gain, Output and Start screen. They're saved in `/.echo/settings.bin`, and favorites in `/.echo/favorites.bin`. Without `--system-dir` the simulator can't save, and says so. Playback resumes, paused, where it left off.
+Settings: Shuffle (Off / Songs / Albums), Repeat (Off / One / All), Sleep timer, Screen timeout, Brightness, Gain, Output and Start screen. They're saved in `/.rippl/settings.bin`, and favorites in `/.rippl/favorites.bin`. Without `--system-dir` the simulator can't save, and says so. Playback resumes, paused, where it left off.
 
 Music → Cover Flow shows your albums as covers, by album artist. Vol± move, Play opens the album, holding Play adds or removes it from Favorites, and Back leaves. Music → Playlists lists the M3U playlists the indexer found. Music → Favorites lists your favorite albums.
 

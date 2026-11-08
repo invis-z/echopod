@@ -9,7 +9,7 @@ enum {
     PACK_LIMIT = 0x3000
 };
 
-static const char PACK_PATHS[] = ECHO_LANGUAGE_PACK_PATHS;
+static const char PACK_PATHS[] = RIPPL_LANGUAGE_PACK_PATHS;
 static uint8_t pack[PACK_LIMIT];
 
 static bool path_for(uint32_t language, char *path)

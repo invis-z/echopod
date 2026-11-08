@@ -22,7 +22,7 @@ static void card_paths_stay_on_the_card(void)
     CHECK(volume_internal_path("/:internals/x.flac") == NULL);
     CHECK(volume_internal_path("/:intern") == NULL);
     CHECK(volume_internal_path(":internal/x.flac") == NULL);
-    CHECK(volume_internal_path("/.echo/library.db") == NULL);
+    CHECK(volume_internal_path("/.rippl/library.db") == NULL);
 }
 
 static void only_the_exact_name_is_the_internal_folder(void)

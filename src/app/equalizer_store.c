@@ -10,7 +10,7 @@ enum {
     MISSING_NONE = 0
 };
 
-const char EQUALIZER_STORE_PATH[] = "/.echo/equalizer.bin";
+const char EQUALIZER_STORE_PATH[] = "/.rippl/equalizer.bin";
 const char EQUALIZER_FOLDER_PATH[] = "/EQ";
 
 static bool name_valid(const char *name)
@@ -99,7 +99,7 @@ bool equalizer_store_file_curve(const char *name, EqualizerCurve *curve, Equaliz
     if (error == NULL) {
         error = &local;
     }
-#ifdef ECHO_EQ_FILES_HIDDEN
+#ifdef RIPPL_EQ_FILES_HIDDEN
     (void)name;
     (void)curve;
     error->problem = EQUALIZER_TEXT_UNREADABLE;
