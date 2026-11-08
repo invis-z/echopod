@@ -5,6 +5,7 @@
 #include "core/i18n.h"
 #include "core/string_builder.h"
 #include "cover_cache.h"
+#include "error_log.h"
 #include "folders_store.h"
 #include "hal/clock.h"
 #include "hal/input.h"
@@ -104,6 +105,7 @@ static bool open_file(void *context, const char *path, ByteSource *source, uint3
     bool opened = hal_file_open(&files->file, path);
     spend(TIME_OPEN, since);
     if (!opened) {
+        error_log_add("can't open during the scan", path);
         return false;
     }
     *source = (ByteSource){.read = read_handle, .context = &files->file};

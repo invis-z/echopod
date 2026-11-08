@@ -3,6 +3,7 @@
 #include "core/format.h"
 #include "core/i18n.h"
 #include "core/string_builder.h"
+#include "error_log.h"
 #include "hal/storage.h"
 
 const char SPOKEN_STORE_PATH[] = "/.rippl/bookmarks.bin";
@@ -21,6 +22,7 @@ static bool read_bookmarks(uint8_t *bytes, uint32_t *length)
 {
     HalFile file;
     if (!hal_file_open(&file, SPOKEN_STORE_PATH)) {
+        error_log_add("can't open", SPOKEN_STORE_PATH);
         return false;
     }
     *length = file.size < BOOKMARKS_FILE_CAPACITY ? file.size : BOOKMARKS_FILE_CAPACITY;

@@ -2,6 +2,7 @@ add_library(rippl_app STATIC
     app.c
     card_files.c
     clock_store.c
+    error_log.c
     app_screens.c
     bluetooth_link.c
     bluetooth_store.c

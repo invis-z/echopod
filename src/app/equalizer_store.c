@@ -2,6 +2,9 @@
 
 #include <stddef.h>
 
+#include "core/string_builder.h"
+
+#include "error_log.h"
 #include "hal/audio.h"
 #include "hal/storage.h"
 
@@ -61,6 +64,7 @@ static bool read_choice(uint8_t *bytes, uint32_t *length)
 {
     HalFile file;
     if (!hal_file_open(&file, EQUALIZER_STORE_PATH)) {
+        error_log_add("can't open", EQUALIZER_STORE_PATH);
         return false;
     }
     *length = file.size < EQUALIZER_FILE_SIZE ? file.size : EQUALIZER_FILE_SIZE;
@@ -93,7 +97,7 @@ static bool read_preset(void *context, uint32_t offset, char *buffer, uint32_t l
     return hal_file_read(*file, offset, buffer, length);
 }
 
-bool equalizer_store_file_curve(const char *name, EqualizerCurve *curve, EqualizerTextError *error)
+static bool read_file_curve(const char *name, EqualizerCurve *curve, EqualizerTextError *error)
 {
     EqualizerTextError local = {MISSING_NONE, EQUALIZER_TEXT_UNREADABLE, 0};
     if (error == NULL) {
@@ -123,6 +127,49 @@ bool equalizer_store_file_curve(const char *name, EqualizerCurve *curve, Equaliz
     bool parsed = equalizer_text_parse_from(source, file.size, curve, error);
     hal_file_close(&file);
     return parsed;
+}
+
+static void log_preset_error(const char *name, EqualizerTextError error)
+{
+    char path[PATH_CAPACITY];
+    if (!make_path(path, name)) {
+        return;
+    }
+    char what[48];
+    StringBuilder text = string_builder_make(what, sizeof what);
+    switch (error.problem) {
+    case EQUALIZER_TEXT_UNREADABLE:
+        string_builder_append(&text, "can't open the preset");
+        break;
+    case EQUALIZER_TEXT_TOO_LARGE:
+        string_builder_append(&text, "preset over 4 KB");
+        break;
+    case EQUALIZER_TEXT_EMPTY:
+        string_builder_append(&text, "no filters in the preset");
+        break;
+    default:
+        string_builder_append(&text, "can't use the preset");
+        break;
+    }
+    if (error.line > 0) {
+        string_builder_append(&text, " (line ");
+        string_builder_append_unsigned(&text, error.line);
+        string_builder_append_char(&text, ')');
+    }
+    error_log_add(what, path);
+}
+
+bool equalizer_store_file_curve(const char *name, EqualizerCurve *curve, EqualizerTextError *error)
+{
+    EqualizerTextError local = {MISSING_NONE, EQUALIZER_TEXT_UNREADABLE, 0};
+    if (error == NULL) {
+        error = &local;
+    }
+    if (read_file_curve(name, curve, error)) {
+        return true;
+    }
+    log_preset_error(name, *error);
+    return false;
 }
 
 void equalizer_store_load(EqualizerStore *store)

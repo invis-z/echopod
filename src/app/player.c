@@ -5,6 +5,7 @@
 #include "core/format.h"
 #include "core/i18n.h"
 #include "core/string_builder.h"
+#include "error_log.h"
 #include "hal/storage.h"
 #include "playback/resume_state.h"
 #include "playback/spoken.h"
@@ -33,6 +34,9 @@ static bool track_path(const Player *player, uint32_t track, char *buffer, size_
     StringBuilder builder = string_builder_make(buffer, capacity);
     string_builder_append_char(&builder, '/');
     string_builder_append(&builder, relative);
+    if (builder.overflowed) {
+        error_log_add("path too long", buffer);
+    }
     return !builder.overflowed;
 }
 
@@ -112,6 +116,20 @@ static uint32_t resume_point(const Player *player, uint32_t track, uint32_t star
     return player->resume.position_for(player->resume.context, track);
 }
 
+static const char *refusal_reason(HalAudioProblem problem)
+{
+    switch (problem) {
+    case HAL_AUDIO_PROBLEM_FORMAT:
+        return "can't play this format";
+    case HAL_AUDIO_PROBLEM_RATE:
+        return "can't play this sample rate";
+    case HAL_AUDIO_PROBLEM_UNREADABLE:
+    case HAL_AUDIO_PROBLEM_NONE:
+        break;
+    }
+    return "can't open the track";
+}
+
 static bool start_current(Player *player, uint32_t start_ms)
 {
     char path[PLAYER_PATH_CAPACITY];
@@ -129,6 +147,7 @@ static bool start_current(Player *player, uint32_t start_ms)
     if (!player->loaded) {
         player->refusal = hal_audio_refusal();
         player->refusal_count++;
+        error_log_add(refusal_reason(player->refusal.problem), path);
         become_idle(player);
         return false;
     }
@@ -562,6 +581,7 @@ static bool read_resume_state(ResumeState *state)
     HalFile file;
     uint8_t bytes[RESUME_STATE_SIZE];
     if (!hal_file_open(&file, PLAYER_RESUME_PATH)) {
+        error_log_add("can't open", PLAYER_RESUME_PATH);
         return false;
     }
     bool read = file.size >= RESUME_STATE_SIZE && hal_file_read(file, 0, bytes, sizeof bytes);
@@ -606,6 +626,7 @@ static void load_up_next(Player *player)
     HalFile file;
     uint8_t bytes[UP_NEXT_STATE_SIZE];
     if (!hal_file_open(&file, PLAYER_UP_NEXT_PATH)) {
+        error_log_add("can't open", PLAYER_UP_NEXT_PATH);
         return;
     }
     bool read = file.size >= UP_NEXT_STATE_SIZE && hal_file_read(file, 0, bytes, sizeof bytes);

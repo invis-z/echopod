@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include "error_log.h"
 #include "hal/storage.h"
 
 const char FOLDERS_STORE_PATH[] = "/.rippl/folders.bin";
@@ -12,6 +13,7 @@ void folders_store_load(MusicFolders *folders)
     HalFile file;
     folders->count = 0;
     if (!hal_file_open(&file, FOLDERS_STORE_PATH)) {
+        error_log_add("can't open", FOLDERS_STORE_PATH);
         return;
     }
     if (file.size >= sizeof bytes && hal_file_read(file, 0, bytes, sizeof bytes)) {

@@ -7,6 +7,7 @@
 #include "core/hash.h"
 #include "core/i18n.h"
 #include "default_theme.h"
+#include "error_log.h"
 #include "fake_hal.h"
 #include "fixture_library.h"
 #include "folders_store.h"
@@ -1383,9 +1384,15 @@ static void a_refused_track_says_why_it_was_skipped(void)
     fake_hal_audio_set_refusal(
         (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_RATE, .sample_rate = 192000});
     fake_hal_audio_refuse_plays(1);
+    fake_hal_set_reserve_result(HAL_RESERVE_CREATED);
+    error_log_forget();
     play_first_album_track();
     CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
     CHECK(toast_is("192 kHz isn't supported yet"));
+    uint32_t size = 0;
+    const char *log = (const char *)fake_hal_file_bytes(ERROR_LOG_PATH, &size);
+    CHECK(log != NULL && strstr(log, "can't play this sample rate: /") != NULL);
+    CHECK(log != NULL && strchr(log, '\n') == strrchr(log, '\n'));
 }
 
 static void music_folders_leaves_an_unticked_folder_out_of_the_rescan(void)
@@ -1509,10 +1516,30 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
     CHECK(toast_is("Library: 0 tracks"));
 }
 
+static uint32_t error_log_length(void)
+{
+    uint32_t size = 0;
+    const uint8_t *bytes = fake_hal_file_bytes("/.rippl/errors.log", &size);
+    uint32_t length = 0;
+    while (bytes != NULL && length < size && bytes[length] != 0) {
+        length++;
+    }
+    return length;
+}
+
+static void a_fresh_card_logs_no_errors(void)
+{
+    start_on_a_fresh_card(HAL_RESERVE_CREATED);
+    for (int round = 0; round < 20; round++) {
+        step();
+    }
+    CHECK_EQUAL(0u, error_log_length());
+}
+
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(11, fake_hal_reserve_count());
+    CHECK_EQUAL(11, fake_hal_reserve_count() - fake_hal_reserve_count_of(ERROR_LOG_PATH));
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
@@ -2982,6 +3009,7 @@ int main(void)
         TEST_CASE(the_music_check_after_an_installed_update_skips_the_walk),
         TEST_CASE(a_fresh_card_gets_the_player_files_and_a_first_scan),
         TEST_CASE(a_card_that_has_the_files_is_not_rescanned),
+        TEST_CASE(a_fresh_card_logs_no_errors),
         TEST_CASE(unchanged_music_is_not_rescanned_after_usb),
         TEST_CASE(a_different_stored_fingerprint_is_rescanned_after_usb),
         TEST_CASE(a_new_firmware_checks_the_music_once_without_rescanning),

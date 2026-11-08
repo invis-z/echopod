@@ -17,6 +17,7 @@
 #include "default_theme.h"
 #include "draw_profile.h"
 #include "equalizer_store.h"
+#include "error_log.h"
 #include "favorites_store.h"
 #include "frame_overlay.h"
 #include "gfx/frame_diff.h"
@@ -883,7 +884,15 @@ static bool attach_language(Language language)
 
 static void apply_language(Language language)
 {
-    if (!attach_language(language) && !attach_language(LANGUAGE_ENGLISH)) {
+    if (attach_language(language)) {
+        return;
+    }
+    char path[LANGUAGE_FILE_PATH_CAPACITY];
+    if ((int)language >= LANGUAGE_BUILTIN_COUNT &&
+        language_files_path(language, path, sizeof path)) {
+        error_log_add("can't load the language pack", path);
+    }
+    if (!attach_language(LANGUAGE_ENGLISH)) {
         i18n_detach();
     }
 }
@@ -914,6 +923,8 @@ void app_start(void)
     settings_store_load(&app.settings);
     hal_power_confirm_start(app.settings.settings.options[OPTION_POWER_ON] == POWER_ON_HOLD);
     clock_store_start(&app.clock, &app.settings.settings, now_ms);
+    error_log_forget();
+    error_log_use_clock(&app.clock);
     apply_language(app.settings.settings.language);
     apply_orientation();
     equalizer_store_load(&app.equalizer);
@@ -1212,6 +1223,7 @@ static void take_computer_clock(void)
         return;
     }
     app.usb_written = false;
+    error_log_forget();
     equalizer_screen_refresh(&app.screens.equalizer);
     uint32_t now_ms = hal_clock_milliseconds();
     if (clock_store_after_usb(&app.clock, &app.settings.settings, now_ms)) {

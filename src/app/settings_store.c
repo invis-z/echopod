@@ -1,5 +1,6 @@
 #include "settings_store.h"
 
+#include "error_log.h"
 #include "hal/audio.h"
 #include "hal/display.h"
 #include "hal/storage.h"
@@ -18,6 +19,7 @@ static uint32_t read_settings(uint8_t *bytes)
 {
     HalFile file;
     if (!hal_file_open(&file, SETTINGS_STORE_PATH)) {
+        error_log_add("can't open", SETTINGS_STORE_PATH);
         return 0;
     }
     uint32_t length = file.size < SETTINGS_FILE_SIZE ? file.size : SETTINGS_FILE_SIZE;

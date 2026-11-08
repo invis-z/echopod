@@ -1,6 +1,7 @@
 #include "favorites_store.h"
 
 #include "core/i18n.h"
+#include "error_log.h"
 #include "hal/storage.h"
 
 const char FAVORITES_STORE_PATH[] = "/.rippl/favorites.bin";
@@ -9,6 +10,7 @@ static bool read_favorites(uint8_t *bytes, uint32_t *length)
 {
     HalFile file;
     if (!hal_file_open(&file, FAVORITES_STORE_PATH)) {
+        error_log_add("can't open", FAVORITES_STORE_PATH);
         return false;
     }
     *length = file.size < FAVORITES_FILE_CAPACITY ? file.size : FAVORITES_FILE_CAPACITY;

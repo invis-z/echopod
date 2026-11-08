@@ -1,5 +1,6 @@
 #include "app/update_record.h"
 
+#include "error_log.h"
 #include "hal/storage.h"
 
 const char UPDATE_RECORD_PATH[] = "/.rippl/update.bin";
@@ -66,6 +67,7 @@ bool update_record_read(HalUpdateRecord *record)
     HalFile file;
     uint8_t bytes[UPDATE_RECORD_BYTES];
     if (!hal_file_open(&file, UPDATE_RECORD_PATH)) {
+        error_log_add("can't open", UPDATE_RECORD_PATH);
         return false;
     }
     bool read = file.size >= UPDATE_RECORD_BYTES && hal_file_read(file, 0, bytes, sizeof bytes);
