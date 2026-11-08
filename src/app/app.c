@@ -931,6 +931,7 @@ void app_start(void)
     start_hardware(now_ms);
     bluetooth_link_start(&app.bluetooth, &app.toast, now_ms);
     start_screens(now_ms);
+    equalizer_screen_refresh(&app.screens.equalizer);
     report_card_files(files, now_ms);
     if (hal_power_take_usb_start()) {
         start_charging(now_ms);
@@ -1221,6 +1222,7 @@ static void take_computer_clock(void)
         return;
     }
     app.usb_written = false;
+    equalizer_screen_refresh(&app.screens.equalizer);
     uint32_t now_ms = hal_clock_milliseconds();
     if (clock_store_after_usb(&app.clock, &app.settings.settings, now_ms)) {
         settings_store_save(&app.settings);

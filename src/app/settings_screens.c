@@ -599,11 +599,14 @@ static MenuItem row_item(SettingsScreens *screens, int row)
     void *contexts[] = {settings->bluetooth, settings->equalizer, settings->date_time,
                         settings->folders, settings};
     const SettingsLink *link = &LINKS[row - ROW_BLUETOOTH];
+    bool equalizer = row == ROW_EQUALIZER;
     return (MenuItem){.label = i18n_text(link->label),
                       .select = link->select,
                       .context = contexts[row - ROW_BLUETOOTH],
                       .value = link->value,
-                      .opens = link->value != NULL};
+                      .opens = link->value != NULL,
+                      .shown = equalizer ? equalizer_screen_has_presets : NULL,
+                      .shown_context = equalizer ? settings->equalizer : NULL};
 }
 
 static void fill_rows(SettingsScreens *screens, MenuItem *items, int first, int count)

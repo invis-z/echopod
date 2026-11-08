@@ -64,7 +64,7 @@ static bool read_choice(uint8_t *bytes, uint32_t *length)
         return false;
     }
     *length = file.size < EQUALIZER_FILE_SIZE ? file.size : EQUALIZER_FILE_SIZE;
-    bool read = *length >= 20 && hal_file_read(file, 0, bytes, *length);
+    bool read = *length == EQUALIZER_FILE_SIZE && hal_file_read(file, 0, bytes, *length);
     hal_file_close(&file);
     return read;
 }
@@ -99,12 +99,6 @@ bool equalizer_store_file_curve(const char *name, EqualizerCurve *curve, Equaliz
     if (error == NULL) {
         error = &local;
     }
-#ifdef RIPPL_EQ_FILES_HIDDEN
-    (void)name;
-    (void)curve;
-    error->problem = EQUALIZER_TEXT_UNREADABLE;
-    return false;
-#endif
     char path[PATH_CAPACITY];
     if (!make_path(path, name)) {
         error->problem = EQUALIZER_TEXT_UNREADABLE;
@@ -163,8 +157,8 @@ bool equalizer_store_save(EqualizerStore *store)
 bool equalizer_store_apply(EqualizerStore *store)
 {
     if (store->choice.preset != EQUALIZER_PRESET_FILE) {
-        EqualizerCurve curve = equalizer_file_curve(&store->choice);
-        hal_audio_set_equalizer(&curve);
+        EqualizerCurve flat = {0};
+        hal_audio_set_equalizer(&flat);
         return true;
     }
     EqualizerCurve curve;

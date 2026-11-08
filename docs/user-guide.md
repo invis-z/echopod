@@ -162,7 +162,7 @@ The computer picks each album's cover the way the player does: the picture insid
 |---|---|---|
 | Volume up / down | Next / previous item; hold to scroll faster | Volume; hold Vol+ for the next track, Vol− for the previous one (in audiobooks and podcasts: 30 s forward, 15 s back) |
 | Play | Select; a song plays the list from that song. Hold on an album for Favorites, hold on a song for Play Next / Add to Up Next | Play / pause; hold to seek |
-| Menu | Hold for Settings | Opens Up Next; hold for the Equalizer (or, with Settings → Buttons → Menu button → Next track: next track; hold for Up Next) |
+| Menu | Hold for Settings | Opens Up Next; hold for the Equalizer, when `/EQ` has presets (or, with Settings → Buttons → Menu button → Next track: next track; hold for Up Next) |
 | Back | Back; hold to go home | Back; hold to go home |
 | Power | Screen off or on; hold 2 s to turn off | Same |
 
@@ -228,7 +228,7 @@ In Cover Flow (Music → Cover Flow), the tile before the first album, with a sh
 
 Settings → Display → Orientation has Landscape, Portrait and Portrait, flipped. The screen turns as soon as you pick, and the player starts the same way next time. Pick whichever portrait way round puts the buttons where you like them.
 
-In portrait, Home shows the album art under the menu, Now Playing puts the cover above the track, Cover Flow scrolls albums from top to bottom, and the Custom EQ shows its bands as rows. The volume rocker turns with the screen, so the button on top moves up through lists. In both portraits a tap turns the volume the other way from landscape: the button that turns it up in landscape turns it down. Holding the buttons skips to the next and previous track as in landscape, and seeking forward and back stays the same too.
+In portrait, Home shows the album art under the menu, Now Playing puts the cover above the track and Cover Flow scrolls albums from top to bottom. The volume rocker turns with the screen, so the button on top moves up through lists. In both portraits a tap turns the volume the other way from landscape: the button that turns it up in landscape turns it down. Holding the buttons skips to the next and previous track as in landscape, and seeking forward and back stays the same too.
 
 ## Language
 
@@ -238,13 +238,11 @@ The translations were not checked by native speakers, and a few long texts may b
 
 ## Equalizer
 
-Open it from Settings → Equalizer, or hold ≡ on Now Playing.
+Open it from Settings → Equalizer, or hold ≡ on Now Playing. The equalizer plays presets from files, so with no preset on the card Settings has no Equalizer row, and holding ≡ on Now Playing says "No presets in /EQ".
 
-- **Presets:** Off, Retro, Bass, Heavy, Pop, Jazz and Unique, the same ones FiiO's firmware has. Moving through the list plays each one, so you can hear them as you go. ↩ or ▶ keeps the one you're on.
-- **Custom:** press ▶ on Custom to open a 7-band equalizer (63 Hz, 160 Hz, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz and 16 kHz). Vol+ and Vol− move between the bands. Press ▶ to grab the highlighted band (its column turns blue); Vol+ and Vol− then raise and lower it by 1 dB (hold to keep going), from −12 to +12 dB. Press ▶ or ↩ to let go and pick another band. Hold ▶ to set a band back to 0 dB, and press ↩ with no band grabbed to leave. Changes play straight away; they reach your ears after a fraction of a second, because the player keeps that much music ready ahead.
-- When a band is boosted, the player lowers the overall level by the largest boost (shown as "Preamp") so loud music doesn't distort. Turn the volume up a little to make up for it.
+- **Presets** are files: put up to eight `.txt` presets in an `EQ` folder on the card, in Equalizer APO's parametric format (AutoEQ's `ParametricEQ.txt` works as it is: a `Preamp:` line and up to ten `Filter` lines of type `PK`, `LSC` or `HSC`, gain ±12 dB, Q 0.1 to 10). They're listed after Off, by file name; files copied over USB show up when the USB session ends. Moving through the list plays each one, so you can hear them as you go. ↩ or ▶ keeps the one you're on. A file the player can't use stays in the list and says why (for example "Line 4: gain over 12 dB"); filters it can't play, such as low-pass, are skipped and counted.
 
-The player remembers the equalizer you used last, including your Custom bands and the name of a preset file, in `/.rippl/equalizer.bin`. If that preset file is gone at the next start, the equalizer is Off. The equalizer also applies to Bluetooth headphones. The second processor does the equalizing and runs at full speed while the equalizer is on, which costs a little battery. Switching the equalizer on in the middle of a track restarts the second processor at full speed, so the music stops for a moment and carries on where it was; switching it off takes effect straight away, and the second processor slows down again from the next track. It's off for 176.4 and 192 kHz tracks and for 32-bit WAV, which goes to the DAC with all 32 bits (the screen says so), and in USB DAC mode.
+The player remembers the preset you used last, by its file name, in `/.rippl/equalizer.bin`. If that preset file is gone at the next start, the equalizer is Off. The equalizer also applies to Bluetooth headphones. The second processor does the equalizing and runs at full speed while the equalizer is on, which costs a little battery. Switching the equalizer on in the middle of a track restarts the second processor at full speed, so the music stops for a moment and carries on where it was; switching it off takes effect straight away, and the second processor slows down again from the next track. It's off for 176.4 and 192 kHz tracks and for 32-bit WAV, which goes to the DAC with all 32 bits (the screen says so), and in USB DAC mode.
 
 ## Charging
 

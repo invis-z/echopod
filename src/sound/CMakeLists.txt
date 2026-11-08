@@ -1,4 +1,4 @@
-add_library(rippl_sound STATIC equalizer_file.c equalizer_presets.c equalizer_text.c)
+add_library(rippl_sound STATIC equalizer_file.c equalizer_text.c)
 target_include_directories(rippl_sound PUBLIC include)
 if(CMAKE_CROSSCOMPILING)
     target_compile_definitions(rippl_sound PRIVATE RIPPL_RESIDENT_TABLES)
