@@ -18,11 +18,9 @@
 #include "library/cover_build.h"
 #include "library/covers.h"
 #include "library_rescan.h"
-#include "listen_history.h"
 #include "music_check.h"
 #include "np_faces/now_playing_face.h"
 #include "screens/now_playing_screen.h"
-#include "scrobbler_log.h"
 #include "settings/rocker.h"
 #include "settings/settings.h"
 #include "settings_screens.h"
@@ -1307,7 +1305,6 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/upnext.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/bluetooth.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/equalizer.bin"));
-    CHECK_EQUAL(1024 * 1024, fake_hal_reserved_size("/.rippl/history.bin"));
     CHECK_EQUAL(4096, fake_hal_reserved_size("/.rippl/update.bin"));
     step();
     CHECK_EQUAL(1, fake_hal_scratch_borrow_count());
@@ -1317,7 +1314,7 @@ static void a_fresh_card_gets_the_player_files_and_a_first_scan(void)
 static void a_card_that_has_the_files_is_not_rescanned(void)
 {
     start_on_a_fresh_card(HAL_RESERVE_EXISTS);
-    CHECK_EQUAL(15, fake_hal_reserve_count());
+    CHECK_EQUAL(14, fake_hal_reserve_count());
     step();
     CHECK_EQUAL(0, fake_hal_scratch_borrow_count());
 }
@@ -2323,64 +2320,6 @@ static void menu_does_nothing_while_nothing_plays(void)
     CHECK(title_is("Rippl"));
 }
 
-static uint8_t history_settings[SETTINGS_FILE_SIZE];
-
-static void start_app_with_history_and_chip(bool history_on, HalTime chip, uint32_t build_day)
-{
-    uint32_t size = 0;
-    const uint8_t *bytes = fixture_bytes(&size);
-    Settings settings = settings_defaults();
-    settings.options[OPTION_LISTEN_HISTORY] = history_on ? LISTEN_HISTORY_ON : LISTEN_HISTORY_OFF;
-    settings.options[OPTION_TIME_ZONE] = WALL_CLOCK_ZONE_UTC;
-    settings_encode(&settings, history_settings);
-    fake_hal_reset();
-    fake_hal_add_file("/.rippl/library.db", bytes, size);
-    fake_hal_add_file("/.rippl/settings.bin", history_settings, sizeof history_settings);
-    fake_hal_add_file(LISTEN_HISTORY_PATH, NULL, 16 * HISTORY_SLOT_BYTES);
-    fake_hal_set_time(chip);
-    fake_hal_set_build_day(build_day);
-    app_forget_clock();
-    now_ms = START_MS;
-    fake_hal_set_milliseconds(now_ms);
-    app_start();
-    step();
-    app_release_audio();
-}
-
-static void start_app_with_history(bool history_on)
-{
-    start_app_with_history_and_chip(history_on, (HalTime){.present = false}, 0);
-}
-
-static int history_records(HistoryRecord *records, int capacity)
-{
-    uint32_t size = 0;
-    const uint8_t *bytes = fake_hal_file_bytes(LISTEN_HISTORY_PATH, &size);
-    int count = 0;
-    for (uint32_t at = 0; bytes != NULL && at + HISTORY_SLOT_BYTES <= size && count < capacity;
-         at += HISTORY_SLOT_BYTES) {
-        count += listen_history_decode(bytes + at, &records[count]);
-    }
-    return count;
-}
-
-static void played_songs_go_to_the_listen_history_with_a_mark_for_usb(void)
-{
-    HistoryRecord records[16];
-    start_app_with_history(true);
-    int before = history_records(records, 16);
-    play_first_album_track();
-    wait_ms(40000);
-    app_release_audio();
-    int count = history_records(records, 16);
-    CHECK_EQUAL(before + 2, count);
-    CHECK_EQUAL(HISTORY_PLAY, records[count - 2].kind);
-    CHECK(records[count - 2].played_ms >= 40000);
-    CHECK_EQUAL(60000, records[count - 2].duration_ms);
-    CHECK_EQUAL(HISTORY_COMPUTER, records[count - 1].kind);
-    CHECK_EQUAL(now_ms, records[count - 1].end_ms);
-}
-
 static void the_clock_is_under_display_and_date_time_under_system(void)
 {
     start_app_with_library();
@@ -3288,54 +3227,6 @@ static void the_landscape_clock_and_battery_show_at_every_minute(void)
     CHECK_EQUAL(0, hidden);
 }
 
-static uint32_t last_play_time(void)
-{
-    HistoryRecord records[16];
-    play_first_album_track();
-    wait_ms(40000);
-    app_release_audio();
-    int count = history_records(records, 16);
-    CHECK(count >= 2);
-    CHECK_EQUAL(HISTORY_PLAY, records[count - 2].kind);
-    return records[count - 2].unix_time;
-}
-
-static void the_listen_history_has_no_time_while_the_clock_predates_the_firmware(void)
-{
-    start_app_with_history_and_chip(true, chip_on(2026, 1, 14), day_of(2026, 11, 1));
-    CHECK_EQUAL(0, last_play_time());
-    start_app_with_history_and_chip(true, chip_on(2026, 11, 5), day_of(2026, 11, 1));
-    CHECK(last_play_time() >= day_of(2026, 11, 5) * 86400u);
-}
-
-static bool log_after_a_play(bool history_on)
-{
-    uint32_t size = 0;
-    start_app_with_history_and_chip(history_on, chip_on(2026, 11, 5), day_of(2026, 11, 1));
-    fake_hal_set_reserve_result(HAL_RESERVE_CREATED);
-    play_first_album_track();
-    wait_ms(40000);
-    app_release_audio();
-    const char *log = (const char *)fake_hal_file_bytes(SCROBBLER_LOG_PATH, &size);
-    static const char HEADER[] = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/Rippl test\n";
-    if (log == NULL) {
-        return false;
-    }
-    CHECK(size > sizeof HEADER && memcmp(log, HEADER, sizeof HEADER - 1) == 0);
-    CHECK_EQUAL('\n', log[size - 1]);
-    CHECK(memchr(log + sizeof HEADER - 1, '\n', size - sizeof HEADER) == NULL);
-    uint32_t mark_size = 0;
-    const uint8_t *mark = fake_hal_file_bytes(SCROBBLER_MARK_PATH, &mark_size);
-    CHECK(mark != NULL && mark_size == SCROBBLER_MARK_BYTES);
-    return true;
-}
-
-static void connecting_writes_the_scrobbler_log_while_the_history_is_on(void)
-{
-    CHECK(log_after_a_play(true));
-    CHECK(!log_after_a_play(false));
-}
-
 static void start_with_new_firmware(HalTime chip)
 {
     start_on_a_fresh_card(HAL_RESERVE_CREATED);
@@ -3428,18 +3319,6 @@ static void a_clock_record_written_over_usb_sets_the_clock(void)
     Settings settings;
     CHECK(saved_settings(&settings));
     CHECK_EQUAL(wall_clock_zone_of(60), settings.options[OPTION_TIME_ZONE]);
-}
-
-static void a_listen_history_turned_off_records_nothing(void)
-{
-    HistoryRecord records[16];
-    start_app_with_history(false);
-    int before = history_records(records, 16);
-    play_first_album_track();
-    wait_ms(40000);
-    app_release_audio();
-    hold_power();
-    CHECK_EQUAL(before, history_records(records, 16));
 }
 
 int main(void)
@@ -3594,13 +3473,9 @@ int main(void)
         TEST_CASE(a_calm_frame_is_not_drawn_again_for_a_while),
         TEST_CASE(a_key_draws_the_next_frame_at_once),
         TEST_CASE(play_opens_a_menu_row_while_the_key_is_still_down),
-        TEST_CASE(played_songs_go_to_the_listen_history_with_a_mark_for_usb),
-        TEST_CASE(a_listen_history_turned_off_records_nothing),
-        TEST_CASE(connecting_writes_the_scrobbler_log_while_the_history_is_on),
         TEST_CASE(the_clock_is_under_display_and_date_time_under_system),
         TEST_CASE(a_clock_dated_before_the_firmware_shows_no_time),
         TEST_CASE(the_landscape_clock_and_battery_show_at_every_minute),
-        TEST_CASE(the_listen_history_has_no_time_while_the_clock_predates_the_firmware),
         TEST_CASE(a_new_firmware_asks_once_for_the_clock_after_the_start_up_screen),
         TEST_CASE(set_now_opens_the_date_and_time_at_the_build_date),
         TEST_CASE(a_new_firmware_does_not_ask_when_the_clock_is_set),

@@ -21,9 +21,7 @@ add_library(rippl_app STATIC
     library_rescan.c
     music_check.c
     library_store.c
-    listen_history.c
     player.c
-    scrobbler_log.c
     settings_screens.c
     settings_store.c
     spoken_store.c

@@ -12,7 +12,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import cover_export
-import rippl_history
 import library_index
 
 RIPPL_FOLDER = ".rippl"
@@ -745,15 +744,6 @@ def print_next_steps(options, recorded, volume, seconds):
               "rescan on the player (Settings, Rescan library).")
 
 
-def export_history(card, dry_run):
-    if not (card / RIPPL_FOLDER / rippl_history.HISTORY_NAME).is_file():
-        print("Listen history: none on this card yet.")
-        return
-    result = rippl_history.export(card, dry_run=dry_run)
-    listened = sum(play.rating == "L" for play in result.plays)
-    print(f"Listen history: {listened} new plays added to {card / rippl_history.LOG_NAME}.")
-
-
 def run_check(card, volume, internal=None, excluded=frozenset()):
     print(f"Checking {card} ({volume.file_system})")
     if internal is not None:
@@ -816,9 +806,6 @@ def parse_arguments(argv):
     parser.add_argument("--yes", action="store_true",
                         help="create the card's .rippl folder without asking")
     parser.add_argument("--verbose", action="store_true", help="list the albums without art")
-    parser.add_argument("--history", action="store_true",
-                        help="also add the songs the player played to .scrobbler.log at the "
-                             "card's root, for Last.fm uploaders (see rippl_history.py)")
     return parser.parse_args(argv)
 
 
@@ -902,8 +889,6 @@ def run(arguments):
             print(f"  and the internal storage {internal.root} ({internal.volume.file_system})")
         ensure_rippl_folder(rippl, options, arguments.yes)
         recorded = sync(card, volume, options, internal, internal is None, excluded)
-        if arguments.history:
-            export_history(card, options.dry_run)
     except SyncError as error:
         print(f"rippl_sync: {error}", file=sys.stderr)
         return 2
