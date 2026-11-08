@@ -63,7 +63,7 @@ Settings → Library → **Music folders** lists the top-level folders of the ca
 1. Connect the player. Two drives appear: internal storage and the SD card.
 2. Copy music to the SD card or to internal storage.
 3. **Eject both drives before you unplug.** If you unplug first, recent changes may be lost, and the player warns you.
-4. When music changed, on the card or on internal storage, the player rebuilds its library by itself. Copying other files doesn't trigger a rebuild. Settings → Library → Rescan library rebuilds it on demand.
+4. When music changed, on the card or on internal storage, the player rebuilds its library by itself. Copying other files doesn't trigger a rebuild. Settings → Library → Rescan library rebuilds it on demand. A rebuild reads only new or changed files, and keeps your place: the song you were playing comes back paused where you left it (in its album, if the list you played it from changed), and Up Next keeps its songs, minus any that are gone.
 
 During a long copy the screen goes dark after 30 seconds; any button lights it again. If the drives disappear from the computer on their own while the cable stays in, the player connects again by itself (without asking Storage or DAC) and the computer may warn that a drive was removed without ejecting. Afterwards, Home → Diagnostics → **USB errors** shows what happened in the last session, or *None*:
 

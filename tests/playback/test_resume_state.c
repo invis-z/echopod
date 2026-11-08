@@ -6,7 +6,7 @@
 
 enum {
     SHUFFLE_FIELD = 6,
-    CHECKSUM_FIELD = 40
+    CHECKSUM_FIELD = 56
 };
 
 static ResumeState sample_state(void)
@@ -26,7 +26,7 @@ static ResumeState sample_state(void)
         .repeat = REPEAT_ALL,
         .volume = 37,
         .cursor = {.position = 17, .album_track = 4},
-        .track = 1240,
+        .track_id = UINT64_C(0x0123456789ABCDEF),
         .position_ms = 183456,
     };
 }
@@ -58,7 +58,7 @@ static void a_state_survives_a_round_trip(void)
     CHECK_EQUAL(original.volume, decoded.volume);
     CHECK_EQUAL(original.cursor.position, decoded.cursor.position);
     CHECK_EQUAL(original.cursor.album_track, decoded.cursor.album_track);
-    CHECK_EQUAL(original.track, decoded.track);
+    CHECK(original.track_id == decoded.track_id);
     CHECK_EQUAL(original.position_ms, decoded.position_ms);
     CHECK(!decoded.from_up_next);
 }

@@ -52,7 +52,7 @@ static void become_idle(Player *player)
 static void save_up_next(const Player *player)
 {
     uint8_t bytes[UP_NEXT_STATE_SIZE];
-    up_next_encode(&player->up_next, player->fingerprint, bytes);
+    up_next_encode(&player->up_next, player->library, bytes);
     (void)hal_file_write(PLAYER_UP_NEXT_PATH, bytes, sizeof bytes);
 }
 
@@ -567,7 +567,8 @@ void player_flush_save(Player *player)
 bool player_save(Player *player)
 {
     player->save_pending = false;
-    if (!player->has_track) {
+    uint64_t id = 0;
+    if (!player->has_track || !library_track_id(player->library, player->track, &id)) {
         return false;
     }
     ResumeState state = {
@@ -576,7 +577,7 @@ bool player_save(Player *player)
         .repeat = player->repeat,
         .volume = player->volume,
         .cursor = player->queue.cursor,
-        .track = player->track,
+        .track_id = id,
         .position_ms = current_position(player),
         .from_up_next = player->from_up_next,
     };
@@ -597,15 +598,36 @@ static bool read_resume_state(ResumeState *state)
     return read && resume_state_decode(bytes, sizeof bytes, state);
 }
 
-static bool rebuild_queue(Player *player, const ResumeState *state)
+static bool rebuild_queue(Player *player, const ResumeState *state, uint32_t track)
 {
-    uint32_t track = 0;
-    if (!play_queue_build(&player->queue, player->library, state->plan)) {
+    uint32_t current = 0;
+    if (state->library_fingerprint != player->fingerprint ||
+        !play_queue_build(&player->queue, player->library, state->plan)) {
         return false;
     }
     play_queue_move_to(&player->queue, state->cursor);
-    return play_queue_current(&player->queue, &track) &&
-           (state->from_up_next || track == state->track);
+    return play_queue_current(&player->queue, &current) &&
+           (state->from_up_next || current == track);
+}
+
+static bool album_queue(Player *player, const ResumeState *state, uint32_t track)
+{
+    LibraryTrack record;
+    if (!library_read_track(player->library, track, &record)) {
+        return false;
+    }
+    PlayQueuePlan plan = {
+        .source = {.kind = BROWSE_ALBUM_TRACKS,
+                   .group = LIBRARY_ARTISTS,
+                   .subject = record.album,
+                   .artist = LIBRARY_NONE},
+        .anchor_track = track,
+        .shuffle = state->plan.shuffle,
+        .seed = state->plan.seed,
+    };
+    uint32_t current = 0;
+    return play_queue_build(&player->queue, player->library, plan) &&
+           play_queue_current(&player->queue, &current) && current == track;
 }
 
 static void load_up_next(Player *player)
@@ -617,7 +639,7 @@ static void load_up_next(Player *player)
     }
     bool read = file.size >= UP_NEXT_STATE_SIZE && hal_file_read(file, 0, bytes, sizeof bytes);
     hal_file_close(&file);
-    if (!read || !up_next_decode(bytes, sizeof bytes, player->fingerprint, &player->up_next)) {
+    if (!read || !up_next_decode(bytes, sizeof bytes, player->library, &player->up_next)) {
         up_next_clear(&player->up_next);
     }
 }
@@ -626,11 +648,18 @@ bool player_restore(Player *player)
 {
     ResumeState state;
     load_up_next(player);
-    if (!read_resume_state(&state) || state.library_fingerprint != player->fingerprint ||
-        !rebuild_queue(player, &state)) {
+    uint32_t track = 0;
+    if (!read_resume_state(&state) ||
+        !library_find_track(player->library, state.track_id, &track)) {
         return false;
     }
-    player->track = state.track;
+    if (!rebuild_queue(player, &state, track)) {
+        if (!album_queue(player, &state, track)) {
+            return false;
+        }
+        state.from_up_next = false;
+    }
+    player->track = track;
     player->from_up_next = state.from_up_next;
     player->has_track = true;
     player->repeat = state.repeat;

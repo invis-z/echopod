@@ -348,7 +348,7 @@ static void a_saved_session_resumes_paused_at_its_position(void)
     CHECK_EQUAL(42000, fake_hal_audio_play_start());
 }
 
-static void a_session_from_another_library_is_ignored(void)
+static void a_session_for_a_song_not_in_the_library_is_ignored(void)
 {
     fresh_player();
     ResumeState foreign = {.library_fingerprint = 1, .plan = {.source = back_in_black()}};
@@ -518,6 +518,47 @@ static void up_next_survives_a_restart(void)
     CHECK_EQUAL(ARMY_OF_ME, resumed.up_next.tracks[1]);
 }
 
+static void after_a_rescan_the_session_resumes_the_song_in_its_album(void)
+{
+    Player *started = fresh_player();
+    BrowseQuery all_songs = browse_root_query(BROWSE_ALL_SONGS);
+    uint32_t position = 0;
+    BrowseItem item;
+    while (browse_item(&fixture.library, all_songs, position, &item) &&
+           item.index != SHOOT_TO_THRILL) {
+        position++;
+    }
+    CHECK(player_play_list(started, all_songs, position, SEED));
+    fake_hal_audio_set_position(42000);
+    CHECK(player_save(started));
+    fixture.library.generation++;
+    Player resumed;
+    player_init(&resumed, &fixture.library);
+    CHECK(player_restore(&resumed));
+    PlayerStatus status = player_status(&resumed);
+    CHECK_EQUAL(SHOOT_TO_THRILL, status.track);
+    CHECK_EQUAL(42000, status.position_ms);
+    CHECK_EQUAL(BROWSE_ALBUM_TRACKS, resumed.queue.plan.source.kind);
+    CHECK_EQUAL(BACK_IN_BLACK, resumed.queue.plan.source.subject);
+    fixture.library.generation--;
+}
+
+static void up_next_survives_a_rescan(void)
+{
+    Player *started = playing(0);
+    player_add_to_up_next(started, HELP);
+    player_add_to_up_next(started, ARMY_OF_ME);
+    player_flush_save(started);
+    fixture.library.generation++;
+    Player resumed;
+    player_init(&resumed, &fixture.library);
+    player_restore(&resumed);
+    CHECK_EQUAL(2, resumed.up_next.count);
+    CHECK_EQUAL(HELP, resumed.up_next.tracks[0]);
+    CHECK_EQUAL(ARMY_OF_ME, resumed.up_next.tracks[1]);
+    fixture.library.generation--;
+}
+
 static void a_session_resumes_inside_an_added_song(void)
 {
     Player *started = playing(0);
@@ -590,7 +631,7 @@ int main(void)
         TEST_CASE(volume_changes_are_clamped_and_sent),
         TEST_CASE(changing_shuffle_keeps_the_current_track_playing),
         TEST_CASE(a_saved_session_resumes_paused_at_its_position),
-        TEST_CASE(a_session_from_another_library_is_ignored),
+        TEST_CASE(a_session_for_a_song_not_in_the_library_is_ignored),
         TEST_CASE(the_session_is_saved_regularly_while_playing),
         TEST_CASE(pausing_writes_the_session_only_when_it_is_flushed),
         TEST_CASE(saving_at_once_clears_the_pending_save),
@@ -605,6 +646,8 @@ int main(void)
         TEST_CASE(jumping_to_an_added_song_skips_the_ones_before_it),
         TEST_CASE(jumping_into_the_list_clears_up_next),
         TEST_CASE(up_next_survives_a_restart),
+        TEST_CASE(up_next_survives_a_rescan),
+        TEST_CASE(after_a_rescan_the_session_resumes_the_song_in_its_album),
         TEST_CASE(a_session_resumes_inside_an_added_song),
         TEST_CASE(releasing_the_output_pauses_where_the_track_was),
         TEST_CASE(play_after_a_release_starts_the_output_again),

@@ -7,8 +7,7 @@ enum {
     MAGIC_FIELD = 0,
     VERSION_FIELD = 4,
     COUNT_FIELD = 6,
-    FINGERPRINT_FIELD = 8,
-    TRACKS_FIELD = UP_NEXT_HEADER_SIZE,
+    IDS_FIELD = UP_NEXT_HEADER_SIZE,
     CHECKSUM_FIELD = UP_NEXT_STATE_SIZE - UP_NEXT_CHECKSUM_SIZE,
     MAGIC_SIZE = 4,
     BITS_PER_BYTE = 8
@@ -91,21 +90,26 @@ void up_next_drop(UpNext *up_next, uint32_t count)
     up_next->count = up_next->count - count;
 }
 
-void up_next_encode(const UpNext *up_next, uint32_t fingerprint, uint8_t *bytes)
+void up_next_encode(const UpNext *up_next, const Library *library, uint8_t *bytes)
 {
     for (int index = 0; index < UP_NEXT_STATE_SIZE; index++) {
         bytes[index] = index < MAGIC_SIZE ? MAGIC[index] : 0;
     }
     put_u16(bytes, VERSION_FIELD, VERSION);
-    put_u16(bytes, COUNT_FIELD, up_next->count);
-    put_u32(bytes, FINGERPRINT_FIELD, fingerprint);
+    uint32_t count = 0;
     for (uint32_t index = 0; index < up_next->count; index++) {
-        put_u32(bytes, TRACKS_FIELD + 4 * (int)index, up_next->tracks[index]);
+        uint64_t id = 0;
+        if (library_track_id(library, up_next->tracks[index], &id)) {
+            int field = IDS_FIELD + UP_NEXT_ID_SIZE * (int)count++;
+            put_u32(bytes, field, (uint32_t)id);
+            put_u32(bytes, field + 4, (uint32_t)(id >> 32));
+        }
     }
+    put_u16(bytes, COUNT_FIELD, count);
     put_u32(bytes, CHECKSUM_FIELD, checksum_of(bytes));
 }
 
-static bool header_valid(const uint8_t *bytes, uint32_t fingerprint)
+static bool header_valid(const uint8_t *bytes)
 {
     for (int index = 0; index < MAGIC_SIZE; index++) {
         if (bytes[MAGIC_FIELD + index] != MAGIC[index]) {
@@ -114,18 +118,23 @@ static bool header_valid(const uint8_t *bytes, uint32_t fingerprint)
     }
     return get_u16(bytes, VERSION_FIELD) == VERSION &&
            get_u16(bytes, COUNT_FIELD) <= UP_NEXT_CAPACITY &&
-           get_u32(bytes, FINGERPRINT_FIELD) == fingerprint &&
            get_u32(bytes, CHECKSUM_FIELD) == checksum_of(bytes);
 }
 
-bool up_next_decode(const uint8_t *bytes, uint32_t length, uint32_t fingerprint, UpNext *up_next)
+bool up_next_decode(const uint8_t *bytes, uint32_t length, const Library *library, UpNext *up_next)
 {
-    if (length < UP_NEXT_STATE_SIZE || !header_valid(bytes, fingerprint)) {
+    if (length < UP_NEXT_STATE_SIZE || !header_valid(bytes)) {
         return false;
     }
-    up_next->count = get_u16(bytes, COUNT_FIELD);
-    for (uint32_t index = 0; index < up_next->count; index++) {
-        up_next->tracks[index] = get_u32(bytes, TRACKS_FIELD + 4 * (int)index);
+    uint32_t count = get_u16(bytes, COUNT_FIELD);
+    up_next->count = 0;
+    for (uint32_t index = 0; index < count; index++) {
+        int field = IDS_FIELD + UP_NEXT_ID_SIZE * (int)index;
+        uint64_t id = (uint64_t)get_u32(bytes, field + 4) << 32 | get_u32(bytes, field);
+        uint32_t track = 0;
+        if (library_find_track(library, id, &track)) {
+            up_next->tracks[up_next->count++] = track;
+        }
     }
     return true;
 }
