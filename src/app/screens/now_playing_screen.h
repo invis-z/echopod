@@ -9,6 +9,7 @@
 #include "library/library.h"
 #include "playback/lyrics.h"
 #include "player.h"
+#include "settings/settings.h"
 #include "ui/screen.h"
 #include "ui/theme.h"
 
@@ -42,6 +43,8 @@ typedef struct NowPlayingControls {
     uint8_t rocker;
     bool menu_skips;
     bool volume_shown;
+    bool volume_flipped;
+    bool skip_flipped;
 } NowPlayingControls;
 
 enum {
@@ -69,6 +72,7 @@ typedef struct NowPlayingConfig {
     Screen *up_next;
     Screen *equalizer;
     const uint8_t *options;
+    const Orientation *orientation;
 } NowPlayingConfig;
 
 typedef struct NowPlayingLyrics {
@@ -105,7 +109,7 @@ typedef struct NowPlayingScreen {
 NowPlayingCommand now_playing_command_for(KeyEvent event, bool scrubbing);
 NowPlayingCommand now_playing_command_with(KeyEvent event, bool scrubbing,
                                            NowPlayingControls controls);
-NowPlayingControls now_playing_controls_of(const uint8_t *options);
+NowPlayingControls now_playing_controls_of(const uint8_t *options, Orientation orientation);
 uint32_t now_playing_scrub_target(uint32_t position_ms, uint32_t duration_ms, int32_t delta_ms);
 const char *now_playing_codec_name(HalAudioCodec codec);
 void now_playing_stream_text(HalAudioFormat format, char *buffer, size_t capacity);

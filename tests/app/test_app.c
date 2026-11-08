@@ -712,6 +712,30 @@ static void dac_keys_follow_the_swap_setting(void)
     app_dac_keys_stop();
 }
 
+static void swapped_volume_buttons_leave_lists_and_skips_alone(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_BUTTONS, BUTTONS_SWAP_ROW);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Buttons"));
+    tap(KEY_VOLUME_UP);
+    tap(KEY_PLAY);
+    CHECK(title_is("Menu button"));
+    tap(KEY_BACK);
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_DOWN, dac_tap(KEY_VOLUME_UP));
+    dac_press(KEY_VOLUME_UP, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_DOWN, app_dac_next_key());
+    dac_release(KEY_VOLUME_UP);
+    now_ms += DAC_VOLUME_WINDOW_MS;
+    fake_hal_set_milliseconds(now_ms);
+    dac_press(KEY_VOLUME_UP, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_NEXT, app_dac_next_key());
+    dac_release(KEY_VOLUME_UP);
+    app_dac_keys_stop();
+}
+
 static void dac_keys_turn_around_in_a_swapping_portrait(void)
 {
     start_app_with_library();
@@ -2858,6 +2882,7 @@ int main(void)
         TEST_CASE(a_clock_record_written_over_usb_sets_the_clock),
         TEST_CASE(dac_keys_follow_the_swap_setting),
         TEST_CASE(dac_keys_turn_around_in_a_swapping_portrait),
+        TEST_CASE(swapped_volume_buttons_leave_lists_and_skips_alone),
         TEST_CASE(dac_keys_skip_on_a_held_rocker_and_play_pause_on_play),
         TEST_CASE(dac_keys_keep_changing_the_volume_when_held_right_after_a_tap),
         TEST_CASE(dac_keys_leave_on_a_long_back_press_and_then_serve_the_screens_again),

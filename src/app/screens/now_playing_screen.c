@@ -9,6 +9,7 @@
 #include "hal/audio.h"
 #include "hal/storage.h"
 #include "screens/equalizer_screen.h"
+#include "settings/rocker.h"
 #include "settings/settings.h"
 #include "ui/header.h"
 #include "ui/icons.h"
@@ -156,13 +157,15 @@ uint32_t now_playing_scrub_target(uint32_t position_ms, uint32_t duration_ms, in
     return target > duration_ms ? duration_ms : (uint32_t)target;
 }
 
-static NowPlayingCommand scrub_command_for(KeyEvent event)
+static NowPlayingCommand scrub_command_for(KeyEvent event, bool skip_flipped)
 {
     bool held = event.gesture != KEY_GESTURE_PRESS;
     switch (event.key) {
     case KEY_VOLUME_UP:
-        return held ? NOW_PLAYING_SCRUB_FORWARD_FAST : NOW_PLAYING_SCRUB_FORWARD;
     case KEY_VOLUME_DOWN:
+        if ((event.key == KEY_VOLUME_UP) != skip_flipped) {
+            return held ? NOW_PLAYING_SCRUB_FORWARD_FAST : NOW_PLAYING_SCRUB_FORWARD;
+        }
         return held ? NOW_PLAYING_SCRUB_BACK_FAST : NOW_PLAYING_SCRUB_BACK;
     case KEY_PLAY:
         return by_gesture(event.gesture, NOW_PLAYING_SCRUB_COMMIT, NOW_PLAYING_NONE);
@@ -175,19 +178,26 @@ static NowPlayingCommand scrub_command_for(KeyEvent event)
     return NOW_PLAYING_NONE;
 }
 
-NowPlayingControls now_playing_controls_of(const uint8_t *options)
+NowPlayingControls now_playing_controls_of(const uint8_t *options, Orientation orientation)
 {
-    if (options == NULL) {
-        return (NowPlayingControls){0};
+    NowPlayingControls controls = {
+        .volume_flipped = orientation == ORIENTATION_PORTRAIT_FLIPPED,
+        .skip_flipped = rocker_swapped_in(orientation),
+    };
+    if (options != NULL) {
+        controls.rocker = options[OPTION_ROCKER];
+        controls.menu_skips = options[OPTION_MENU_KEY] == MENU_KEY_NEXT;
+        controls.volume_flipped = controls.volume_flipped != (options[OPTION_VOLUME_KEYS] != 0);
     }
-    return (NowPlayingControls){.rocker = options[OPTION_ROCKER],
-                                .menu_skips = options[OPTION_MENU_KEY] == MENU_KEY_NEXT};
+    return controls;
 }
 
 static NowPlayingCommand rocker_command(KeyGesture gesture, NowPlayingControls controls, bool up)
 {
-    NowPlayingCommand volume = up ? NOW_PLAYING_VOLUME_UP : NOW_PLAYING_VOLUME_DOWN;
-    NowPlayingCommand skip = up ? NOW_PLAYING_NEXT : NOW_PLAYING_PREVIOUS;
+    bool volume_up = up != controls.volume_flipped;
+    bool forward = up != controls.skip_flipped;
+    NowPlayingCommand volume = volume_up ? NOW_PLAYING_VOLUME_UP : NOW_PLAYING_VOLUME_DOWN;
+    NowPlayingCommand skip = forward ? NOW_PLAYING_NEXT : NOW_PLAYING_PREVIOUS;
     bool held = gesture != KEY_GESTURE_PRESS;
     if (controls.rocker == ROCKER_SKIP_VOLUME) {
         return held ? volume : skip;
@@ -196,7 +206,7 @@ static NowPlayingCommand rocker_command(KeyGesture gesture, NowPlayingControls c
         return volume;
     }
     if (held && controls.rocker == ROCKER_VOLUME_SEEK) {
-        return up ? NOW_PLAYING_SEEK_FORWARD : NOW_PLAYING_SEEK_BACK;
+        return forward ? NOW_PLAYING_SEEK_FORWARD : NOW_PLAYING_SEEK_BACK;
     }
     return by_gesture(gesture, volume, skip);
 }
@@ -210,7 +220,7 @@ NowPlayingCommand now_playing_command_with(KeyEvent event, bool scrubbing,
                                            NowPlayingControls controls)
 {
     if (scrubbing) {
-        return scrub_command_for(event);
+        return scrub_command_for(event, controls.skip_flipped);
     }
     switch (event.key) {
     case KEY_VOLUME_UP:
@@ -471,7 +481,10 @@ static void refresh(NowPlayingScreen *now_playing, uint32_t now_ms)
 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     NowPlayingScreen *now_playing = context;
-    NowPlayingControls controls = now_playing_controls_of(now_playing->config.options);
+    Orientation orientation = now_playing->config.orientation != NULL
+                                  ? *now_playing->config.orientation
+                                  : ORIENTATION_LANDSCAPE;
+    NowPlayingControls controls = now_playing_controls_of(now_playing->config.options, orientation);
     controls.volume_shown = now_playing->feedback == NOW_PLAYING_FEEDBACK_VOLUME &&
                             now_ms - now_playing->feedback_started_ms < NOW_PLAYING_VOLUME_HOLD_MS;
     now_playing->now_ms = now_ms;

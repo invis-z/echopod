@@ -258,7 +258,8 @@ Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
                                     .theme = theme,
                                     .covers = context.covers,
                                     .up_next = up_next_screen_init(&screens->up_next, up_next),
-                                    .options = context.settings->settings.options};
+                                    .options = context.settings->settings.options,
+                                    .orientation = &context.settings->settings.orientation};
     EqualizerConfig equalizer = {
         .store = context.equalizer, .toast = context.toast, .theme = theme};
     now_playing.equalizer = equalizer_screen_init(&screens->equalizer, equalizer);
