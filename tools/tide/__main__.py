@@ -3,13 +3,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from tide import bookmarks, sync
+from tide import bookmarks, languages, sync
 
-COMMANDS = {"sync": sync.main, "bookmarks": bookmarks.main}
+COMMANDS = {"sync": sync.main, "bookmarks": bookmarks.main, "languages": languages.main}
 USAGE = """usage: tide COMMAND [options]
 
   tide sync [CARD]       build the library and album covers for the card on this computer
   tide bookmarks CARD    list the audiobook and podcast bookmarks on the card
+  tide languages [install|remove CODE...]
+                         put extra language packs on the player (English and Chinese are built in)
 
 Without a command, tide runs sync. Add --help after a command for its options."""
 

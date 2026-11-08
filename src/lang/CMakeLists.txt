@@ -2,11 +2,22 @@ file(READ ${PROJECT_SOURCE_DIR}/assets/lang/languages.json RIPPL_LANGUAGE_CONFIG
 string(JSON RIPPL_LANGUAGE_TOTAL LENGTH "${RIPPL_LANGUAGE_CONFIG}" languages)
 math(EXPR RIPPL_LANGUAGE_LAST "${RIPPL_LANGUAGE_TOTAL} - 1")
 set(RIPPL_LANGUAGE_PACK_FILES "")
+set(RIPPL_BUILTIN_LANGUAGE_PACK_FILES "")
 foreach(language RANGE 0 ${RIPPL_LANGUAGE_LAST})
     string(JSON language_code GET "${RIPPL_LANGUAGE_CONFIG}" languages ${language} code)
+    string(JSON language_builtin ERROR_VARIABLE language_not_builtin
+        GET "${RIPPL_LANGUAGE_CONFIG}" languages ${language} builtin)
     list(APPEND RIPPL_LANGUAGE_PACK_FILES ${CMAKE_CURRENT_SOURCE_DIR}/packs/${language_code}.bin)
+    if(language_builtin)
+        list(LENGTH RIPPL_BUILTIN_LANGUAGE_PACK_FILES builtin_count)
+        if(NOT builtin_count EQUAL language)
+            message(FATAL_ERROR "built-in languages must come first in languages.json")
+        endif()
+        list(APPEND RIPPL_BUILTIN_LANGUAGE_PACK_FILES ${CMAKE_CURRENT_SOURCE_DIR}/packs/${language_code}.bin)
+    endif()
 endforeach()
 set(RIPPL_LANGUAGE_PACK_FILES "${RIPPL_LANGUAGE_PACK_FILES}" CACHE INTERNAL "language packs in language order")
+set(RIPPL_BUILTIN_LANGUAGE_PACK_FILES "${RIPPL_BUILTIN_LANGUAGE_PACK_FILES}" CACHE INTERNAL "language packs in the firmware image")
 set(RIPPL_LANGUAGE_TOTAL "${RIPPL_LANGUAGE_TOTAL}" CACHE INTERNAL "languages including English")
 set_property(DIRECTORY ${PROJECT_SOURCE_DIR} APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     ${PROJECT_SOURCE_DIR}/assets/lang/languages.json

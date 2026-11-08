@@ -27,6 +27,12 @@ static bool path_for(uint32_t language, char *path)
     return false;
 }
 
+uint8_t *hal_language_buffer(uint32_t *capacity)
+{
+    *capacity = PACK_LIMIT;
+    return pack;
+}
+
 bool hal_language_pack(uint32_t language, const uint8_t **bytes, uint32_t *size)
 {
     char path[PATH_CAPACITY];

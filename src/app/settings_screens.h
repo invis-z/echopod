@@ -78,6 +78,9 @@ struct SettingsScreens {
     uint8_t shown;
     MenuItem items[SETTINGS_TOP_COUNT];
     MenuItem rows[SETTINGS_GROUP_ROWS_MAX];
+    StringId language_options[LANGUAGE_COUNT];
+    uint8_t language_map[LANGUAGE_COUNT];
+    uint8_t language_shown;
 };
 
 Screen *settings_screens_init(SettingsScreens *screens, SettingsContext context,

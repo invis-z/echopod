@@ -232,7 +232,7 @@ In portrait, Home shows the album art under the menu, Now Playing puts the cover
 
 ## Language
 
-Settings → System → Language lists English, 简体中文, 日本語, 한국어, Deutsch, Français, Español, Italiano, Português, Nederlands, Svenska, Dansk, Norsk, Suomi, Русский, Українська, Polski and Bahasa Indonesia. Pick one and the player says "Restart to apply"; hold Power to turn it off and on again, and every menu, setting and message uses that language. Song, artist and album names are never translated.
+English and 简体中文 are built in. Japanese, Korean, German, French, Spanish, Italian, Portuguese, Dutch, Swedish, Danish, Norwegian, Finnish, Russian, Ukrainian, Polish and Indonesian are language packs you add to the player's internal drive (the one named RIPPL): `tide languages install de` copies the German pack (`tide languages` lists them), or copy `<code>.bin` from the release's `rippl-languages.zip` into a `Languages` folder at the root of that drive. Settings → System → Language lists the built-in two and every pack it finds there. Pick one and the player says "Restart to apply"; hold Power to turn it off and on again, and every menu, setting and message uses that language. A pack that is missing or damaged when the player starts is skipped, and the player starts in English. Song, artist and album names are never translated.
 
 The translations were not checked by native speakers, and a few long texts may be cut short on the small screen. Folder names stay as they are: audiobooks and podcasts still go in folders named `Audiobooks` and `Podcasts`.
 

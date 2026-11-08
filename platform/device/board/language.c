@@ -13,6 +13,12 @@ enum {
 
 static uint32_t pack[LANGUAGE_RAM_BYTES / 4] __attribute__((section(".language_ram")));
 
+uint8_t *hal_language_buffer(uint32_t *capacity)
+{
+    *capacity = LANGUAGE_RAM_BYTES;
+    return (uint8_t *)pack;
+}
+
 bool hal_language_pack(uint32_t language, const uint8_t **bytes, uint32_t *size)
 {
     EmmcInfo info;

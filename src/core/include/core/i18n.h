@@ -13,6 +13,7 @@ enum {
     I18N_MAX_ARGUMENTS = 10
 };
 
+bool i18n_header_valid(const uint8_t *header, size_t file_size);
 bool i18n_attach(const uint8_t *pack, size_t size);
 void i18n_detach(void);
 const char *i18n_text(StringId id);

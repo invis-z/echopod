@@ -29,6 +29,7 @@
 #include "hal/language.h"
 #include "hal/power.h"
 #include "hal/system.h"
+#include "language_files.h"
 #include "library_rescan.h"
 #include "library_store.h"
 #include "music_check.h"
@@ -889,11 +890,20 @@ static void show_card_setup(void)
     app_show_notice("Rippl", i18n_text(STR_BOOT_CARD_SETUP));
 }
 
-static void apply_language(Language language)
+static bool attach_language(Language language)
 {
+    if ((int)language >= LANGUAGE_BUILTIN_COUNT) {
+        return language_files_attach(language);
+    }
     const uint8_t *pack;
     uint32_t size;
-    if (!hal_language_pack((uint32_t)language, &pack, &size) || !i18n_attach(pack, size)) {
+    i18n_detach();
+    return hal_language_pack((uint32_t)language, &pack, &size) && i18n_attach(pack, size);
+}
+
+static void apply_language(Language language)
+{
+    if (!attach_language(language) && !attach_language(LANGUAGE_ENGLISH)) {
         i18n_detach();
     }
 }

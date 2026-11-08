@@ -18,6 +18,7 @@ add_library(rippl_app STATIC
     folders_store.c
     frame_overlay.c
     home_art.c
+    language_files.c
     library_rescan.c
     music_check.c
     library_store.c

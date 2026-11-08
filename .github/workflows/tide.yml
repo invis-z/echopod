@@ -6,10 +6,14 @@ on:
     tags: ["v*"]
     paths:
       - "tools/**"
+      - "assets/lang/**"
+      - "src/lang/packs/**"
       - ".github/workflows/tide.yml"
   pull_request:
     paths:
       - "tools/**"
+      - "assets/lang/**"
+      - "src/lang/packs/**"
       - ".github/workflows/tide.yml"
   workflow_dispatch:
 
@@ -45,14 +49,21 @@ jobs:
       - name: Test the tools
         run: python -m unittest discover -s tools/tests
       - name: Build one file
-        run: >
-          python -m PyInstaller --onefile --console --name tide
-          --paths tools --distpath dist --workpath build/pyinstaller --specpath build/pyinstaller
-          tools/tide/__main__.py
+        run: |
+          SEP=$([ "$RUNNER_OS" = Windows ] && echo ";" || echo ":")
+          ROOT=$([ "$RUNNER_OS" = Windows ] && pwd -W || pwd)
+          python -m PyInstaller --onefile --console --name tide \
+            --paths tools --distpath dist --workpath build/pyinstaller --specpath build/pyinstaller \
+            --add-data "$ROOT/assets/lang/languages.json${SEP}assets/lang" \
+            --add-data "$ROOT/src/lang/packs${SEP}src/lang/packs" \
+            tools/tide/__main__.py
       - name: Smoke test
         run: |
           ${{ matrix.built }} --help
           ${{ matrix.built }} sync --help
+          mkdir -p smoke-internal
+          ${{ matrix.built }} languages install de --drive smoke-internal
+          test -f smoke-internal/Languages/de.bin
           mkdir -p smoke/.rippl smoke/Artist/Album
           python -c "import sys; sys.path[:0] = ['tools', 'tools/tests']; from pathlib import Path; from test_library_index import write_silent_flac; write_silent_flac(Path('smoke/Artist/Album/01 - Song.flac'), 1)"
           ${{ matrix.built }} sync smoke --dry-run
@@ -69,10 +80,24 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+        with:
+          path: source
       - uses: actions/download-artifact@v8
         with:
           path: assets
           merge-multiple: true
+      - name: Pack the extra languages
+        run: |
+          mkdir -p languages/Languages
+          python3 - <<'PACKS'
+          import json, shutil
+          for language in json.load(open("source/assets/lang/languages.json"))["languages"]:
+              if not language.get("builtin"):
+                  code = language["code"]
+                  shutil.copy(f"source/src/lang/packs/{code}.bin", f"languages/Languages/{code}.bin")
+          PACKS
+          (cd languages && zip -r ../assets/rippl-languages.zip Languages)
       - name: Publish the files with the release
         env:
           GH_TOKEN: ${{ github.token }}

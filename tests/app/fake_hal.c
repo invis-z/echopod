@@ -884,7 +884,9 @@ bool hal_file_write(const char *path, const void *bytes, uint32_t length)
         return false;
     }
     copy_path(slot->path, path);
-    memcpy(slot->bytes, bytes, length);
+    if (length > 0) {
+        memcpy(slot->bytes, bytes, length);
+    }
     register_written(path, length);
     fake.write_count++;
     return true;
@@ -1419,6 +1421,13 @@ bool hal_system_restart_pending(void)
 static const uint8_t *language_pack;
 static uint32_t language_pack_size;
 static uint32_t language_requested;
+static uint8_t language_buffer[0x4000];
+
+uint8_t *hal_language_buffer(uint32_t *capacity)
+{
+    *capacity = sizeof language_buffer;
+    return language_buffer;
+}
 
 void fake_hal_set_language_pack(const uint8_t *pack, uint32_t size)
 {

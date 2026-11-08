@@ -1,7 +1,7 @@
 {
   "languages": [
-    {"code": "en", "name": "English"},
-    {"code": "zh", "name": "Simplified Chinese"},
+    {"code": "en", "name": "English", "builtin": true},
+    {"code": "zh", "name": "Simplified Chinese", "builtin": true},
     {"code": "ja", "name": "Japanese"},
     {"code": "ko", "name": "Korean"},
     {"code": "de", "name": "German"},
