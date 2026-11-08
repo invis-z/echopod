@@ -2,6 +2,7 @@
 
 #include "check.h"
 #include "screens/now_playing_screen.h"
+#include "settings/rocker.h"
 #include "settings/settings.h"
 
 enum {
@@ -256,10 +257,35 @@ static void controls_follow_the_saved_options(void)
     uint8_t options[SETTINGS_OPTION_COUNT] = {0};
     options[OPTION_ROCKER] = ROCKER_VOLUME_SEEK;
     options[OPTION_MENU_KEY] = MENU_KEY_NEXT;
-    NowPlayingControls controls = now_playing_controls_of(options);
+    NowPlayingControls controls = now_playing_controls_of(options, ORIENTATION_LANDSCAPE);
     CHECK_EQUAL(ROCKER_VOLUME_SEEK, controls.rocker);
     CHECK(controls.menu_skips);
-    CHECK(!now_playing_controls_of(NULL).menu_skips);
+    CHECK(!now_playing_controls_of(NULL, ORIENTATION_LANDSCAPE).menu_skips);
+}
+
+static Key pressed_in(Orientation orientation, Key key)
+{
+    return rocker_key(key, rocker_swapped_in(orientation));
+}
+
+static void both_portraits_turn_the_volume_round_but_not_the_skips(void)
+{
+    static const Orientation PORTRAITS[] = {ORIENTATION_PORTRAIT, ORIENTATION_PORTRAIT_FLIPPED};
+    for (int index = 0; index < 2; index++) {
+        Orientation orientation = PORTRAITS[index];
+        NowPlayingControls controls = now_playing_controls_of(NULL, orientation);
+        Key up = pressed_in(orientation, KEY_VOLUME_UP);
+        Key down = pressed_in(orientation, KEY_VOLUME_DOWN);
+        CHECK_EQUAL(NOW_PLAYING_VOLUME_DOWN, controlled(up, KEY_GESTURE_PRESS, controls));
+        CHECK_EQUAL(NOW_PLAYING_VOLUME_UP, controlled(down, KEY_GESTURE_PRESS, controls));
+        CHECK_EQUAL(NOW_PLAYING_NEXT, controlled(up, KEY_GESTURE_LONG_PRESS, controls));
+        CHECK_EQUAL(NOW_PLAYING_PREVIOUS, controlled(down, KEY_GESTURE_LONG_PRESS, controls));
+        KeyEvent scrub = {.key = up, .gesture = KEY_GESTURE_PRESS};
+        CHECK_EQUAL(NOW_PLAYING_SCRUB_FORWARD, now_playing_command_with(scrub, true, controls));
+    }
+    NowPlayingControls landscape = now_playing_controls_of(NULL, ORIENTATION_LANDSCAPE);
+    CHECK_EQUAL(NOW_PLAYING_VOLUME_UP, controlled(KEY_VOLUME_UP, KEY_GESTURE_PRESS, landscape));
+    CHECK_EQUAL(NOW_PLAYING_NEXT, controlled(KEY_VOLUME_UP, KEY_GESTURE_LONG_PRESS, landscape));
 }
 
 int main(void)
@@ -271,6 +297,7 @@ int main(void)
         TEST_CASE(holding_while_the_volume_shows_keeps_changing_it),
         TEST_CASE(the_menu_button_can_skip_to_the_next_track),
         TEST_CASE(controls_follow_the_saved_options),
+        TEST_CASE(both_portraits_turn_the_volume_round_but_not_the_skips),
         TEST_CASE(the_codec_has_a_short_name),
         TEST_CASE(lossless_streams_show_bit_depth_and_rate),
         TEST_CASE(lossy_streams_show_only_the_rate),

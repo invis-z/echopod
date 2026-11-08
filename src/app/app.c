@@ -249,8 +249,7 @@ static Key oriented_key(HalKeyTransition transition)
 {
     if (transition.pressed) {
         const Settings *settings = &app.settings.settings;
-        app.rocker_swapped[transition.key] = rocker_swapped_in(settings->orientation) !=
-                                             (settings->options[OPTION_VOLUME_KEYS] != 0);
+        app.rocker_swapped[transition.key] = rocker_swapped_in(settings->orientation);
     }
     return rocker_key(transition.key, app.rocker_swapped[transition.key]);
 }
@@ -485,7 +484,8 @@ static void show_now_playing(uint32_t now_ms)
 
 static void run_background(KeyEvent event)
 {
-    NowPlayingControls controls = now_playing_controls_of(app.settings.settings.options);
+    NowPlayingControls controls =
+        now_playing_controls_of(app.settings.settings.options, app.settings.settings.orientation);
     NowPlayingCommand command = now_playing_command_with(event, false, controls);
     switch (command) {
     case NOW_PLAYING_TOGGLE_PAUSE:
@@ -1046,7 +1046,8 @@ static AppDacKey dac_key_of(NowPlayingCommand command)
 
 static AppDacKey dac_key_for(KeyEvent event, uint32_t now_ms)
 {
-    NowPlayingControls controls = now_playing_controls_of(app.settings.settings.options);
+    NowPlayingControls controls =
+        now_playing_controls_of(app.settings.settings.options, app.settings.settings.orientation);
     controls.volume_shown = !deadline_reached(now_ms, app.dac_volume_until_ms);
     AppDacKey key = dac_key_of(now_playing_command_with(event, false, controls));
     if (key == APP_DAC_KEY_VOLUME_UP || key == APP_DAC_KEY_VOLUME_DOWN) {

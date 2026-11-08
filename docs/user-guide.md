@@ -168,7 +168,7 @@ The computer picks each album's cover the way the player does: the picture insid
 
 With the screen off, ▶‖ still pauses and resumes, a tap of vol± changes the volume and holding vol± skips tracks (or jumps 30 s / 15 s in audiobooks and podcasts). After 30 s paused the player powers its audio output down to save battery, so resuming after a longer pause takes a moment longer. With the screen off, FLAC, ALAC, WAV and MP3 at 48 kHz or less play with the processor at a lower speed; switching between the two speeds happens at a track change, which then has a short gap instead of following seamlessly (Diagnostics → Savings → No 96 MHz turns this off).
 
-Settings → Buttons → **Volume buttons** changes what the rocker does on Now Playing and with the screen off: *Tap: volume, hold: skip* (the default), *Tap: skip, hold: volume*, or *Tap: volume, hold: seek* (5 s steps while held). Right after you tap the volume, holding the rocker keeps changing the volume in every mode. **Swap volume buttons** turns + and − around everywhere.
+Settings → Buttons → **Volume buttons** changes what the rocker does on Now Playing and with the screen off: *Tap: volume, hold: skip* (the default), *Tap: skip, hold: volume*, or *Tap: volume, hold: seek* (5 s steps while held). Right after you tap the volume, holding the rocker keeps changing the volume in every mode. **Swap volume buttons** turns the volume direction around: + turns it down and − turns it up. Skipping, seeking and moving through lists stay as they are.
 
 At the top of an artist's, album artist's or genre's album list, **Play all** plays every song there in album order and **Shuffle all** plays them shuffled. All Songs and playlists have **Shuffle all**. The list still opens on the first album or song, so scroll up to reach them.
 
@@ -228,7 +228,7 @@ In Cover Flow (Music → Cover Flow), the tile before the first album, with a sh
 
 Settings → Display → Orientation has Landscape, Portrait and Portrait, flipped. The screen turns as soon as you pick, and the player starts the same way next time. Pick whichever portrait way round puts the buttons where you like them.
 
-In portrait, Home shows the album art under the menu, Now Playing puts the cover above the track, Cover Flow scrolls albums from top to bottom, and the Custom EQ shows its bands as rows. The volume rocker turns with the screen, so the button on top moves up through lists. In Portrait (not flipped) that same button also turns the volume down.
+In portrait, Home shows the album art under the menu, Now Playing puts the cover above the track, Cover Flow scrolls albums from top to bottom, and the Custom EQ shows its bands as rows. The volume rocker turns with the screen, so the button on top moves up through lists. In both portraits a tap turns the volume the other way from landscape: the button that turns it up in landscape turns it down. Holding the buttons skips to the next and previous track as in landscape, and seeking forward and back stays the same too.
 
 ## Language
 

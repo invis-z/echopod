@@ -719,6 +719,30 @@ static void dac_keys_follow_the_swap_setting(void)
     app_dac_keys_stop();
 }
 
+static void swapped_volume_buttons_leave_lists_and_skips_alone(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_BUTTONS, BUTTONS_SWAP_ROW);
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("Buttons"));
+    tap(KEY_VOLUME_UP);
+    tap(KEY_PLAY);
+    CHECK(title_is("Menu button"));
+    tap(KEY_BACK);
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_DOWN, dac_tap(KEY_VOLUME_UP));
+    dac_press(KEY_VOLUME_UP, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_VOLUME_DOWN, app_dac_next_key());
+    dac_release(KEY_VOLUME_UP);
+    now_ms += DAC_VOLUME_WINDOW_MS;
+    fake_hal_set_milliseconds(now_ms);
+    dac_press(KEY_VOLUME_UP, 1000);
+    CHECK_EQUAL(APP_DAC_KEY_NEXT, app_dac_next_key());
+    dac_release(KEY_VOLUME_UP);
+    app_dac_keys_stop();
+}
+
 static void dac_keys_turn_around_in_a_swapping_portrait(void)
 {
     start_app_with_library();
@@ -2971,8 +2995,8 @@ static uint32_t shot_hash(ShotSetup setup)
 
 static const uint32_t STANDARD_SHOT_HASHES[SHOT_LAYOUT_COUNT][SHOT_STATE_COUNT] = {
     {0xD85EFC32U, 0xB6900B31U, 0x5C6D94A2U, 0x626E71B1U, 0x02C98651U, 0xB9B220AEU, 0xF2A5A9BCU},
-    {0x6AAFCF5FU, 0x4399E6B7U, 0x64CAA383U, 0xAE502424U, 0x0E3E4DDFU, 0xD613A892U, 0x1ECD6D48U},
-    {0x8F200FC4U, 0x0FD22AA3U, 0xB65AB530U, 0x0D0E1427U, 0x426118CBU, 0x7E22F99DU, 0x18AF1BF7U},
+    {0x6AAFCF5FU, 0x4399E6B7U, 0x64CAA383U, 0x0450A9BBU, 0x0E3E4DDFU, 0xD613A892U, 0x1ECD6D48U},
+    {0x8F200FC4U, 0x0FD22AA3U, 0xB65AB530U, 0x453AC02CU, 0x426118CBU, 0x7E22F99DU, 0x18AF1BF7U},
 };
 
 static void the_standard_now_playing_keeps_its_pixels(void)
@@ -2990,9 +3014,9 @@ static const ShotLayout SHOT_LAYOUTS[2] = {SHOT_LANDSCAPE, SHOT_PORTRAIT};
 
 static const uint32_t FACE_SHOT_HASHES[2][2][SHOT_STATE_COUNT] = {
     {{0x396A393BU, 0x597D1834U, 0x43849A9FU, 0xA371FF18U, 0x597D1834U, 0x6D9C1AABU, 0x8012DFC1U},
-     {0xA645C254U, 0x3F3621E0U, 0xE0A0EB67U, 0xCB3A99B2U, 0x3F3621E0U, 0xA1865489U, 0x5F7ED099U}},
+     {0xA645C254U, 0x3F3621E0U, 0xE0A0EB67U, 0xFAAB936CU, 0x3F3621E0U, 0xA1865489U, 0x5F7ED099U}},
     {{0x25743527U, 0x358B9E0CU, 0x1B4CA08AU, 0x9B0C37BBU, 0xD5C7B3B5U, 0x92FA5A12U, 0x848B2E48U},
-     {0xB46AF402U, 0x3CB1BB2DU, 0xACC16553U, 0x844F3265U, 0xBDD3CE10U, 0x4E8B28B8U, 0xF6A14BE9U}},
+     {0xB46AF402U, 0x3CB1BB2DU, 0xACC16553U, 0x028BC61EU, 0xBDD3CE10U, 0x4E8B28B8U, 0xF6A14BE9U}},
 };
 
 static void the_cassette_and_turntable_frames_keep_their_pixels_in_every_state(void)
@@ -3550,6 +3574,7 @@ int main(void)
         TEST_CASE(a_clock_record_written_over_usb_sets_the_clock),
         TEST_CASE(dac_keys_follow_the_swap_setting),
         TEST_CASE(dac_keys_turn_around_in_a_swapping_portrait),
+        TEST_CASE(swapped_volume_buttons_leave_lists_and_skips_alone),
         TEST_CASE(dac_keys_skip_on_a_held_rocker_and_play_pause_on_play),
         TEST_CASE(dac_keys_keep_changing_the_volume_when_held_right_after_a_tap),
         TEST_CASE(dac_keys_leave_on_a_long_back_press_and_then_serve_the_screens_again),
