@@ -4,10 +4,46 @@ Rippl is a fork of EchoPod (github.com/BasilSkyWalk/echopod), starting from Echo
 
 ## Unreleased
 
-- About 10 KB of code (the Bluetooth protocol and the Bluetooth, Equalizer, Music folders and Date & time screens) moves into a second code area the player loads after it starts, at `0x03076670` beside the main code, so the main code window has about 16 KB free instead of 7. It doesn't count toward the boot ROM's size limit. If it fails to load, those screens say to reinstall the update and Bluetooth stays off; everything else works.
-- Only English and Simplified Chinese are built into the firmware. The other 16 languages are packs on the internal drive (`Languages/<code>.bin`): `tide languages install <code>` copies one there, and each release has them in `rippl-languages.zip`. Settings → Language lists the built-in two and the packs it finds. A pack that is missing, too big or damaged is refused and the player starts in English. If you use one of those languages, add its pack before updating, or the player starts in English until you do.
-- The language pack moves to the 16 KB of RAM after the data area, which is free once the player has started (a full read-back test passed on a player), so a pack can be up to 16 KB instead of 12; the glyph cache takes the 12 KB it leaves and grows from 34 to 46 KB.
-- The listen history is gone: the player no longer logs plays to `/.rippl/history.bin` or writes `.scrobbler.log` when it connects, Settings → Library → Listen history and Tide's `--history` are removed, and `tools/rippl_history.py` is deleted. Existing `history.bin`, `history-exported.txt` and `.scrobbler.log` files are left on the card and can be deleted.
-- The equalizer's presets are files: `.txt` presets in `/EQ` (Equalizer APO's parametric format, as AutoEQ exports it) are listed after Off and Custom and play on the player, and the built-in Retro, Bass, Heavy, Pop, Jazz and Unique are gone; a saved built-in preset becomes Off. MP3, AAC and Opus are equalized on the second processor like FLAC, and changing tracks no longer leaves old audio in the buffer (from EchoPod pull request 56).
-- After an update installs, the player restarts by itself once USB is unplugged, and the install percentage always has its own line, so it shows in portrait in every language.
-- The library is built into segment files in `/.rippl/library`, which grow with the music instead of a fixed 4 MB `library.db` and 24 MB `build.tmp`, and a rescan reads only files that are new or changed. Resume and Up Next keep their songs across rescans. Covers move from the fixed 80 MB `covers.bin` into 4 MiB segment files with no album limit, and favorites use 64-bit album keys, so favorites made before this start over. Tide replaces rippl-sync: `tide sync` writes the same segment files as the player, so a synced card needs no rescan and the next rescan reads only new files, and `tide bookmarks` lists audiobook bookmarks.
+The first Rippl release, forked from EchoPod 0.11.1.
+
+### Before you update
+
+- **The player's files move from `/.echo` to `/.rippl`.** The first start sets the card up again: settings, the equalizer, resume, Up Next, favorites, bookmarks, Bluetooth devices, music folder choices and the library start fresh, and the card is scanned. Old `/.echo` files are left alone and can be deleted.
+- **The firmware is an 8 MiB image, `RIPPL.IMG`.** From EchoPod, install `flasher/HIFIEC90.IMG` first, since EchoPod only accepts 5 MiB images; from FiiO's firmware, rename `RIPPL.IMG` to `HIFIEC90.IMG`. `docs/device-install.md` has the steps.
+- **Only English and Simplified Chinese are built in.** If you use another language, put its pack on the internal drive first (`tide languages install <code>`, or `Languages/<code>.bin` from `rippl-languages.zip`); without it the player starts in English.
+
+### Library
+
+- The library lives in segment files in `/.rippl/library`, which grow with the music instead of a fixed 4 MB `library.db`, 24 MB `build.tmp` and 80 MB `covers.bin`. Tracks, albums, folders and playlists are counted in 32 bits, so a library is no longer limited to 65,535 tracks; the builder is tested with 250,000.
+- A rescan reads only files that are new or changed. Resume and Up Next keep their songs across rescans, and covers are kept for albums that didn't change, in 4 MiB segments with no album limit.
+- **Tide** replaces rippl-sync. `tide sync` writes the same segment files as the player, so a synced card needs no rescan; `tide bookmarks` lists audiobook and podcast bookmarks; `tide languages` installs language packs.
+
+### Sound
+
+- Volume has 85 levels of exactly 1 dB each, from 84 dB below the top on both jacks. Bluetooth headphones get the level the 3.5 mm jack would at the same volume, so Settings → Sound → Bluetooth level is gone.
+- Settings → Sound → Filter names the DAC's five filters instead of numbering them, and **DRE** turns the DACs' Dynamic Range Enhancement Off, On or On with a lower threshold.
+- The equalizer's presets are files: `.txt` presets in `/EQ` (Equalizer APO's parametric format, as AutoEQ exports it) are listed after Off, and the built-in presets and the 7-band Custom equalizer are gone; with no preset in `/EQ`, Settings has no Equalizer row. MP3, AAC and Opus are equalized on the second processor like FLAC, and changing tracks no longer leaves old audio in the buffer (from EchoPod pull request 56). WAV is decoded and equalized there too, and the main core no longer decodes FLAC or WAV itself: after an update, nothing plays until the player restarts, which it does by itself once USB is unplugged. The main core doesn't equalize either: switching the equalizer on during a track restarts the second processor at full speed where the track was, with a short gap, instead of the main core equalizing the rest of the track.
+- 32-bit WAV goes to the DAC with all 32 bits instead of being rounded to 24, and the equalizer is off for it, as for 176.4 and 192 kHz.
+
+### Buttons
+
+- In both portraits the volume buttons turn the volume the other way, while holding them still skips and seeks as in landscape. **Swap volume buttons** now reverses only the volume, not lists, skips or seeking.
+
+### Languages and text
+
+- Language packs other than English and Chinese load from `Languages/<code>.bin` on the internal drive, and Settings → Language lists the built-in two plus the packs it finds. A pack that is missing, too big or damaged is refused and the player starts in English.
+- The 69 strings that were still English are translated in every language, and awkward or clashing Chinese strings are fixed.
+- Track, artist and album names in GBK and JIS X 0213 characters beyond the common CJK set draw too.
+
+### Updates
+
+- The install percentage always has its own line, so it shows in portrait in every language, and after an update installs the player restarts by itself once USB is unplugged.
+
+### Memory
+
+- The language pack moves to 16 KB of RAM that is free once the player has started, so a pack can be 16 KB instead of 12, and the glyph cache grows from 34 to 46 KB.
+- About 10 KB of code (the Bluetooth protocol and the Bluetooth, Equalizer, Music folders and Date & time screens) loads after start into a second code area, leaving about 15 KB free in the main one. If it fails to load, those screens say to reinstall the update and Bluetooth stays off.
+
+### Removed
+
+- The listen history: the player no longer logs plays or writes `.scrobbler.log`, and Settings → Library → Listen history, rippl-sync's `--history` and `tools/rippl_history.py` are gone. Existing `history.bin`, `history-exported.txt` and `.scrobbler.log` files can be deleted.
