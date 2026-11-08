@@ -14,7 +14,6 @@
 #include "device/dma_loop.h"
 #include "device/flac_source.h"
 #include "device/mp3_probe.h"
-#include "device/wav_source.h"
 #include "dmac.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
@@ -69,20 +68,10 @@ typedef struct TrackProbe {
     uint32_t rate;
 } TrackProbe;
 
-typedef struct FlacMemory {
-    FlacDecoder decoder;
-    FlacBlockBuffer block;
-} FlacMemory;
-
-static union {
-    FlacMemory flac;
-    WavBuffers wav;
-} decoding __attribute__((section(".high_ram")));
+static FlacDecoder header_decoder __attribute__((section(".high_ram")));
 static uint32_t music_ring[RING_WORDS];
-static WavSource wav_source;
 static SourceKind source_kind;
 static bool unknown_format;
-static FlacSource software_source;
 static Core1Source core1_source;
 static bool using_core1;
 static bool resume_after_clock_change;
@@ -267,11 +256,10 @@ static Core1Program program_for(SourceKind kind)
     return kind == SOURCE_AAC ? CORE1_PROGRAM_AAC : CORE1_PROGRAM_FLAC;
 }
 
-
 static AudioSource chosen_source(void)
 {
     if (source_kind == SOURCE_WAV) {
-        return wav_source_interface(&wav_source);
+        return core1_source_wav_interface(&core1_source);
     }
     if (source_kind == SOURCE_MP3) {
         return core1_source_mp3_interface(&core1_source);
@@ -282,8 +270,7 @@ static AudioSource chosen_source(void)
     if (source_kind == SOURCE_OPUS) {
         return core1_source_ogg_interface(&core1_source);
     }
-    return using_core1 ? core1_source_interface(&core1_source)
-                       : flac_source_interface(&software_source);
+    return core1_source_interface(&core1_source);
 }
 
 static void remember(char *copy, const char *path)
@@ -311,15 +298,9 @@ static bool open_chosen(void *context, const char *path, uint32_t start_ms, Audi
     if (unknown_format) {
         return false;
     }
-    if (source_kind == SOURCE_FLAC) {
-        flac_use_block_buffer(&decoding.flac.decoder, &decoding.flac.block);
-        using_core1 = board_core1_start_stream(CORE1_PROGRAM_FLAC, probe.rate);
-    }
-    if (source_kind != SOURCE_FLAC && source_kind != SOURCE_WAV) {
-        using_core1 = board_core1_start_stream(program_for(source_kind), probe.rate);
-        if (!using_core1) {
-            return false;
-        }
+    using_core1 = board_core1_start_stream(program_for(source_kind), probe.rate);
+    if (!using_core1) {
+        return false;
     }
     AudioSource source = chosen_source();
     return source.open(source.context, path, start_ms, track);
@@ -363,15 +344,11 @@ static void ensure_engine(void)
         return;
     }
     FlacFileOpener files = {.open = open_file, .close = close_file, .context = NULL};
-    flac_source_init(&software_source, files, &decoding.flac.decoder);
-    core1_source_init(&core1_source, core1_region(), files, &decoding.flac.decoder,
-                      FILL_BUDGET_BYTES);
+    core1_source_init(&core1_source, core1_region(), files, &header_decoder, FILL_BUDGET_BYTES);
     core1_source_set_wake(&core1_source, signal_core1);
-    wav_source_init(&wav_source, files, &decoding.wav);
     AudioSource source = {open_chosen, next_chosen, release_chosen, close_chosen, NULL};
     audio_engine_init(
         &engine, (AudioEngineConfig){.source = source, .ring = ring(), .ring_words = RING_WORDS});
-    audio_engine_set_equalizer(&engine, &equalizer_curve);
     engine_ready = true;
 }
 
@@ -582,7 +559,7 @@ static void choose_clock(const char *path)
 
 static bool core1_restart_for(TrackProbe probe)
 {
-    if (probe.kind == SOURCE_WAV || probe.kind == SOURCE_UNKNOWN) {
+    if (probe.kind == SOURCE_UNKNOWN) {
         return false;
     }
     return board_core1_needs_restart(program_for(probe.kind), probe.rate);
@@ -787,10 +764,9 @@ void hal_audio_set_equalizer(const EqualizerCurve *curve)
     if (!engine_ready) {
         return;
     }
-    audio_engine_set_equalizer(&engine, &equalizer_curve);
     AudioEngineState state = audio_engine_status(&engine).state;
     if (transferring && state != AUDIO_ENGINE_STOPPED && equalizer_on() &&
-        hal_system_clock_mhz() < AUDIO_CLOCK_MHZ) {
+        (hal_system_clock_mhz() < AUDIO_CLOCK_MHZ || board_core1_equalizer_waits())) {
         seek_to(audio_engine_status(&engine).position_ms, state == AUDIO_ENGINE_PAUSED, true);
     }
     if (deferred || audio_engine_next_pending(&engine)) {

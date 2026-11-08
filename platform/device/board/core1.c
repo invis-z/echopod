@@ -205,6 +205,12 @@ bool board_core1_needs_restart(Core1Program program, uint32_t rate)
             streaming_divider != stream_divider(program, rate, hal_system_clock_mhz()));
 }
 
+bool board_core1_equalizer_waits(void)
+{
+    return streaming && equalizing(streaming_program, streaming_rate) && streaming_divider != 1 &&
+           core1_region().control->bits_per_sample <= EQUALIZER_MAX_BITS;
+}
+
 bool board_core1_start_stream(Core1Program program, uint32_t rate)
 {
     if (streaming && !board_core1_needs_restart(program, rate)) {

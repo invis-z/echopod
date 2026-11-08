@@ -7,6 +7,7 @@
 #include "core1_ticks.h"
 #include "device/core1_alac.h"
 #include "device/core1_control.h"
+#include "device/core1_pcm.h"
 #include "device/flac_accel.h"
 #include "device/tick_clock.h"
 #include "hal/system.h"
@@ -23,6 +24,7 @@ void core1_main(void);
 static FlacDecoder flac_decoder;
 static Core1Flac flac;
 static Core1Alac alac;
+static Core1Pcm pcm;
 static Core1Decoder flac_stream;
 static FlacLpcHook lpc_hook;
 static AccelHook accel_hook;
@@ -155,6 +157,9 @@ void core1_main(void)
     core1_stream_set_decoder(
         &stream, STREAM_CODEC_ALAC,
         core1_alac_decoder(&alac, (AlacDecoder *)(uintptr_t)CORE1_FLAC_BANK_1));
+    core1_stream_set_decoder(&stream, STREAM_CODEC_PCM,
+                             core1_pcm_decoder(&pcm, (int32_t *)(uintptr_t)CORE1_FLAC_BANK_0,
+                                               (int32_t *)(uintptr_t)CORE1_FLAC_BANK_1));
     core1_stream_set_equalizer(&stream, &equalizer,
                                (volatile Core1EqualizerShare *)(uintptr_t)CORE1_SHARED_EQUALIZER);
     core1_ticks_start();

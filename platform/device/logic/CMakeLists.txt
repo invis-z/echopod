@@ -78,6 +78,7 @@ set(RIPPL_DEVICE_LOGIC_SOURCES
     card_write.c
     core1_aac.c
     core1_alac.c
+    core1_pcm.c
     core1_control.c
     core1_mp3.c
     core1_opus.c
@@ -119,7 +120,7 @@ set(RIPPL_DEVICE_LOGIC_SOURCES
     usb_device.c
     usb_fallback.c
     vbus_debounce.c
-    wav_source.c
+    wav_format.c
 )
 add_library(rippl_device_logic STATIC ${RIPPL_DEVICE_LOGIC_SOURCES})
 if(CMAKE_CROSSCOMPILING)

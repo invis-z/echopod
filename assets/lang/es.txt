@@ -345,3 +345,6 @@ STR_SETTINGS_DISPLAY = Pantalla
 STR_SETTINGS_LIBRARY = Biblioteca
 STR_SETTINGS_BUTTONS = Botones
 STR_SETTINGS_SYSTEM = Sistema
+STR_SETTINGS_EQ_WIDE_LINE_1 = EQ desactivado en
+STR_SETTINGS_EQ_WIDE_LINE_2 = pistas de 32 bits
+STR_SETTINGS_EQ_WIDE_HINT = EQ desactivado en pistas de 32 bits

@@ -9,8 +9,10 @@
 #include "device/core1_control.h"
 #include "device/core1_mp3.h"
 #include "device/core1_opus.h"
+#include "device/core1_pcm.h"
 #include "device/core1_stream.h"
 #include "device/mp3_probe.h"
+#include "device/wav_format.h"
 #include "flac_writer.h"
 
 enum {
@@ -65,8 +67,18 @@ static Fixture copy_of(const void *bytes, uint32_t size)
     return fixture;
 }
 
+enum {
+    WAV_CAPACITY = 512 * 1024
+};
+
+static uint8_t wav_bytes[WAV_CAPACITY];
+static uint32_t wav_size;
+
 static Fixture load(const char *name, const char *extension)
 {
+    if (strcmp(name, "wav") == 0) {
+        return copy_of(wav_bytes, wav_size);
+    }
     if (strcmp(name, "made") == 0) {
         return strcmp(extension, "pcm") == 0 ? copy_of(made.samples, made.sample_bytes)
                                              : copy_of(made.bytes, made.size);
@@ -346,6 +358,178 @@ static void core_1_leaves_the_audio_alone_unless_asked(void)
     core1_stream_set_equalizer(&stream, &core1_equalizer, &share);
     share_curve(bells_and_shelves(0, 0), true);
     CHECK(plays_exactly("lpc_16_44k_stereo", 2));
+}
+
+static void put_wav(const void *data, uint32_t length)
+{
+    if (wav_size + length > WAV_CAPACITY) {
+        abort();
+    }
+    memcpy(wav_bytes + wav_size, data, length);
+    wav_size += length;
+}
+
+static void put_wav_u32(uint32_t value)
+{
+    uint8_t bytes[4] = {(uint8_t)value, (uint8_t)(value >> 8), (uint8_t)(value >> 16),
+                        (uint8_t)(value >> 24)};
+    put_wav(bytes, 4);
+}
+
+static void put_wav_u16(uint32_t value)
+{
+    uint8_t bytes[2] = {(uint8_t)value, (uint8_t)(value >> 8)};
+    put_wav(bytes, 2);
+}
+
+static void build_wav(int channels, uint32_t rate, int bits, uint32_t frames)
+{
+    uint32_t align = (uint32_t)(channels * bits / 8);
+    wav_size = 0;
+    put_wav("RIFF", 4);
+    put_wav_u32(0);
+    put_wav("WAVE", 4);
+    put_wav("LIST", 4);
+    put_wav_u32(4);
+    put_wav("abcd", 4);
+    put_wav("fmt ", 4);
+    put_wav_u32(16);
+    put_wav_u16(1);
+    put_wav_u16((uint32_t)channels);
+    put_wav_u32(rate);
+    put_wav_u32(rate * align);
+    put_wav_u16(align);
+    put_wav_u16((uint32_t)bits);
+    put_wav("data", 4);
+    put_wav_u32(frames * align);
+    for (uint32_t frame = 0; frame < frames; frame++) {
+        for (int channel = 0; channel < channels; channel++) {
+            uint32_t mix = frame * 2654435761u + (uint32_t)channel * 40503u;
+            for (int byte = 0; byte < bits / 8; byte++) {
+                uint8_t value = (uint8_t)(mix >> (8 * byte));
+                put_wav(&value, 1);
+            }
+        }
+    }
+}
+
+static int32_t wav_left[60000];
+static int32_t wav_right[60000];
+
+static int32_t written_sample(uint32_t frame, int channel, int bits)
+{
+    uint32_t mix = frame * 2654435761u + (uint32_t)channel * 40503u;
+    if (bits == 8) {
+        return (int32_t)(mix & 0xFFu) - 128;
+    }
+    if (bits == 32) {
+        return (int32_t)mix;
+    }
+    uint32_t sign = 1u << (bits - 1);
+    uint32_t value = mix & ((sign << 1) - 1u);
+    return (int32_t)(value ^ sign) - (int32_t)sign;
+}
+
+static uint32_t reference_wav(int channels, int bits, uint32_t frames)
+{
+    for (uint32_t frame = 0; frame < frames; frame++) {
+        wav_left[frame] = written_sample(frame, 0, bits);
+        wav_right[frame] = channels > 1 ? written_sample(frame, 1, bits) : wav_left[frame];
+    }
+    return frames;
+}
+
+static void start_wav(uint32_t ring_bytes)
+{
+    start_with(ring_bytes, false);
+    static int32_t pcm_left[STREAM_PCM_BLOCK_FRAMES];
+    static int32_t pcm_right[STREAM_PCM_BLOCK_FRAMES];
+    static Core1Pcm core1_pcm;
+    core1_stream_set_decoder(&stream, STREAM_CODEC_PCM,
+                             core1_pcm_decoder(&core1_pcm, pcm_left, pcm_right));
+    interface = core1_source_wav_interface(&source);
+}
+
+static bool wav_streams_like_core_0(int channels, int bits, uint32_t start_ms, uint32_t ring_bytes)
+{
+    build_wav(channels, 44100, bits, 50000);
+    uint32_t total = reference_wav(channels, bits, 50000);
+    start_wav(ring_bytes);
+    AudioTrackInfo info;
+    bool ok = total == 50000 && interface.open(interface.context, "wav", start_ms, &info) &&
+              info.stream.bits_per_sample == bits && info.codec == AUDIO_CODEC_WAV;
+    uint32_t next = start_ms * 44100 / 1000;
+    AudioFrame frame;
+    AudioFrameResult result = AUDIO_FRAME_READY;
+    while (ok && (result = next_frame(&frame)) == AUDIO_FRAME_READY) {
+        ok = frame.first_sample == next && frame.bits == bits && !frame.equalized;
+        for (uint32_t sample = 0; ok && sample < frame.samples; sample++) {
+            ok = frame.left[sample] == wav_left[next + sample] &&
+                 frame.right[sample] == wav_right[next + sample];
+        }
+        next += frame.samples;
+        interface.release(interface.context);
+    }
+    interface.close(interface.context);
+    return ok && result == AUDIO_FRAME_END && next == total;
+}
+
+static void a_wav_streams_through_core_1_exactly_at_every_depth(void)
+{
+    for (int bits = 8; bits <= 32; bits += 8) {
+        CHECK(wav_streams_like_core_0(2, bits, 0, BIG_RING_BYTES));
+        CHECK(wav_streams_like_core_0(1, bits, 0, BIG_RING_BYTES));
+    }
+}
+
+static void a_wav_opened_part_way_and_through_a_small_ring_stays_exact(void)
+{
+    CHECK(wav_streams_like_core_0(2, 24, 300, SMALL_RING_BYTES));
+    CHECK(wav_streams_like_core_0(2, 32, 777, SMALL_RING_BYTES));
+}
+
+static void a_32_bit_wav_is_left_unequalized_and_whole(void)
+{
+    build_wav(2, 44100, 32, 50000);
+    reference_wav(2, 32, 50000);
+    start_wav(BIG_RING_BYTES);
+    core1_stream_set_equalizer(&stream, &core1_equalizer, &share);
+    share_curve(bells_and_shelves(6, -4), true);
+    AudioTrackInfo info;
+    bool ok = interface.open(interface.context, "wav", 0, &info);
+    AudioFrame frame;
+    int frames = 0;
+    while (ok && next_frame(&frame) == AUDIO_FRAME_READY) {
+        ok = !frame.equalized && frame.bits == 32;
+        for (uint32_t sample = 0; ok && sample < frame.samples; sample++) {
+            ok = frame.left[sample] == wav_left[frame.first_sample + sample];
+        }
+        interface.release(interface.context);
+        frames++;
+    }
+    interface.close(interface.context);
+    CHECK(ok);
+    CHECK(frames > 1);
+}
+
+static void a_wav_opened_past_its_end_ends_at_once(void)
+{
+    build_wav(2, 44100, 16, 1000);
+    start_wav(BIG_RING_BYTES);
+    AudioTrackInfo info;
+    CHECK(interface.open(interface.context, "wav", 60000, &info));
+    AudioFrame frame;
+    CHECK_EQUAL(AUDIO_FRAME_END, next_frame(&frame));
+    interface.close(interface.context);
+}
+
+static void a_file_core_0_cannot_parse_is_refused(void)
+{
+    build_wav(2, 44100, 16, 1000);
+    memcpy(wav_bytes, "fLaC", 4);
+    start_wav(BIG_RING_BYTES);
+    AudioTrackInfo info;
+    CHECK(!interface.open(interface.context, "wav", 0, &info));
 }
 
 static bool streams_exactly(const char *name, int channels, uint32_t ring_bytes)
@@ -1141,6 +1325,11 @@ int main(void)
         TEST_CASE(a_16_bit_track_streams_through_core_1_exactly),
         TEST_CASE(core_1_equalizes_exactly_like_the_main_core),
         TEST_CASE(core_1_leaves_the_audio_alone_unless_asked),
+        TEST_CASE(a_wav_streams_through_core_1_exactly_at_every_depth),
+        TEST_CASE(a_wav_opened_part_way_and_through_a_small_ring_stays_exact),
+        TEST_CASE(a_32_bit_wav_is_left_unequalized_and_whole),
+        TEST_CASE(a_wav_opened_past_its_end_ends_at_once),
+        TEST_CASE(a_file_core_0_cannot_parse_is_refused),
         TEST_CASE(a_mono_track_plays_its_channel_on_both_sides),
         TEST_CASE(a_ring_smaller_than_the_track_wraps_and_stays_exact),
         TEST_CASE(core_1_waits_while_its_slots_are_full),

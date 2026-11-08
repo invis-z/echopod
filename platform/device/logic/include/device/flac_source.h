@@ -21,4 +21,3 @@ void flac_source_init(FlacSource *source, FlacFileOpener files, FlacDecoder *dec
 bool flac_source_open_at(FlacSource *source, const char *path, uint32_t start_ms,
                          AudioTrackInfo *track);
 void flac_source_close(FlacSource *source);
-AudioSource flac_source_interface(FlacSource *source);

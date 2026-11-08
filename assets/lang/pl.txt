@@ -320,3 +320,6 @@ STR_SETTINGS_DISPLAY = Ekran
 STR_SETTINGS_LIBRARY = Biblioteka
 STR_SETTINGS_BUTTONS = Przyciski
 STR_SETTINGS_SYSTEM = System
+STR_SETTINGS_EQ_WIDE_LINE_1 = Korektor wyłączony dla
+STR_SETTINGS_EQ_WIDE_LINE_2 = utworów 32-bitowych
+STR_SETTINGS_EQ_WIDE_HINT = Korektor wyłączony dla utworów 32-bitowych
