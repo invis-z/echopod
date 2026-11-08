@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "error_log.h"
 #include "hal/storage.h"
 
 const char BLUETOOTH_STORE_PATH[] = "/.rippl/bluetooth.bin";
@@ -53,6 +54,7 @@ static uint32_t read_record(uint8_t *record)
 {
     HalFile file;
     if (!hal_file_open(&file, BLUETOOTH_STORE_PATH)) {
+        error_log_add("can't open", BLUETOOTH_STORE_PATH);
         return 0;
     }
     uint32_t size = file.size < RECORD_SIZE ? file.size : RECORD_SIZE;

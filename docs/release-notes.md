@@ -40,6 +40,10 @@ The first Rippl release, forked from EchoPod 0.12.0.
 - The 69 strings that were still English are translated in every language, and awkward or clashing Chinese strings are fixed.
 - Track, artist and album names in GBK and JIS X 0213 characters beyond the common CJK set draw too.
 
+### Errors
+
+- `/.rippl/errors.log` lists the files the player couldn't open or use (tracks, presets, language packs, its own files and those of the library and the scan), with the time and the reason. The player makes the file at the first error and only adds to it, so delete it to empty it.
+
 ### Updates
 
 - The install percentage always has its own line, so it shows in portrait in every language, and after an update installs the player restarts by itself once USB is unplugged.

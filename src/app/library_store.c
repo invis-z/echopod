@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include "error_log.h"
 #include "hal/storage.h"
 #include "hal/system.h"
 #include "library/library_rebuild.h"
@@ -55,6 +56,9 @@ static bool read(void *context, const char *path, uint32_t offset, void *buffer,
         }
         card.path[index] = '\0';
         card.open = hal_file_open(&card.file, path);
+        if (!card.open && !same_path(path, SEGMENT_MANIFEST_PATH)) {
+            error_log_add("can't open", path);
+        }
     }
     return card.open && hal_file_read(card.file, offset, buffer, length);
 }

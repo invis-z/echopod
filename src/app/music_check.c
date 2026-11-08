@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "error_log.h"
 #include "folders_store.h"
 #include "hal/storage.h"
 #include "hal/system.h"
@@ -78,6 +79,7 @@ static bool read_bytes(uint8_t *bytes)
 {
     HalFile file;
     if (!hal_file_open(&file, MUSIC_CHECK_PATH)) {
+        error_log_add("can't open", MUSIC_CHECK_PATH);
         return false;
     }
     bool read = file.size >= RECORD_BYTES && hal_file_read(file, 0, bytes, RECORD_BYTES);

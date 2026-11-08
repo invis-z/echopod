@@ -148,6 +148,8 @@ typedef struct FakeHal {
     HalUsbMode usb_mode;
     bool usb_prompt;
     bool card_missing;
+    bool fail_file_writes;
+    int write_at_count;
     uint8_t dac_volume;
     HalTime time;
     int time_reads;
@@ -776,6 +778,16 @@ void fake_hal_set_card_missing(bool missing)
     fake.card_missing = missing;
 }
 
+void fake_hal_fail_file_writes(bool failing)
+{
+    fake.fail_file_writes = failing;
+}
+
+int fake_hal_write_at_count(void)
+{
+    return fake.write_at_count;
+}
+
 bool fake_hal_usb_prompt(void)
 {
     return fake.usb_prompt;
@@ -1311,6 +1323,10 @@ static uint8_t *store_for(FakeFile *file)
 
 bool hal_file_write_at(const char *path, uint32_t offset, const void *bytes, uint32_t length)
 {
+    fake.write_at_count++;
+    if (fake.fail_file_writes) {
+        return false;
+    }
     FakeFile *file = fake_file(path);
     if (file == NULL || offset > file->size || length > file->size - offset) {
         return false;
@@ -1398,6 +1414,15 @@ int fake_hal_grow_count(void)
 int fake_hal_reserve_count(void)
 {
     return fake.reserve_count;
+}
+
+int fake_hal_reserve_count_of(const char *path)
+{
+    int count = 0;
+    for (int index = 0; index < fake.reserve_count && index < FILE_CAPACITY; index++) {
+        count += strcmp(fake.reserved_paths[index], path) == 0;
+    }
+    return count;
 }
 
 uint32_t fake_hal_reserved_size(const char *path)

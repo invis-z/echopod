@@ -272,6 +272,11 @@ rippl_add_unit_test(NAME test_stopwatch_screen
     LIBRARIES rippl_app rippl_library_scan
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
+rippl_add_unit_test(NAME test_error_log
+    SOURCES app/test_error_log.c app/fake_hal.c
+    LIBRARIES rippl_app rippl_library_scan
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
 rippl_add_unit_test(NAME test_clock_store
     SOURCES app/test_clock_store.c app/fake_hal.c
     LIBRARIES rippl_app rippl_library_scan
