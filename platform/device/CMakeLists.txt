@@ -24,6 +24,7 @@ add_executable(rippl_device
     board/panic.c
     board/power.c
     board/resident.c
+    board/code2.c
     board/rtc.c
     board/sd.c
     board/stack.c
@@ -217,6 +218,7 @@ set_target_properties(rippl_device PROPERTIES
 set_source_files_properties(board/libc.c board/startup.c PROPERTIES
     COMPILE_OPTIONS "-fno-builtin;-fno-tree-loop-distribute-patterns;-fno-lto"
 )
+set_source_files_properties(board/bluetooth.c PROPERTIES COMPILE_DEFINITIONS RIPPL_RESIDENT_TABLES)
 if(CMAKE_CROSSCOMPILING)
     set_source_files_properties(
         board/audio.c
@@ -237,6 +239,7 @@ if(CMAKE_CROSSCOMPILING)
         board/panic.c
         board/power.c
         board/resident.c
+        board/code2.c
         board/rtc.c
         board/sd.c
         board/stack.c
@@ -336,9 +339,14 @@ set(RIPPL_IMAGE_ARGUMENTS
 set(RIPPL_IMAGE_DEPENDS rippl_device rippl_rescan_overlay rippl_usb_overlay ${RIPPL_CORE1_MP3_BINARY} ${RIPPL_CORE1_BINARY}
     ${RIPPL_CORE1_AAC_BINARY} ${RIPPL_CORE1_OPUS_BINARY}
     ${PROJECT_SOURCE_DIR}/tools/make_image.py
+    ${PROJECT_SOURCE_DIR}/tools/check_code2.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/code2_entries.txt
 )
 
 add_custom_target(rippl_device_image ALL
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check_code2.py
+        --elf $<TARGET_FILE:rippl_device> --allowed ${CMAKE_CURRENT_SOURCE_DIR}/code2_entries.txt
+        --objdump ${CMAKE_OBJDUMP} --nm ${CMAKE_NM}
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/make_image.py
         ${RIPPL_IMAGE_ARGUMENTS}
         --image-mib 8
@@ -352,6 +360,9 @@ add_custom_target(rippl_device_image ALL
 )
 
 add_custom_target(rippl_flasher_image ALL
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check_code2.py
+        --elf $<TARGET_FILE:rippl_device> --allowed ${CMAKE_CURRENT_SOURCE_DIR}/code2_entries.txt
+        --objdump ${CMAKE_OBJDUMP} --nm ${CMAKE_NM}
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/make_image.py
         ${RIPPL_IMAGE_ARGUMENTS}
         --image-mib 5

@@ -632,6 +632,38 @@ static void without_presets_settings_has_no_equalizer_row(void)
     CHECK(title_is("Sleep timer"));
 }
 
+static void start_without_code_2(void)
+{
+    start_app_with_library();
+    fake_hal_set_code2_missing(true);
+}
+
+static void screens_in_code_2_stay_closed_when_it_did_not_load(void)
+{
+    static const char MISSING[] = "Part of the firmware is missing: reinstall the update";
+    with_preset = true;
+    start_without_code_2();
+    with_preset = false;
+    open_top_setting(SETTINGS_EQUALIZER_INDEX);
+    CHECK(title_is("Settings"));
+    CHECK(toast_is(MISSING));
+    start_without_code_2();
+    open_top_setting(SETTINGS_BLUETOOTH_INDEX);
+    CHECK(title_is("Settings"));
+    CHECK(toast_is(MISSING));
+    start_without_code_2();
+    open_setting(SETTINGS_LIBRARY, LIBRARY_FOLDERS_ROW);
+    CHECK(title_is("Library"));
+    CHECK(toast_is(MISSING));
+    start_without_code_2();
+    open_setting(SETTINGS_SYSTEM, SYSTEM_DATE_TIME_ROW);
+    CHECK(title_is("System"));
+    CHECK(toast_is(MISSING));
+    start_app_with_preset();
+    open_top_setting(SETTINGS_EQUALIZER_INDEX);
+    CHECK(title_is("Equalizer"));
+}
+
 static void dre_is_applied(void)
 {
     start_app_with_library();
@@ -926,6 +958,8 @@ static void the_screen_starts_in_the_saved_orientation(void)
     CHECK_EQUAL(HAL_DISPLAY_PORTRAIT, fake_hal_display_rotation());
     CHECK(drew_the_bottom_of_a_portrait_screen());
 }
+
+static bool toast_is(const char *expected);
 
 static uint8_t language_pack[I18N_HEADER_BYTES + STRING_COUNT * 2 + 16];
 
@@ -2872,6 +2906,7 @@ int main(void)
         TEST_CASE(the_equalizer_opens_from_settings_and_is_applied),
         TEST_CASE(without_presets_settings_has_no_equalizer_row),
         TEST_CASE(holding_menu_on_now_playing_opens_the_equalizer_only_with_presets),
+        TEST_CASE(screens_in_code_2_stay_closed_when_it_did_not_load),
         TEST_CASE(gain_is_applied),
         TEST_CASE(dre_is_applied),
         TEST_CASE(saved_settings_are_restored_at_start),

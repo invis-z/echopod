@@ -31,11 +31,11 @@ def vector_table(stack=0x03004000, reset=RESET, size=256):
 
 
 def firmware(code_tail=b"\xAA" * 64, data_tail=b"", bss_size=0x100, stack=0x03004000,
-             reset=RESET, code_reset=RESET, resident=b""):
+             reset=RESET, code_reset=RESET, resident=b"", code2=b""):
     return make_image.Firmware(
         code=vector_table(reset=code_reset) + code_tail,
         data=struct.pack("<II", stack, reset) + data_tail,
-        bss_size=bss_size, resident=resident)
+        bss_size=bss_size, resident=resident, code2=code2)
 
 
 def build(firmware_parts=None, **options):
@@ -519,7 +519,9 @@ class OverlayTest(unittest.TestCase):
         self.assertEqual(make_image.FW_SIZE, end)
         self.assertEqual(0, make_image.USB_OVERLAY_OFFSET % 512)
         self.assertIn((make_image.GLYPH_TABLE_OFFSET + make_image.GLYPH_TABLE_SIZE,
-                       make_image.USB_OVERLAY_OFFSET), make_image.GLYPH_REGIONS)
+                       make_image.CODE2_OFFSET), make_image.GLYPH_REGIONS)
+        self.assertLessEqual(make_image.CODE2_OFFSET + make_image.CODE2_CAPACITY,
+                             make_image.USB_OVERLAY_OFFSET)
 
     def test_a_usb_overlay_bigger_than_its_space_is_refused(self):
         with self.assertRaises(make_image.ImageError):
@@ -577,6 +579,39 @@ class OverlayCopiesTest(unittest.TestCase):
         overlay = symbol_elf([("hash_update", 1, 2, 1)])
         with self.assertRaises(make_image.ImageError):
             make_image.check_overlay_copies(symbol_elf(self.MAIN), overlay, "rescan overlay")
+
+
+class Code2Test(unittest.TestCase):
+    def code2(self, body=b"\x5A" * 200):
+        return bytes(16) + body
+
+    def test_code_2_lands_at_its_offset_with_size_crc_and_the_code_it_belongs_to(self):
+        parts = firmware(code_tail=b"!D" * 40, code2=self.code2())
+        image = build(parts)
+        offset = make_image.CODE2_OFFSET
+        self.assertEqual(b"ECD2", image[offset:offset + 4])
+        self.assertEqual(len(parts.code2), word(image, offset + 4))
+        self.assertEqual(make_image.crc32(parts.code2[16:]), word(image, offset + 8))
+        self.assertEqual(make_image.crc32(parts.code), word(image, offset + 12))
+        self.assertEqual(parts.code2[16:], image[offset + 16:offset + len(parts.code2)])
+        self.assertEqual([], make_image.validate_image(image))
+
+    def test_code_2_is_not_loaded_at_start_or_counted_in_the_loaded_total(self):
+        with_code2 = build(firmware(code2=self.code2()))
+        without = build()
+        self.assertEqual(row(without, 0), row(with_code2, 0))
+        self.assertEqual(row(without, 1), row(with_code2, 1))
+
+    def test_code_2_bigger_than_28_sectors_or_in_odd_bytes_is_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(firmware(code2=self.code2(bytes(make_image.CODE2_CAPACITY))))
+        with self.assertRaises(make_image.ImageError):
+            build(firmware(code2=self.code2(b"\x01" * 7)))
+
+    def test_an_empty_code_2_section_writes_nothing(self):
+        image = build(firmware(code2=bytes(16)))
+        offset = make_image.CODE2_OFFSET
+        self.assertNotEqual(b"ECD2", image[offset:offset + 4])
 
 
 class ResidentTablesTest(unittest.TestCase):

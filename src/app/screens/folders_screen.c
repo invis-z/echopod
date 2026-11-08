@@ -3,11 +3,13 @@
 #include <stddef.h>
 
 #include "core/i18n.h"
+#include "core/resident.h"
 #include "core/string_builder.h"
 #include "core/volume_path.h"
 #include "folders_store.h"
 #include "hal/clock.h"
 #include "hal/storage.h"
+#include "hal/system.h"
 #include "library/music_fingerprint.h"
 #include "library/spoken_path.h"
 #include "ui/header.h"
@@ -111,25 +113,25 @@ static void list_folders(FoldersScreen *folders)
     folders->listed = true;
 }
 
-static int row_count(const void *context)
+RIPPL_CODE2 static int row_count(const void *context)
 {
     const FoldersScreen *folders = context;
     return folders->count > 0 ? folders->count : 1;
 }
 
-static const char *row_label(const void *context, int index)
+RIPPL_CODE2 static const char *row_label(const void *context, int index)
 {
     const FoldersScreen *folders = context;
     return folders->count > 0 ? label_of(folders, index) : i18n_text(STR_SETTINGS_NO_FOLDERS);
 }
 
-static const char *row_mark(const void *context, int index)
+RIPPL_CODE2 static const char *row_mark(const void *context, int index)
 {
     const FoldersScreen *folders = context;
     return folders->count > 0 && !folders->rows[index].off ? CHECK_MARK : NULL;
 }
 
-static ScreenAction toggle(void *context, int index)
+RIPPL_CODE2 static ScreenAction toggle(void *context, int index)
 {
     FoldersScreen *folders = context;
     if (index < folders->count) {
@@ -138,7 +140,7 @@ static ScreenAction toggle(void *context, int index)
     return screen_action_none();
 }
 
-static bool shown_key(const FoldersScreen *folders, uint32_t key)
+RIPPL_CODE2 static bool shown_key(const FoldersScreen *folders, uint32_t key)
 {
     for (int index = 0; index < folders->count; index++) {
         if (folders->rows[index].key == key) {
@@ -148,7 +150,7 @@ static bool shown_key(const FoldersScreen *folders, uint32_t key)
     return false;
 }
 
-static bool rows_changed(const FoldersScreen *folders)
+RIPPL_CODE2 static bool rows_changed(const FoldersScreen *folders)
 {
     for (int index = 0; index < folders->count; index++) {
         if (folders->rows[index].off != folders->rows[index].was_off) {
@@ -158,7 +160,7 @@ static bool rows_changed(const FoldersScreen *folders)
     return false;
 }
 
-static void save(FoldersScreen *folders)
+RIPPL_CODE2 static void save(FoldersScreen *folders)
 {
     MusicFolders stored;
     MusicFolders kept = {.count = 0};
@@ -186,7 +188,7 @@ static void save(FoldersScreen *folders)
     }
 }
 
-static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
+RIPPL_CODE2 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     FoldersScreen *folders = context;
     ListSelection selection = {.select = toggle, .hold = NULL, .context = folders};
@@ -198,20 +200,20 @@ static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
     return action;
 }
 
-static void enter(void *context, uint32_t now_ms)
+RIPPL_CODE2 static void enter(void *context, uint32_t now_ms)
 {
     FoldersScreen *folders = context;
     folders->now_ms = now_ms;
     list_view_select(&folders->list, 0, now_ms);
 }
 
-static void update(void *context, uint32_t now_ms)
+RIPPL_CODE2 static void update(void *context, uint32_t now_ms)
 {
     FoldersScreen *folders = context;
     folders->now_ms = now_ms;
 }
 
-static void draw(void *context, Canvas *canvas)
+RIPPL_CODE2 static void draw(void *context, Canvas *canvas)
 {
     const FoldersScreen *folders = context;
     const Theme *theme = folders->config.theme;
@@ -240,6 +242,10 @@ Screen *folders_screen_init(FoldersScreen *folders, FoldersConfig config)
 ScreenAction folders_screen_open(void *context)
 {
     FoldersScreen *folders = context;
+    if (!hal_system_code2_ready()) {
+        toast_show(folders->config.toast, i18n_text(STR_CODE2_MISSING), hal_clock_milliseconds());
+        return screen_action_none();
+    }
     list_folders(folders);
     return screen_action_push(&folders->screen);
 }

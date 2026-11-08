@@ -1,6 +1,7 @@
 #include "date_time_screen.h"
 
 #include "core/i18n.h"
+#include "core/resident.h"
 #include "core/string_builder.h"
 #include "hal/clock.h"
 #include "hal/system.h"
@@ -42,7 +43,7 @@ static const FieldRange RANGES[DATE_TIME_FIELD_COUNT] = {
     {0, LAST_MINUTE},
     {1, WALL_CLOCK_ZONE_COUNT - 1}};
 
-static int field_value(const DateTimeScreen *screen, int field)
+RIPPL_CODE2 static int field_value(const DateTimeScreen *screen, int field)
 {
     switch (field) {
     case FIELD_YEAR:
@@ -60,7 +61,7 @@ static int field_value(const DateTimeScreen *screen, int field)
     }
 }
 
-static void store_value(DateTimeScreen *screen, int field, int value)
+RIPPL_CODE2 static void store_value(DateTimeScreen *screen, int field, int value)
 {
     switch (field) {
     case FIELD_YEAR:
@@ -84,7 +85,7 @@ static void store_value(DateTimeScreen *screen, int field, int value)
     }
 }
 
-static void change(DateTimeScreen *screen, int delta)
+RIPPL_CODE2 static void change(DateTimeScreen *screen, int delta)
 {
     FieldRange range = RANGES[screen->field];
     int span = range.high - range.low + 1;
@@ -94,14 +95,14 @@ static void change(DateTimeScreen *screen, int delta)
     screen->changed = true;
 }
 
-static void clamp_day(DateTimeScreen *screen)
+RIPPL_CODE2 static void clamp_day(DateTimeScreen *screen)
 {
     while (!wall_clock_civil_valid(&screen->civil) && screen->civil.day > 1) {
         screen->civil.day--;
     }
 }
 
-static void save(DateTimeScreen *screen)
+RIPPL_CODE2 static void save(DateTimeScreen *screen)
 {
     const DateTimeConfig *config = &screen->config;
     uint32_t now_ms = hal_clock_milliseconds();
@@ -113,7 +114,7 @@ static void save(DateTimeScreen *screen)
                i18n_text(kept ? STR_SETTINGS_CLOCK_SET : STR_SETTINGS_CLOCK_SET_UNTIL_OFF), now_ms);
 }
 
-static ScreenAction leave(DateTimeScreen *screen, ScreenAction action)
+RIPPL_CODE2 static ScreenAction leave(DateTimeScreen *screen, ScreenAction action)
 {
     if (screen->changed) {
         save(screen);
@@ -121,7 +122,7 @@ static ScreenAction leave(DateTimeScreen *screen, ScreenAction action)
     return action;
 }
 
-static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
+RIPPL_CODE2 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     (void)now_ms;
     DateTimeScreen *screen = context;
@@ -155,7 +156,7 @@ static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
     return screen_action_none();
 }
 
-static void enter(void *context, uint32_t now_ms)
+RIPPL_CODE2 static void enter(void *context, uint32_t now_ms)
 {
     DateTimeScreen *screen = context;
     const DateTimeConfig *config = &screen->config;
@@ -176,7 +177,8 @@ static void enter(void *context, uint32_t now_ms)
     screen->changed = false;
 }
 
-static void value_text(const DateTimeScreen *screen, int field, char *text, size_t capacity)
+RIPPL_CODE2 static void value_text(const DateTimeScreen *screen, int field, char *text,
+                                   size_t capacity)
 {
     if (field == FIELD_ZONE) {
         wall_clock_zone_text(screen->zone, text, capacity);
@@ -190,7 +192,7 @@ static void value_text(const DateTimeScreen *screen, int field, char *text, size
     string_builder_append_unsigned(&builder, (uint32_t)value);
 }
 
-static void draw(void *context, Canvas *canvas)
+RIPPL_CODE2 static void draw(void *context, Canvas *canvas)
 {
     const DateTimeScreen *screen = context;
     const Theme *theme = screen->config.theme;
@@ -244,6 +246,10 @@ Screen *date_time_screen_init(DateTimeScreen *screen, DateTimeConfig config)
 ScreenAction date_time_screen_open(void *context)
 {
     DateTimeScreen *screen = context;
+    if (!hal_system_code2_ready()) {
+        toast_show(screen->config.toast, i18n_text(STR_CODE2_MISSING), hal_clock_milliseconds());
+        return screen_action_none();
+    }
     return screen_action_push(&screen->screen);
 }
 

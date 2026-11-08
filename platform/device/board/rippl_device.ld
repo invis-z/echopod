@@ -4,6 +4,7 @@ MEMORY
 {
     DATA_RAM (rw) : ORIGIN = 0x03004000, LENGTH = 0x48000
     CODE_RAM (rx) : ORIGIN = 0x03050000, LENGTH = 0x2666C
+    CODE2_RAM (rx) : ORIGIN = 0x03076670, LENGTH = 0x3990
     HIGH_RAM (rw) : ORIGIN = 0x0307A000, LENGTH = 0x15000
     LANGUAGE_RAM (rw) : ORIGIN = 0x0304C000, LENGTH = 0x4000
     GLYPH_RAM (rw) : ORIGIN = 0x0308F000, LENGTH = 0xB800
@@ -61,6 +62,15 @@ SECTIONS
         . = ALIGN(4);
     } > GLYPH_RAM
 
+    .code2 :
+    {
+        device_code2_start = .;
+        LONG(0) LONG(0) LONG(0) LONG(0)
+        *(.code2 .code2.*)
+        . = ALIGN(4);
+        device_code2_end = .;
+    } > CODE2_RAM
+
     .resident :
     {
         device_resident_start = .;
@@ -85,3 +95,5 @@ ASSERT(ADDR(.data) == 0x03004000, "the entry vector must be at 0x03004000")
 ASSERT(SIZEOF(.data) == 8, "only the entry vector may be in .data: make initialised globals const")
 ASSERT(device_noinit_end <= 0x0304C000, ".data, .bss and .noinit must end below 0x0304C000")
 ASSERT(ADDR(.resident) == 0x0309A800, "the resident tables must start at 0x0309A800")
+ASSERT(ADDR(.code2) == 0x03076670, "code 2 must start at 0x03076670")
+ASSERT(device_code2_end - device_code2_start <= 28 * 512, "code 2 is read in whole sectors and must fit 28 of them below 0x0307A000")

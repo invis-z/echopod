@@ -80,6 +80,11 @@ bool hal_system_set_clock_mhz(uint32_t mhz)
     return true;
 }
 
+bool hal_system_code2_ready(void)
+{
+    return true;
+}
+
 bool hal_system_restart_pending(void)
 {
     return false;

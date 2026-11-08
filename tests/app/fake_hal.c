@@ -157,6 +157,7 @@ typedef struct FakeHal {
 static FakeHal fake;
 
 static uint32_t file_reads;
+static bool code2_missing;
 
 uint32_t fake_hal_file_read_count(void)
 {
@@ -166,6 +167,7 @@ uint32_t fake_hal_file_read_count(void)
 void fake_hal_reset(void)
 {
     file_reads = 0;
+    code2_missing = false;
     for (int index = 0; index < FILE_CAPACITY; index++) {
         free(owned_stores[index]);
         owned_stores[index] = NULL;
@@ -1405,6 +1407,16 @@ uint32_t fake_hal_reserved_size(const char *path)
 void fake_hal_set_restart_pending(bool pending)
 {
     fake.restart_pending = pending;
+}
+
+void fake_hal_set_code2_missing(bool missing)
+{
+    code2_missing = missing;
+}
+
+bool hal_system_code2_ready(void)
+{
+    return !code2_missing;
 }
 
 bool hal_system_restart_pending(void)

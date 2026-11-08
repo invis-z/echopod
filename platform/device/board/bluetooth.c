@@ -1,10 +1,12 @@
 #include "hal/bluetooth.h"
 #include "board.h"
+#include "core/resident.h"
 #include "cru.h"
 #include "dac.h"
 #include "device/bt_module.h"
 #include "gpio.h"
 #include "hal/clock.h"
+#include "hal/system.h"
 #include "registers.h"
 
 #define UART1_BASE 0x400B0000u
@@ -96,7 +98,7 @@ void board_bluetooth_off(void)
     pins_off();
 }
 
-static void uart_clock_on(void)
+RIPPL_CODE2 static void uart_clock_on(void)
 {
     cru_reset(UART1_RESET, true);
     board_delay_ms(1);
@@ -107,7 +109,7 @@ static void uart_clock_on(void)
     cru_write(CRU_UART_CLOCK, CRU_UART1_DIVIDER_ONE);
 }
 
-static void uart_configure(void)
+RIPPL_CODE2 static void uart_configure(void)
 {
     uart_write(UART_SOFTWARE_RESET, RESET_ALL);
     uart_write(UART_INTERRUPT_ENABLE, 0);
@@ -124,7 +126,7 @@ static void uart_configure(void)
     uart_write(UART_SOFTWARE_RESET, RESET_FIFOS);
 }
 
-static void uart_open(void)
+RIPPL_CODE2 static void uart_open(void)
 {
     register_write(GRF_BASE + GRF_IOMUX_CON, GRF_UART1_GROUP_A);
     uart_clock_on();
@@ -133,12 +135,12 @@ static void uart_open(void)
     gpio_mux(UART_PIN_B, GPIO_FUNCTION_ALTERNATE);
 }
 
-static uint16_t fifo_depth(void)
+RIPPL_CODE2 static uint16_t fifo_depth(void)
 {
     return (uint16_t)((uart_read(UART_PARAMETERS) >> FIFO_MODE_SHIFT & 0xFFu) * FIFO_MODE_UNIT);
 }
 
-static void power_on(void)
+RIPPL_CODE2 static void power_on(void)
 {
     pins_off();
     uart_open();
@@ -150,7 +152,7 @@ static void power_on(void)
     powered = true;
 }
 
-static void match_stock_housekeeping(void)
+RIPPL_CODE2 static void match_stock_housekeeping(void)
 {
     register_write(GRF_BASE + 0xC4u, 0x00010000u);
     register_write(CRU_BASE + 0x84u, 0x00920092u);
@@ -163,7 +165,7 @@ static void match_stock_housekeeping(void)
     matched_stock = true;
 }
 
-static void route_to_module(bool to_module)
+RIPPL_CODE2 static void route_to_module(bool to_module)
 {
     if (to_module && !matched_stock) {
         match_stock_housekeeping();
@@ -192,7 +194,7 @@ bool board_bluetooth_settling(void)
     return rerouted_ms != 0 && hal_clock_milliseconds() - rerouted_ms < ROUTE_SETTLE_MS;
 }
 
-static void follow_stream(void)
+RIPPL_CODE2 static void follow_stream(void)
 {
     uint32_t now_ms = hal_clock_milliseconds();
     if (module.status.streaming) {
@@ -203,7 +205,7 @@ static void follow_stream(void)
     }
 }
 
-static void power_off(void)
+__attribute__((noinline)) static void power_off(void)
 {
     pins_off();
     powered = false;
@@ -212,8 +214,12 @@ static void power_off(void)
     }
 }
 
-void hal_bluetooth_set_power(bool on)
+__attribute__((noinline)) void hal_bluetooth_set_power(bool on)
 {
+    if (!hal_system_code2_ready()) {
+        power_off();
+        return;
+    }
     if (on) {
         power_on();
         return;
@@ -222,7 +228,7 @@ void hal_bluetooth_set_power(bool on)
     bt_module_power_off(&module);
 }
 
-static void send(const BtModuleFrame *frame)
+RIPPL_CODE2 static void send(const BtModuleFrame *frame)
 {
     for (uint8_t index = 0; index < frame->length; index++) {
         uint32_t polls = 0;
@@ -233,7 +239,7 @@ static void send(const BtModuleFrame *frame)
     }
 }
 
-void hal_bluetooth_scan(void)
+__attribute__((noinline)) void hal_bluetooth_scan(void)
 {
     BtModuleFrame frame;
     if (powered && bt_module_scan(&module, hal_clock_milliseconds(), &frame)) {
@@ -241,7 +247,7 @@ void hal_bluetooth_scan(void)
     }
 }
 
-void hal_bluetooth_stop_scan(void)
+__attribute__((noinline)) void hal_bluetooth_stop_scan(void)
 {
     BtModuleFrame frame;
     if (powered && bt_module_stop_scan(&module, hal_clock_milliseconds(), &frame)) {
@@ -249,7 +255,7 @@ void hal_bluetooth_stop_scan(void)
     }
 }
 
-void hal_bluetooth_connect(const HalBluetoothDevice *device)
+__attribute__((noinline)) void hal_bluetooth_connect(const HalBluetoothDevice *device)
 {
     BtModuleFrame frame;
     if (powered && bt_module_connect(&module, device, hal_clock_milliseconds(), &frame)) {
@@ -257,7 +263,7 @@ void hal_bluetooth_connect(const HalBluetoothDevice *device)
     }
 }
 
-void hal_bluetooth_disconnect(void)
+__attribute__((noinline)) void hal_bluetooth_disconnect(void)
 {
     BtModuleFrame frame;
     if (powered && bt_module_disconnect(&module, hal_clock_milliseconds(), &frame)) {
@@ -302,7 +308,7 @@ void board_bluetooth_tick(void)
     }
 }
 
-static void receive(uint32_t now_ms)
+RIPPL_CODE2 static void receive(uint32_t now_ms)
 {
     while (rx_tail != rx_head) {
         uint8_t byte = rx_ring[rx_tail];
@@ -313,7 +319,7 @@ static void receive(uint32_t now_ms)
     module.status.link.fifo_peak = rx_peak;
 }
 
-void hal_bluetooth_service(void)
+__attribute__((noinline)) void hal_bluetooth_service(void)
 {
     if (!powered) {
         return;
@@ -335,7 +341,7 @@ const HalBluetoothStatus *hal_bluetooth_status(void)
     return &module.status;
 }
 
-void hal_bluetooth_set_stream(bool on)
+__attribute__((noinline)) void hal_bluetooth_set_stream(bool on)
 {
     BtModuleFrame frame;
     if (powered && bt_module_set_stream(&module, on, hal_clock_milliseconds(), &frame)) {
