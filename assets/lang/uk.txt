@@ -357,3 +357,6 @@ STR_SETTINGS_LIBRARY = Медіатека
 STR_SETTINGS_BUTTONS = Кнопки
 STR_SETTINGS_SYSTEM = Система
 STR_MENU_CHAPTERS = Розділи
+STR_SETTINGS_EQ_WIDE_LINE_1 = EQ вимкнено для
+STR_SETTINGS_EQ_WIDE_LINE_2 = 32-бітних треків
+STR_SETTINGS_EQ_WIDE_HINT = EQ вимкнено для 32-бітних треків

@@ -67,15 +67,47 @@ static void close_file(void *context)
     (void)context;
 }
 
+static AudioFrameResult decode_next(void *context, AudioFrame *frame)
+{
+    FlacDecoder *flac = ((FlacSource *)context)->decoder;
+    FlacResult result = flac_decode_frame(flac);
+    if (result != FLAC_OK) {
+        return result == FLAC_END ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR;
+    }
+    *frame = (AudioFrame){.left = flac_channel(flac, 0),
+                          .right = flac_channel(flac, flac->info.channels > 1 ? 1 : 0),
+                          .first_sample = flac->frame_first_sample,
+                          .samples = flac->block_samples,
+                          .bits = flac->info.bits_per_sample};
+    return AUDIO_FRAME_READY;
+}
+
+static bool decode_open(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
+{
+    return flac_source_open_at(context, path, start_ms, track);
+}
+
+static void decode_release(void *context)
+{
+    (void)context;
+}
+
+static void decode_close(void *context)
+{
+    flac_source_close(context);
+}
+
 static void start_engine(void)
 {
     flac_use_block_buffer(&decoder, &block);
     flac_source_init(&source,
                      (FlacFileOpener){.open = open_file, .close = close_file, .context = NULL},
                      &decoder);
-    audio_engine_init(&engine, (AudioEngineConfig){.source = flac_source_interface(&source),
-                                                   .ring = ring,
-                                                   .ring_words = RING_WORDS});
+    audio_engine_init(&engine,
+                      (AudioEngineConfig){.source = {decode_open, decode_next, decode_release,
+                                                     decode_close, &source},
+                                          .ring = ring,
+                                          .ring_words = RING_WORDS});
 }
 
 typedef struct ScriptedSource {
@@ -86,7 +118,7 @@ typedef struct ScriptedSource {
     int releases;
     int closes;
     uint32_t rate;
-    bool equalized;
+    uint8_t bits;
 } ScriptedSource;
 
 static ScriptedSource scripted;
@@ -97,8 +129,9 @@ static bool scripted_open(void *context, const char *path, uint32_t start_ms, Au
     (void)start_ms;
     const ScriptedSource *source_state = context;
     uint32_t rate = source_state->rate == 0 ? 44100 : source_state->rate;
+    uint8_t bits = source_state->bits == 0 ? 16 : source_state->bits;
     *track = (AudioTrackInfo){
-        .stream = {.sample_rate = rate, .channels = 2, .bits_per_sample = 16, .max_block = 16}};
+        .stream = {.sample_rate = rate, .channels = 2, .bits_per_sample = bits, .max_block = 16}};
     return true;
 }
 
@@ -117,8 +150,7 @@ static AudioFrameResult scripted_next(void *context, AudioFrame *frame)
                           .right = source_state->right,
                           .first_sample = 0,
                           .samples = 16,
-                          .bits = 16,
-                          .equalized = source_state->equalized};
+                          .bits = source_state->bits == 0 ? 16 : source_state->bits};
     return AUDIO_FRAME_READY;
 }
 
@@ -197,35 +229,23 @@ static void playing_fills_the_ring_with_the_track(void)
     CHECK_EQUAL(0u, status.position_ms);
 }
 
-static void use_a_cut_at_one_kilohertz(void)
+static void use_32_bit_frames(void)
 {
-    EqualizerCurve curve = {.band_count = 1};
-    curve.bands[0] = (EqualizerBand){.frequency_hz = 1000, .gain_tenths = -60, .q_hundredths = 100};
-    audio_engine_set_equalizer(&engine, &curve);
-}
-
-static void the_equalizer_shapes_what_the_main_core_decodes(void)
-{
-    start_scripted_engine(0, 1);
-    use_a_cut_at_one_kilohertz();
-    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
-    pump_until_full(0);
-    bool changed = false;
-    for (uint32_t frame = 0; frame < 16; frame++) {
-        changed = changed || !frame_is(frame, scripted.left[frame], scripted.right[frame], 16);
+    scripted.bits = 32;
+    for (int index = 0; index < 16; index++) {
+        scripted.left[index] = (int32_t)(0x12345671u * (uint32_t)(index + 1));
+        scripted.right[index] = -scripted.left[index];
     }
-    CHECK(changed);
 }
 
-static void frames_core_1_already_equalized_pass_straight_through(void)
+static void a_32_bit_frame_reaches_the_ring_whole(void)
 {
     start_scripted_engine(0, 1);
-    scripted.equalized = true;
-    use_a_cut_at_one_kilohertz();
+    use_32_bit_frames();
     CHECK(audio_engine_play(&engine, "scripted", 0, 1));
     pump_until_full(0);
     for (uint32_t frame = 0; frame < 16; frame++) {
-        CHECK(frame_is(frame, scripted.left[frame], scripted.right[frame], 16));
+        CHECK(frame_is(frame, scripted.left[frame], scripted.right[frame], 32));
     }
 }
 
@@ -661,8 +681,7 @@ int main(void)
         TEST_CASE(what_the_dma_played_is_silenced_so_a_late_lap_plays_nothing_old),
         TEST_CASE(every_decoded_frame_is_counted),
         TEST_CASE(playing_fills_the_ring_with_the_track),
-        TEST_CASE(the_equalizer_shapes_what_the_main_core_decodes),
-        TEST_CASE(frames_core_1_already_equalized_pass_straight_through),
+        TEST_CASE(a_32_bit_frame_reaches_the_ring_whole),
         TEST_CASE(the_position_follows_what_the_dma_consumed),
         TEST_CASE(twenty_four_bit_audio_reaches_the_ring_exactly),
         TEST_CASE(the_end_of_a_track_without_a_next_one_stops_and_goes_silent),

@@ -51,6 +51,7 @@ static const HintLines PICK_LINES = {STR_SETTINGS_EQ_PICK_LINE_1, STR_SETTINGS_E
 static const HintLines EDIT_LINES = {STR_SETTINGS_EQ_EDIT_LINE_1, STR_SETTINGS_EQ_EDIT_LINE_2};
 static const HintLines BYPASS_LINES = {STR_SETTINGS_EQ_BYPASS_LINE_1,
                                        STR_SETTINGS_EQ_BYPASS_LINE_2};
+static const HintLines WIDE_LINES = {STR_SETTINGS_EQ_WIDE_LINE_1, STR_SETTINGS_EQ_WIDE_LINE_2};
 
 static const StringId PRESET_NAMES[EQUALIZER_PRESET_FILE] = {STR_OFF,
                                                              STR_SETTINGS_EQ_RETRO,
@@ -76,9 +77,19 @@ static EqualizerChoice *choice_of(const EqualizerConfig *config)
     return &config->store->choice;
 }
 
+static bool too_wide(void)
+{
+    return hal_audio_status().format.bits_per_sample > EQUALIZER_MAX_BITS;
+}
+
 static bool above_equalizer_rate(void)
 {
-    return hal_audio_status().format.sample_rate > EQUALIZER_MAX_RATE;
+    return hal_audio_status().format.sample_rate > EQUALIZER_MAX_RATE || too_wide();
+}
+
+static StringId bypass_hint(void)
+{
+    return too_wide() ? STR_SETTINGS_EQ_WIDE_HINT : STR_SETTINGS_EQ_BYPASS_HINT;
 }
 
 static ScreenAction leave(const EqualizerConfig *config, ScreenAction action)
@@ -257,7 +268,7 @@ static void enter_picker(void *context, uint32_t now_ms)
     list_view_select(&equalizer->list, selected, now_ms);
     equalizer->file_preview = selected >= EQUALIZER_PRESET_FILE ? selected : -1;
     if (above_equalizer_rate()) {
-        toast_show(equalizer->config.toast, i18n_text(STR_SETTINGS_EQ_BYPASS_HINT), now_ms);
+        toast_show(equalizer->config.toast, i18n_text(bypass_hint()), now_ms);
     }
 }
 
@@ -535,7 +546,7 @@ static void draw_stacked_slider(const EqualizerEditor *editor, Canvas *canvas,
 static HintLines hint_lines(const EqualizerEditor *editor)
 {
     if (editor->bypassed) {
-        return BYPASS_LINES;
+        return too_wide() ? WIDE_LINES : BYPASS_LINES;
     }
     return editor->editing ? EDIT_LINES : PICK_LINES;
 }
@@ -596,7 +607,7 @@ static void draw_editor(void *context, Canvas *canvas)
     }
     TextStyle hint = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
     draw_centered(canvas, hint, (Rect){0, HINT_TOP, width, LINE_HEIGHT},
-                  i18n_text(editor->bypassed  ? STR_SETTINGS_EQ_BYPASS_HINT
+                  i18n_text(editor->bypassed  ? bypass_hint()
                             : editor->editing ? STR_SETTINGS_EQ_EDIT_HINT
                                               : STR_SETTINGS_EQ_PICK_HINT));
 }

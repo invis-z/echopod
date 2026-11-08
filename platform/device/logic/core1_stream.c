@@ -6,6 +6,7 @@
 #include "codec/qoa.h"
 #include "device/core1_control.h"
 #include "device/mp3_probe.h"
+#include "device/wav_format.h"
 
 enum {
     MP3_OUTPUT_BITS = 24,
@@ -692,6 +693,60 @@ static bool open_mp3(void *context, const char *path, uint32_t start_ms, AudioTr
 AudioSource core1_source_mp3_interface(Core1Source *source)
 {
     return (AudioSource){open_mp3, next_frame, release_frame, close_stream, source};
+}
+
+static bool open_wav(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
+{
+    Core1Source *source = context;
+    stop_streaming(source);
+    FlacFileOpener files = source->flac.files;
+    if (!files.open(files.context, path, &source->input)) {
+        return false;
+    }
+    source->file_open = true;
+    WavFormat format = {0};
+    if (!wav_parse(source->input, &format)) {
+        stop_streaming(source);
+        return false;
+    }
+    uint32_t start = (uint32_t)((uint64_t)start_ms * format.sample_rate / MILLISECONDS_PER_SECOND);
+    start = smaller(start, format.frames);
+    source->start_offset = format.data_offset + start * format.frame_bytes;
+    source->end_offset = format.data_offset + format.frames * format.frame_bytes;
+    source->written = source->start_offset;
+    source->lead_trim = 0;
+    source->play_from = 0;
+    source->play_end = UINT32_MAX;
+    source->slot = 0;
+    source->read_failed = false;
+    source->bits_per_sample = format.bits;
+    source->channels = format.channels;
+    *track = (AudioTrackInfo){.stream = {.sample_rate = format.sample_rate,
+                                         .channels = format.channels,
+                                         .bits_per_sample = format.bits,
+                                         .total_samples = format.frames},
+                              .audio_bytes = format.frames * format.frame_bytes,
+                              .codec = AUDIO_CODEC_WAV};
+    volatile StreamControl *control = source->region.control;
+    control->sample_rate = format.sample_rate;
+    control->channels = format.channels;
+    control->bits_per_sample = format.bits;
+    control->min_block = core1_pcm_block_frames(format.frame_bytes);
+    control->max_block = control->min_block;
+    control->total_samples = format.frames;
+    control->first_sample = start;
+    control->start_offset = source->start_offset;
+    control->end_offset = source->end_offset;
+    control->written = source->written;
+    control->codec = STREAM_CODEC_PCM;
+    use_ring(source, source->ring_capacity);
+    begin_generation(source);
+    return true;
+}
+
+AudioSource core1_source_wav_interface(Core1Source *source)
+{
+    return (AudioSource){open_wav, next_frame, release_frame, close_stream, source};
 }
 
 static AudioCodec audio_codec_of(Mp4Codec codec)

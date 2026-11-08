@@ -357,3 +357,6 @@ STR_SETTINGS_LIBRARY = Kirjasto
 STR_SETTINGS_BUTTONS = Painikkeet
 STR_SETTINGS_SYSTEM = Järjestelmä
 STR_MENU_CHAPTERS = Luvut
+STR_SETTINGS_EQ_WIDE_LINE_1 = EQ pois käytöstä
+STR_SETTINGS_EQ_WIDE_LINE_2 = 32-bittisillä raidoilla
+STR_SETTINGS_EQ_WIDE_HINT = EQ pois 32-bittisillä raidoilla

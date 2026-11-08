@@ -7,6 +7,7 @@
 #include "codec/mp4.h"
 #include "device/audio_engine.h"
 #include "device/flac_source.h"
+#include "dsp/equalizer.h"
 
 enum {
     STREAM_SLOTS = 2,
@@ -22,7 +23,10 @@ enum {
     STREAM_CODEC_AAC = 2,
     STREAM_CODEC_OPUS = 3,
     STREAM_CODEC_QOA = 4,
-    STREAM_CODECS = 5
+    STREAM_CODEC_PCM = 5,
+    STREAM_CODECS = 6,
+    STREAM_PCM_BLOCK_FRAMES = 4096,
+    STREAM_PCM_BLOCK_BYTES = 16384
 };
 
 typedef struct StreamSlot {
@@ -183,3 +187,11 @@ AudioSource core1_source_mp3_interface(Core1Source *source);
 AudioSource core1_source_mp4_interface(Core1Source *source);
 AudioSource core1_source_ogg_interface(Core1Source *source);
 AudioSource core1_source_qoa_interface(Core1Source *source);
+
+static inline uint32_t core1_pcm_block_frames(uint32_t frame_bytes)
+{
+    uint32_t frames = STREAM_PCM_BLOCK_BYTES / frame_bytes;
+    return frames < STREAM_PCM_BLOCK_FRAMES ? frames : STREAM_PCM_BLOCK_FRAMES;
+}
+
+AudioSource core1_source_wav_interface(Core1Source *source);

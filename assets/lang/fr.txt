@@ -357,3 +357,6 @@ STR_SETTINGS_LIBRARY = Bibliothèque
 STR_SETTINGS_BUTTONS = Boutons
 STR_SETTINGS_SYSTEM = Système
 STR_MENU_CHAPTERS = Chapitres
+STR_SETTINGS_EQ_WIDE_LINE_1 = EQ désactivé pour les
+STR_SETTINGS_EQ_WIDE_LINE_2 = titres en 32 bits
+STR_SETTINGS_EQ_WIDE_HINT = EQ désactivé pour les titres en 32 bits
