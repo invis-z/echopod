@@ -40,13 +40,13 @@ If FiiO's updater won't take the file, maskrom can write the image straight into
 3. Eject both drives. The player shows "Checking HIFIEC90.IMG", then "Installing update" with a percentage, then "Update installed".
 4. Unplug: the player restarts by itself about half a second later, and the new build starts.
 
-**8 MiB images (prototype).** The build writes the 8 MiB image as `RIPPL.IMG`, and `flasher/HIFIEC90.IMG`, a 5 MiB image of the same firmware without the extended CJK glyphs. How to install `RIPPL.IMG` depends on what the player runs now:
+**8 MiB images.** The build writes the 8 MiB image as `RIPPL.IMG`, and `flasher/HIFIEC90.IMG`, a 5 MiB image of the same firmware without the extended CJK glyphs. How to install `RIPPL.IMG` depends on what the player runs now:
 
 - **FiiO's firmware:** rename `RIPPL.IMG` to `HIFIEC90.IMG` and install it as in First install. FiiO's updater only looks for `HIFIECnn.IMG` (and `ECHOMINI.IMG`); it hasn't been tried with an 8 MiB image yet.
-- **EchoPod** (upstream, github.com/BasilSkyWalk/echopod, any version up to 0.11.0): it only accepts 5 MiB images and doesn't look for `RIPPL.IMG`. Install the flasher first (`flasher/HIFIEC90.IMG`, as above), restart, then copy `RIPPL.IMG` and eject. Both files can go on the drive together: EchoPod installs the flasher, and after a restart the flasher installs `RIPPL.IMG` at the end of the next USB session.
+- **EchoPod** (upstream, github.com/BasilSkyWalk/echopod, any version up to 0.12.0): it only accepts 5 MiB images and doesn't look for `RIPPL.IMG`. Install the flasher first (`flasher/HIFIEC90.IMG`, as above), restart, then copy `RIPPL.IMG` and eject. Both files can go on the drive together: EchoPod installs the flasher, and after a restart the flasher installs `RIPPL.IMG` at the end of the next USB session.
 - **Rippl** (this fork: the flasher or `RIPPL.IMG` itself): copy `RIPPL.IMG` as it is. The updater looks for `RIPPL.IMG` first, then `ECHOMINI.IMG`, then `HIFIEC97.IMG` down to `HIFIEC00.IMG`, and skips an image that is already installed.
 
-Leave no `HIFIECnn.IMG` on the drive afterwards: FiiO's firmware would install it if you go back to stock. `RIPPL.IMG` can stay. An 8 MiB image hasn't been started on a player yet: have maskrom recovery (`docs/device-recovery.md`) ready.
+Leave no `HIFIECnn.IMG` on the drive afterwards: FiiO's firmware would install it if you go back to stock. `RIPPL.IMG` can stay. Keep maskrom recovery (`docs/device-recovery.md`) in mind for a first install.
 
 The updater takes the highest-numbered `HIFIECnn.IMG`. It checks the image's shape, rows, entry vector, header copy and CRC before writing, skips an image that is already installed, and writes slot 2 first, then slot 1, reading back every chunk. It also accepts FiiO's own 8 GB image (see "Going back to FiiO's firmware" in the user guide) and refuses the 512 MB model's.
 
