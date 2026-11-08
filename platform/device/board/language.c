@@ -8,7 +8,7 @@
 
 enum {
     SECTOR_BYTES = 512,
-    LANGUAGE_RAM_BYTES = 0x3000
+    LANGUAGE_RAM_BYTES = 0x4000
 };
 
 static uint32_t pack[LANGUAGE_RAM_BYTES / 4] __attribute__((section(".language_ram")));

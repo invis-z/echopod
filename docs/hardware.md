@@ -5,8 +5,10 @@ A short map of the hardware Rippl drives, for reading the code in `platform/devi
 ## Chip and memory
 
 - Rockchip RKnano with two Cortex-M3 cores. Core 0 runs Rippl; core 1 runs a decoder program (FLAC, ALAC and WAV, MP3, AAC, or Opus) loaded on demand.
-- Core 0 data RAM: `0x03004000`–`0x0304C000`. Code runs from `0x03050000` (about 157 KB).
-- High RAM: `0x0307A000`–`0x0309EFFF` (148 KB). The library rescan code, and the USB session and update code, are loaded here when they run.
+- Core 0 data RAM: `0x03004000`–`0x0304C000` (cleared by the boot ROM). Code runs from `0x03050000` (about 157 KB).
+- `0x0304C000`–`0x03050000` (16 KB) is the boot loader's scratch before Rippl starts and free afterwards (a full read-back test passed on a player, and ReChord uses it too); Rippl loads the language pack there.
+- `0x0307666C`–`0x0307A000` (14 KB), after the code window, is free at run time and runs code (same test).
+- High RAM: `0x0307A000`–`0x0309EFFF` (148 KB). The library rescan code, and the USB session and update code, are loaded at `0x0307A000` when they run (84 KB); above them sit the glyph cache (`0x0308F000`, 46 KB) and the resident tables (`0x0309A800`, 18 KB).
 - Core 1 RAM: `0x01000000`–`0x0105FFFF` (384 KB). It also serves as scratch memory for the rescan while playback is stopped.
 - The boot ROM starts the cores at 24 MHz. Rippl switches the PLL to 96 or 200 MHz.
 
