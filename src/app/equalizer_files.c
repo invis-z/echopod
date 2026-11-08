@@ -52,9 +52,6 @@ void equalizer_files_name(const EqualizerFileList *list, int index, char *name)
 void equalizer_files_scan(EqualizerFileList *list)
 {
     list->count = 0;
-#ifdef RIPPL_EQ_FILES_HIDDEN
-    return;
-#endif
     HalDir dir;
     if (!hal_dir_open(&dir, EQUALIZER_FOLDER_PATH)) {
         return;

@@ -13,63 +13,14 @@
 #include "ui/navigation.h"
 
 enum {
-    INFO_TOP = 28,
-    INFO_HEIGHT = 20,
-    COLUMN_TOP = 52,
-    COLUMN_HEIGHT = 82,
-    ZERO_Y = 93,
-    PIXELS_PER_DB = 3,
-    COLUMN_WIDTH = 44,
-    COLUMN_LEFT = 6,
-    TRACK_WIDTH = 2,
-    BAR_WIDTH = 8,
-    KNOB_WIDTH = 18,
-    KNOB_HEIGHT = 4,
-    LABEL_TOP = 136,
-    HINT_TOP = 152,
-    LINE_HEIGHT = 16,
-    STACK_INFO_GAP = 4,
-    STACK_ROWS_GAP = 6,
-    STACK_ROW_HEIGHT = 24,
-    STACK_ROW_INSET = 6,
-    STACK_LABEL_WIDTH = 36,
-    STACK_TRACK_HEIGHT = 2,
-    STACK_BAR_HEIGHT = 8,
-    STACK_KNOB_WIDTH = 4,
-    STACK_KNOB_HEIGHT = 16,
-    STACK_HINT_GAP = 8,
-    EQ_CUT_CAPACITY = 16,
     SUMMARY_CHARACTERS = 7
 };
 
-typedef struct HintLines {
-    StringId first;
-    StringId second;
-} HintLines;
-
-static const HintLines PICK_LINES = {STR_SETTINGS_EQ_PICK_LINE_1, STR_SETTINGS_EQ_PICK_LINE_2};
-static const HintLines EDIT_LINES = {STR_SETTINGS_EQ_EDIT_LINE_1, STR_SETTINGS_EQ_EDIT_LINE_2};
-static const HintLines BYPASS_LINES = {STR_SETTINGS_EQ_BYPASS_LINE_1,
-                                       STR_SETTINGS_EQ_BYPASS_LINE_2};
-static const HintLines WIDE_LINES = {STR_SETTINGS_EQ_WIDE_LINE_1, STR_SETTINGS_EQ_WIDE_LINE_2};
-
-static const StringId PRESET_NAMES[EQUALIZER_PRESET_FILE] = {STR_OFF,
-                                                             STR_SETTINGS_EQ_RETRO,
-                                                             STR_SETTINGS_EQ_BASS,
-                                                             STR_SETTINGS_EQ_HEAVY,
-                                                             STR_SETTINGS_EQ_POP,
-                                                             STR_SETTINGS_EQ_JAZZ,
-                                                             STR_SETTINGS_EQ_UNIQUE,
-                                                             STR_SETTINGS_EQ_CUSTOM};
-static const char *const BAND_LABELS[EQUALIZER_CUSTOM_BANDS] = {"63",   "160",  "400", "1k",
-                                                                "2.5k", "6.3k", "16k"};
-static const char *const BAND_NAMES[EQUALIZER_CUSTOM_BANDS] = {
-    "63 Hz", "160 Hz", "400 Hz", "1 kHz", "2.5 kHz", "6.3 kHz", "16 kHz"};
 static const char CHECK_MARK[] = "\xE2\x9C\x93";
 
 const char *equalizer_screen_preset_name(EqualizerPreset preset)
 {
-    return (unsigned)preset < EQUALIZER_PRESET_FILE ? i18n_text(PRESET_NAMES[preset]) : "";
+    return preset == EQUALIZER_PRESET_OFF ? i18n_text(STR_OFF) : "";
 }
 
 static EqualizerChoice *choice_of(const EqualizerConfig *config)
@@ -136,7 +87,7 @@ static const char *preset_label(const void *context, int index)
 {
     const EqualizerScreen *equalizer = context;
     if (index < EQUALIZER_PRESET_FILE) {
-        return i18n_text(PRESET_NAMES[index]);
+        return i18n_text(STR_OFF);
     }
     int file = index - EQUALIZER_PRESET_FILE;
     return file < equalizer->files.count ? equalizer->files.names[file] : "";
@@ -155,18 +106,9 @@ static const char *preset_mark(const void *context, int index)
                : NULL;
 }
 
-static bool preset_opens(const void *context, int index)
-{
-    (void)context;
-    return index == EQUALIZER_PRESET_CUSTOM;
-}
-
 static ScreenAction choose_preset(void *context, int index)
 {
     EqualizerScreen *equalizer = context;
-    if (index == EQUALIZER_PRESET_CUSTOM) {
-        return screen_action_push(&equalizer->editor.screen);
-    }
     if (index >= EQUALIZER_PRESET_FILE) {
         if (!preview_file(equalizer, index)) {
             return screen_action_none();
@@ -309,323 +251,11 @@ static bool preview_file(EqualizerScreen *equalizer, int index)
     return true;
 }
 
-static int8_t *gains_of(const EqualizerEditor *editor)
-{
-    return choice_of(&editor->config)->custom_gains;
-}
-
-static void append_decibels(StringBuilder *text, int value)
-{
-    if (value != 0) {
-        string_builder_append_char(text, value > 0 ? '+' : '-');
-    }
-    string_builder_append_unsigned(text, (uint32_t)(value < 0 ? -value : value));
-    string_builder_append(text, " dB");
-}
-
-static int largest_boost(const int8_t *gains)
-{
-    int boost = 0;
-    for (int band = 0; band < EQUALIZER_CUSTOM_BANDS; band++) {
-        boost = gains[band] > boost ? gains[band] : boost;
-    }
-    return boost;
-}
-
-static void describe(EqualizerEditor *editor)
-{
-    const int8_t *gains = gains_of(editor);
-    StringBuilder band = string_builder_make(editor->band_text, sizeof editor->band_text);
-    string_builder_append(&band, BAND_NAMES[editor->band]);
-    string_builder_append(&band, "   ");
-    append_decibels(&band, gains[editor->band]);
-    StringBuilder preamp = string_builder_make(editor->preamp_text, sizeof editor->preamp_text);
-    int boost = largest_boost(gains);
-    if (boost > 0) {
-        char cut[EQ_CUT_CAPACITY];
-        StringBuilder cut_text = string_builder_make(cut, sizeof cut);
-        append_decibels(&cut_text, -boost);
-        const char *arguments[] = {cut};
-        i18n_format(&preamp, STR_SETTINGS_EQ_PREAMP, arguments, 1);
-    }
-}
-
-static void change(EqualizerEditor *editor, int delta)
-{
-    int8_t *gain = &gains_of(editor)[editor->band];
-    int next = *gain + delta;
-    next = next < EQUALIZER_GAIN_MIN_DB   ? EQUALIZER_GAIN_MIN_DB
-           : next > EQUALIZER_GAIN_MAX_DB ? EQUALIZER_GAIN_MAX_DB
-                                          : next;
-    if (next != *gain) {
-        *gain = (int8_t)next;
-        equalizer_store_apply(editor->config.store);
-    }
-    describe(editor);
-}
-
-static void move_band(EqualizerEditor *editor, int delta)
-{
-    int band = editor->band + delta;
-    editor->band = band < 0                         ? 0
-                   : band >= EQUALIZER_CUSTOM_BANDS ? EQUALIZER_CUSTOM_BANDS - 1
-                                                    : band;
-    describe(editor);
-}
-
-static void step(EqualizerEditor *editor, int delta)
-{
-    if (editor->editing) {
-        change(editor, delta);
-    } else {
-        move_band(editor, delta);
-    }
-}
-
-static ScreenAction handle_editor_key(void *context, KeyEvent event, uint32_t now_ms)
-{
-    (void)now_ms;
-    EqualizerEditor *editor = context;
-    NavigationIntent intent = navigation_from_key(event).intent;
-    switch (intent) {
-    case NAVIGATION_NEXT:
-    case NAVIGATION_PREVIOUS:
-        step(editor, intent == NAVIGATION_NEXT ? 1 : -1);
-        return screen_action_none();
-    case NAVIGATION_SELECT:
-        editor->editing = !editor->editing;
-        return screen_action_none();
-    case NAVIGATION_OPTIONS:
-        change(editor, -gains_of(editor)[editor->band]);
-        return screen_action_none();
-    case NAVIGATION_BACK:
-        if (editor->editing) {
-            editor->editing = false;
-            return screen_action_none();
-        }
-        return leave(&editor->config, screen_action_pop());
-    case NAVIGATION_HOME:
-    case NAVIGATION_NONE:
-        return leave(&editor->config, navigation_exit_action(event));
-    }
-    return screen_action_none();
-}
-
-static void enter_editor(void *context, uint32_t now_ms)
-{
-    (void)now_ms;
-    EqualizerEditor *editor = context;
-    use_preset(&editor->config, EQUALIZER_PRESET_CUSTOM);
-    editor->editing = false;
-    editor->bypassed = above_equalizer_rate();
-    describe(editor);
-}
-
-static void draw_text(Canvas *canvas, TextStyle style, Rect area, const char *text)
-{
-    label_draw(canvas, style, (Label){.area = area, .text = text});
-}
-
-static void draw_centered(Canvas *canvas, TextStyle style, Rect area, const char *text)
-{
-    draw_text(canvas, style, label_centered_area(style.font, area, text), text);
-}
-
-static void draw_info(const EqualizerEditor *editor, Canvas *canvas)
-{
-    const Theme *theme = editor->config.theme;
-    int padding = theme->metrics.padding;
-    int width = theme->metrics.screen_width - 2 * padding;
-    TextStyle band = {.font = theme->fonts.title,
-                      .color = editor->editing ? theme->colors.selection_top : theme->colors.text};
-    TextStyle preamp = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
-    draw_text(canvas, band, (Rect){padding, INFO_TOP, width, INFO_HEIGHT}, editor->band_text);
-    int preamp_width = text_width(preamp.font, editor->preamp_text);
-    draw_text(canvas, preamp,
-              (Rect){padding + width - preamp_width, INFO_TOP, preamp_width, INFO_HEIGHT},
-              editor->preamp_text);
-}
-
-static Rect bar_of(int center, int gain)
-{
-    int top = ZERO_Y - gain * PIXELS_PER_DB;
-    int left = center - BAR_WIDTH / 2;
-    return gain >= 0 ? (Rect){left, top, BAR_WIDTH, ZERO_Y - top}
-                     : (Rect){left, ZERO_Y + 1, BAR_WIDTH, top - ZERO_Y};
-}
-
-static void draw_slider(const EqualizerEditor *editor, Canvas *canvas, int band)
-{
-    const ThemeColors *colors = &editor->config.theme->colors;
-    bool selected = band == editor->band;
-    int left = COLUMN_LEFT + band * COLUMN_WIDTH;
-    int center = left + COLUMN_WIDTH / 2;
-    int gain = gains_of(editor)[band];
-    int knob_y = ZERO_Y - gain * PIXELS_PER_DB - KNOB_HEIGHT / 2;
-    canvas_fill_rect(
-        canvas, (Rect){center - TRACK_WIDTH / 2, COLUMN_TOP + 4, TRACK_WIDTH, COLUMN_HEIGHT - 8},
-        colors->divider);
-    bool grabbed = selected && editor->editing;
-    canvas_fill_rect(canvas, bar_of(center, gain),
-                     grabbed    ? colors->selection_shine
-                     : selected ? colors->selection_background
-                                : colors->text_tertiary);
-    canvas_fill_rect(canvas, (Rect){center - KNOB_WIDTH / 2, knob_y, KNOB_WIDTH, KNOB_HEIGHT},
-                     selected ? colors->text : colors->text_secondary);
-    TextStyle label = {.font = editor->config.theme->fonts.small,
-                       .color = selected ? colors->text : colors->text_tertiary};
-    draw_centered(canvas, label, (Rect){left, LABEL_TOP, COLUMN_WIDTH, LINE_HEIGHT},
-                  BAND_LABELS[band]);
-}
-
-typedef struct StackGeometry {
-    int info_top;
-    int rows_top;
-    int slider_left;
-    int slider_width;
-    int zero_x;
-} StackGeometry;
-
-static StackGeometry stack_geometry(const Theme *theme)
-{
-    int info_top = theme->metrics.header_height + STACK_INFO_GAP;
-    int slider_left = STACK_ROW_INSET + STACK_LABEL_WIDTH;
-    int slider_width = theme->metrics.screen_width - slider_left - 2 * STACK_ROW_INSET;
-    return (StackGeometry){
-        .info_top = info_top,
-        .rows_top = info_top + INFO_HEIGHT + LINE_HEIGHT + STACK_ROWS_GAP,
-        .slider_left = slider_left,
-        .slider_width = slider_width,
-        .zero_x = slider_left + slider_width / 2,
-    };
-}
-
-static Rect side_bar_of(int zero_x, int middle, int gain)
-{
-    int end = zero_x + gain * PIXELS_PER_DB;
-    int top = middle - STACK_BAR_HEIGHT / 2;
-    return gain >= 0 ? (Rect){zero_x + 1, top, end - zero_x, STACK_BAR_HEIGHT}
-                     : (Rect){end, top, zero_x - end, STACK_BAR_HEIGHT};
-}
-
-static void draw_stacked_slider(const EqualizerEditor *editor, Canvas *canvas,
-                                StackGeometry geometry, int band)
-{
-    const ThemeColors *colors = &editor->config.theme->colors;
-    bool selected = band == editor->band;
-    int top = geometry.rows_top + band * STACK_ROW_HEIGHT;
-    int middle = top + STACK_ROW_HEIGHT / 2;
-    int gain = gains_of(editor)[band];
-    canvas_fill_rect(canvas,
-                     (Rect){geometry.slider_left, middle - STACK_TRACK_HEIGHT / 2,
-                            geometry.slider_width, STACK_TRACK_HEIGHT},
-                     colors->divider);
-    bool grabbed = selected && editor->editing;
-    canvas_fill_rect(canvas, side_bar_of(geometry.zero_x, middle, gain),
-                     grabbed    ? colors->selection_shine
-                     : selected ? colors->selection_background
-                                : colors->text_tertiary);
-    int knob_x = geometry.zero_x + gain * PIXELS_PER_DB - STACK_KNOB_WIDTH / 2;
-    canvas_fill_rect(
-        canvas, (Rect){knob_x, middle - STACK_KNOB_HEIGHT / 2, STACK_KNOB_WIDTH, STACK_KNOB_HEIGHT},
-        selected ? colors->text : colors->text_secondary);
-    TextStyle label = {.font = editor->config.theme->fonts.small,
-                       .color = selected ? colors->text : colors->text_tertiary};
-    draw_text(
-        canvas, label,
-        (Rect){STACK_ROW_INSET + STACK_ROW_INSET / 2, top, STACK_LABEL_WIDTH, STACK_ROW_HEIGHT},
-        BAND_LABELS[band]);
-}
-
-static HintLines hint_lines(const EqualizerEditor *editor)
-{
-    if (editor->bypassed) {
-        return too_wide() ? WIDE_LINES : BYPASS_LINES;
-    }
-    return editor->editing ? EDIT_LINES : PICK_LINES;
-}
-
-static void draw_stacked_editor(const EqualizerEditor *editor, Canvas *canvas)
-{
-    const Theme *theme = editor->config.theme;
-    int width = theme->metrics.screen_width;
-    int padding = theme->metrics.padding;
-    StackGeometry geometry = stack_geometry(theme);
-    header_draw(canvas, theme, editor->screen.title);
-    TextStyle band = {.font = theme->fonts.title,
-                      .color = editor->editing ? theme->colors.selection_top : theme->colors.text};
-    TextStyle preamp = {.font = theme->fonts.small, .color = theme->colors.text_secondary};
-    draw_text(canvas, band, (Rect){padding, geometry.info_top, width - 2 * padding, INFO_HEIGHT},
-              editor->band_text);
-    draw_text(canvas, preamp,
-              (Rect){padding, geometry.info_top + INFO_HEIGHT, width - 2 * padding, LINE_HEIGHT},
-              editor->preamp_text);
-    canvas_fill_rect(canvas,
-                     (Rect){STACK_ROW_INSET, geometry.rows_top + editor->band * STACK_ROW_HEIGHT,
-                            width - 2 * STACK_ROW_INSET, STACK_ROW_HEIGHT},
-                     editor->editing ? theme->colors.selection_background
-                                     : theme->colors.header_top);
-    int rows_height = EQUALIZER_CUSTOM_BANDS * STACK_ROW_HEIGHT;
-    canvas_fill_rect(canvas, (Rect){geometry.zero_x, geometry.rows_top, 1, rows_height},
-                     theme->colors.text_tertiary);
-    for (int index = 0; index < EQUALIZER_CUSTOM_BANDS; index++) {
-        draw_stacked_slider(editor, canvas, geometry, index);
-    }
-    TextStyle hint = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
-    HintLines lines = hint_lines(editor);
-    int hint_top = geometry.rows_top + rows_height + STACK_HINT_GAP;
-    draw_centered(canvas, hint, (Rect){0, hint_top, width, LINE_HEIGHT}, i18n_text(lines.first));
-    draw_centered(canvas, hint, (Rect){0, hint_top + LINE_HEIGHT, width, LINE_HEIGHT},
-                  i18n_text(lines.second));
-}
-
-static void draw_editor(void *context, Canvas *canvas)
-{
-    const EqualizerEditor *editor = context;
-    const Theme *theme = editor->config.theme;
-    if (theme_is_portrait(theme)) {
-        draw_stacked_editor(editor, canvas);
-        return;
-    }
-    int width = theme->metrics.screen_width;
-    header_draw(canvas, theme, editor->screen.title);
-    draw_info(editor, canvas);
-    canvas_fill_rect(
-        canvas,
-        (Rect){COLUMN_LEFT + editor->band * COLUMN_WIDTH, COLUMN_TOP, COLUMN_WIDTH, COLUMN_HEIGHT},
-        editor->editing ? theme->colors.selection_background : theme->colors.header_top);
-    canvas_fill_rect(canvas, (Rect){COLUMN_LEFT, ZERO_Y, width - 2 * COLUMN_LEFT, 1},
-                     theme->colors.text_tertiary);
-    for (int band = 0; band < EQUALIZER_CUSTOM_BANDS; band++) {
-        draw_slider(editor, canvas, band);
-    }
-    TextStyle hint = {.font = theme->fonts.small, .color = theme->colors.text_tertiary};
-    draw_centered(canvas, hint, (Rect){0, HINT_TOP, width, LINE_HEIGHT},
-                  i18n_text(editor->bypassed  ? bypass_hint()
-                            : editor->editing ? STR_SETTINGS_EQ_EDIT_HINT
-                                              : STR_SETTINGS_EQ_PICK_HINT));
-}
-
-static void init_editor(EqualizerEditor *editor, EqualizerConfig config)
-{
-    *editor = (EqualizerEditor){.config = config};
-    editor->screen = (Screen){
-        .title = i18n_text(STR_SETTINGS_EQ_CUSTOM_TITLE),
-        .context = editor,
-        .enter = enter_editor,
-        .handle_key = handle_editor_key,
-        .draw = draw_editor,
-    };
-}
-
 Screen *equalizer_screen_init(EqualizerScreen *equalizer, EqualizerConfig config)
 {
     *equalizer = (EqualizerScreen){.config = config};
-    equalizer->model = (ListModel){.context = equalizer,
-                                   .count = preset_count,
-                                   .label = preset_label,
-                                   .detail = preset_mark,
-                                   .opens = preset_opens};
+    equalizer->model = (ListModel){
+        .context = equalizer, .count = preset_count, .label = preset_label, .detail = preset_mark};
     list_view_init(&equalizer->list, &equalizer->model, config.theme, 0);
     equalizer->screen = (Screen){
         .title = i18n_text(STR_SETTINGS_EQUALIZER),
@@ -635,14 +265,29 @@ Screen *equalizer_screen_init(EqualizerScreen *equalizer, EqualizerConfig config
         .update = update_picker,
         .draw = draw_picker,
     };
-    init_editor(&equalizer->editor, config);
     return &equalizer->screen;
+}
+
+void equalizer_screen_refresh(EqualizerScreen *equalizer)
+{
+    equalizer_files_scan(&equalizer->files);
+}
+
+bool equalizer_screen_has_presets(const void *context)
+{
+    const EqualizerScreen *equalizer = context;
+    return equalizer->files.count > 0;
 }
 
 ScreenAction equalizer_screen_open(void *context)
 {
     EqualizerScreen *equalizer = context;
-    equalizer_files_scan(&equalizer->files);
+    uint32_t now_ms = hal_clock_milliseconds();
+    equalizer_screen_refresh(equalizer);
+    if (!equalizer_screen_has_presets(equalizer)) {
+        toast_show(equalizer->config.toast, i18n_text(STR_SETTINGS_EQ_NO_PRESETS), now_ms);
+        return screen_action_none();
+    }
     return screen_action_push(&equalizer->screen);
 }
 

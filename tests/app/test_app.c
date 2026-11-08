@@ -43,8 +43,8 @@ enum {
     SETTINGS_REPEAT_INDEX = 1,
     SETTINGS_BLUETOOTH_INDEX = 2,
     SETTINGS_EQUALIZER_INDEX = 3,
-    SETTINGS_SLEEP_INDEX = 4,
-    SETTINGS_FIRST_GROUP_INDEX = 5,
+    SETTINGS_SLEEP_INDEX = 3,
+    SETTINGS_FIRST_GROUP_INDEX = 4,
     SOUND_GAIN_ROW = 0,
     SOUND_DRE_ROW = 4,
     DISPLAY_THEME_ROW = 0,
@@ -114,19 +114,33 @@ static void install_library(const uint8_t *bytes, uint32_t size)
     CHECK_EQUAL(SEGMENT_OK, segment_store_commit(&store));
 }
 
+static bool with_preset;
+
 static void start_app_with_library(void)
 {
     static FixtureLibrary fixture;
     static SegmentStore store;
+    static const char PRESET[] = "Filter 1: ON PK Fc 1000 Hz Gain 2 dB Q 1\n";
     uint32_t size = 0;
     const uint8_t *bytes = fixture_bytes(&size);
     fake_hal_reset();
     install_library(bytes, size);
     segment_store_open(&store, library_store_files());
     CHECK(fixture_covers_write(&store, fixture_library_open(&fixture)));
+    if (with_preset) {
+        fake_hal_add_directory_entry("/EQ", "Mid.txt", false, false);
+        fake_hal_add_file("/EQ/Mid.txt", (const uint8_t *)PRESET, sizeof PRESET - 1);
+    }
     now_ms = START_MS;
     fake_hal_set_milliseconds(now_ms);
     app_start();
+}
+
+static void start_app_with_preset(void)
+{
+    with_preset = true;
+    start_app_with_library();
+    with_preset = false;
 }
 
 static void step(void)
@@ -584,14 +598,37 @@ static void brightness_is_applied_and_saved(void)
 
 static void the_equalizer_opens_from_settings_and_is_applied(void)
 {
-    start_app_with_library();
+    start_app_with_preset();
     CHECK_EQUAL(0, fake_hal_equalizer().band_count);
     open_top_setting(SETTINGS_EQUALIZER_INDEX);
     CHECK(title_is("Equalizer"));
-    move_down(2);
-    CHECK_EQUAL(2, fake_hal_equalizer().band_count);
+    move_down(1);
+    CHECK_EQUAL(1, fake_hal_equalizer().band_count);
     tap(KEY_BACK);
     CHECK(title_is("Settings"));
+}
+
+static bool toast_is(const char *expected);
+
+static void holding_menu_on_now_playing_opens_the_equalizer_only_with_presets(void)
+{
+    start_app_with_library();
+    play_first_album_track();
+    CHECK(title_is("Now Playing"));
+    hold(KEY_MENU);
+    CHECK(title_is("Now Playing"));
+    CHECK(toast_is("No presets in /EQ"));
+    start_app_with_preset();
+    play_first_album_track();
+    hold(KEY_MENU);
+    CHECK(title_is("Equalizer"));
+}
+
+static void without_presets_settings_has_no_equalizer_row(void)
+{
+    start_app_with_library();
+    open_top_setting(SETTINGS_SLEEP_INDEX);
+    CHECK(title_is("Sleep timer"));
 }
 
 static void dre_is_applied(void)
@@ -888,8 +925,6 @@ static void the_screen_starts_in_the_saved_orientation(void)
     CHECK_EQUAL(HAL_DISPLAY_PORTRAIT, fake_hal_display_rotation());
     CHECK(drew_the_bottom_of_a_portrait_screen());
 }
-
-static bool toast_is(const char *expected);
 
 static void the_chosen_language_is_loaded_when_the_app_starts_again(void)
 {
@@ -1392,8 +1427,8 @@ static void a_new_firmware_shows_the_splash_then_checks_the_music_on_a_lit_scree
     start_on_a_fresh_card(HAL_RESERVE_CREATED);
     step();
     fake_hal_set_version("newer");
-    int walks_before = fake_hal_dir_open_count();
     restart_app();
+    int walks_before = fake_hal_dir_open_count();
     app_show_splash();
     step();
     CHECK_EQUAL(walks_before, fake_hal_dir_open_count());
@@ -1492,9 +1527,10 @@ static void the_music_check_after_an_installed_update_skips_the_walk(void)
     fake_hal_set_empty_card(true);
     fake_hal_set_restart_pending(true);
     int before = fake_hal_dir_open_count();
+    int equalizer_folder = 1;
     app_request_rescan_if_music_changed();
     step();
-    CHECK_EQUAL(before, fake_hal_dir_open_count());
+    CHECK_EQUAL(before + equalizer_folder, fake_hal_dir_open_count());
     CHECK(toast_is("Restart the player to finish the update"));
 }
 
@@ -2767,6 +2803,8 @@ int main(void)
         TEST_CASE(settings_choose_shuffle_and_repeat),
         TEST_CASE(brightness_is_applied_and_saved),
         TEST_CASE(the_equalizer_opens_from_settings_and_is_applied),
+        TEST_CASE(without_presets_settings_has_no_equalizer_row),
+        TEST_CASE(holding_menu_on_now_playing_opens_the_equalizer_only_with_presets),
         TEST_CASE(gain_is_applied),
         TEST_CASE(dre_is_applied),
         TEST_CASE(saved_settings_are_restored_at_start),
