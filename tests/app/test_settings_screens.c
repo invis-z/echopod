@@ -19,9 +19,9 @@ static const char *const SOUND[] = {"Gain", "Output", "Filter", "Balance", "Blue
 static const char *const DISPLAY[] = {
     "Theme",       "Accent color", "Highlight",       "Brightness",          "Screen timeout",
     "Orientation", "Animations",   "Battery percent", "Portrait status bar", "Clock"};
-static const char *const LIBRARY[] = {"Music folders",       "Rescan library",   "Start screen",
-                                      "Cover Flow",          "Cover Flow order", "Artist albums",
-                                      "Folders & playlists", "Lyrics",           "Listen history"};
+static const char *const LIBRARY[] = {
+    "Music folders",    "Rescan library", "Start screen",        "Cover Flow",
+    "Cover Flow order", "Artist albums",  "Folders & playlists", "Lyrics"};
 static const char *const BUTTONS[] = {"Volume buttons", "Swap volume buttons", "Menu button",
                                       "Power on"};
 static const char *const SYSTEM[] = {"Language", "Date & time", "Auto off", "USB mode",

@@ -76,7 +76,6 @@ typedef enum SettingOption {
     OPTION_CLOCK,
     OPTION_BLUETOOTH_LEVEL,
     OPTION_USB_PROMPT,
-    OPTION_LISTEN_HISTORY,
     OPTION_TIME_ZONE,
     OPTION_THEME,
     OPTION_LYRICS,
@@ -116,11 +115,6 @@ enum {
 enum {
     USB_PROMPT_ON,
     USB_PROMPT_OFF
-};
-
-enum {
-    LISTEN_HISTORY_ON,
-    LISTEN_HISTORY_OFF
 };
 
 enum {
@@ -172,7 +166,7 @@ enum {
     SCREEN_TIMEOUT_OPTION_COUNT = 7,
     SLEEP_TIMER_OPTION_COUNT = 7,
     AUTO_OFF_OPTION_COUNT = 4,
-    SETTINGS_FILE_SIZE = 43
+    SETTINGS_FILE_SIZE = 42
 };
 
 typedef struct Settings {

@@ -151,17 +151,6 @@ rippl_add_unit_test(NAME test_player
     LIBRARIES rippl_app rippl_library_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
-rippl_add_unit_test(NAME test_listen_history
-    SOURCES app/test_listen_history.c app/fake_hal.c
-    LIBRARIES rippl_app rippl_library_fixtures
-    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
-)
-rippl_add_unit_test(NAME test_scrobbler_log
-    SOURCES app/test_scrobbler_log.c app/fake_hal.c
-    LIBRARIES rippl_app rippl_library_fixtures
-    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
-)
-target_compile_definitions(test_scrobbler_log PRIVATE RIPPL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 rippl_add_unit_test(NAME test_spoken_word
     SOURCES app/test_spoken_word.c app/fake_hal.c
     LIBRARIES rippl_app rippl_library_fixtures
@@ -343,13 +332,6 @@ target_compile_definitions(test_fat_create PRIVATE
     RIPPL_CREATED_DIR="${RIPPL_CREATED_CARDS}"
 )
 set_tests_properties(test_fat_create PROPERTIES TIMEOUT 30 FIXTURES_SETUP created_cards)
-rippl_add_unit_test(NAME test_scrobbler_card
-    SOURCES device/test_scrobbler_card.c device/sparse_card.c
-        ${PROJECT_SOURCE_DIR}/src/app/scrobbler_log.c ${PROJECT_SOURCE_DIR}/src/app/listen_history.c
-    LIBRARIES rippl_device_logic rippl_library rippl_playback rippl_hal
-    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
-)
-target_compile_definitions(test_scrobbler_card PRIVATE RIPPL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 
 if(RIPPL_BUILD_SIM)
     rippl_add_unit_test(NAME test_sim_options
