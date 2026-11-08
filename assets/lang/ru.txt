@@ -409,4 +409,5 @@ STR_DIAG_STACK_USED = {0}/{1} Б
 STR_DIAG_STACK_USED_STALL = {0}/{1} Б, зависание {2}
 STR_DIAG_POWER = Питание
 STR_DIAG_SAVINGS = Экономия
+STR_CODE2_MISSING = Нет части прошивки: переустановите обновление
 STR_SETTINGS_EQ_WIDE_HINT = EQ выключен для 32-битных треков

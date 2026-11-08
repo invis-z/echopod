@@ -3,10 +3,12 @@
 #include <stddef.h>
 
 #include "core/i18n.h"
+#include "core/resident.h"
 #include "core/string_builder.h"
 #include "core/utf8.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
+#include "hal/system.h"
 #include "ui/header.h"
 #include "ui/label.h"
 #include "ui/list_navigation.h"
@@ -28,22 +30,22 @@ static EqualizerChoice *choice_of(const EqualizerConfig *config)
     return &config->store->choice;
 }
 
-static bool too_wide(void)
+RIPPL_CODE2 static bool too_wide(void)
 {
     return hal_audio_status().format.bits_per_sample > EQUALIZER_MAX_BITS;
 }
 
-static bool above_equalizer_rate(void)
+RIPPL_CODE2 static bool above_equalizer_rate(void)
 {
     return hal_audio_status().format.sample_rate > EQUALIZER_MAX_RATE || too_wide();
 }
 
-static StringId bypass_hint(void)
+RIPPL_CODE2 static StringId bypass_hint(void)
 {
     return too_wide() ? STR_SETTINGS_EQ_WIDE_HINT : STR_SETTINGS_EQ_BYPASS_HINT;
 }
 
-static ScreenAction leave(const EqualizerConfig *config, ScreenAction action)
+RIPPL_CODE2 static ScreenAction leave(const EqualizerConfig *config, ScreenAction action)
 {
     bool leaving = action.type == SCREEN_ACTION_POP || action.type == SCREEN_ACTION_POP_TO_ROOT;
     if (leaving && !equalizer_store_save(config->store)) {
@@ -52,7 +54,7 @@ static ScreenAction leave(const EqualizerConfig *config, ScreenAction action)
     return action;
 }
 
-static void use_preset(const EqualizerConfig *config, EqualizerPreset preset)
+RIPPL_CODE2 static void use_preset(const EqualizerConfig *config, EqualizerPreset preset)
 {
     EqualizerChoice *choice = choice_of(config);
     if (preset == EQUALIZER_PRESET_FILE) {
@@ -67,7 +69,7 @@ static void use_preset(const EqualizerConfig *config, EqualizerPreset preset)
 static bool preview_file(EqualizerScreen *equalizer, int index);
 static bool same_name(const char *first, const char *second);
 
-static bool file_is(const EqualizerScreen *equalizer, int file, const char *name)
+RIPPL_CODE2 static bool file_is(const EqualizerScreen *equalizer, int file, const char *name)
 {
     if (file < 0 || file >= equalizer->files.count) {
         return false;
@@ -77,13 +79,13 @@ static bool file_is(const EqualizerScreen *equalizer, int file, const char *name
     return same_name(full, name);
 }
 
-static int preset_count(const void *context)
+RIPPL_CODE2 static int preset_count(const void *context)
 {
     const EqualizerScreen *equalizer = context;
     return EQUALIZER_PRESET_FILE + equalizer->files.count;
 }
 
-static const char *preset_label(const void *context, int index)
+RIPPL_CODE2 static const char *preset_label(const void *context, int index)
 {
     const EqualizerScreen *equalizer = context;
     if (index < EQUALIZER_PRESET_FILE) {
@@ -93,7 +95,7 @@ static const char *preset_label(const void *context, int index)
     return file < equalizer->files.count ? equalizer->files.names[file] : "";
 }
 
-static const char *preset_mark(const void *context, int index)
+RIPPL_CODE2 static const char *preset_mark(const void *context, int index)
 {
     const EqualizerScreen *equalizer = context;
     const EqualizerChoice *choice = choice_of(&equalizer->config);
@@ -106,7 +108,7 @@ static const char *preset_mark(const void *context, int index)
                : NULL;
 }
 
-static ScreenAction choose_preset(void *context, int index)
+RIPPL_CODE2 static ScreenAction choose_preset(void *context, int index)
 {
     EqualizerScreen *equalizer = context;
     if (index >= EQUALIZER_PRESET_FILE) {
@@ -118,7 +120,7 @@ static ScreenAction choose_preset(void *context, int index)
     return screen_action_pop();
 }
 
-static ScreenAction handle_picker_key(void *context, KeyEvent event, uint32_t now_ms)
+RIPPL_CODE2 static ScreenAction handle_picker_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     EqualizerScreen *equalizer = context;
     ListSelection selection = {.select = choose_preset, .hold = NULL, .context = equalizer};
@@ -135,7 +137,7 @@ static ScreenAction handle_picker_key(void *context, KeyEvent event, uint32_t no
     return leave(&equalizer->config, action);
 }
 
-static bool same_name(const char *first, const char *second)
+RIPPL_CODE2 static bool same_name(const char *first, const char *second)
 {
     uint32_t index = 0;
     while (first[index] != '\0' && first[index] == second[index]) {
@@ -160,7 +162,7 @@ static const ProblemText PROBLEM_TEXTS[] = {
     {EQUALIZER_TEXT_PREAMP, 1, STR_SETTINGS_EQ_RANGE_ERROR},
 };
 
-static void show_preset_error(EqualizerScreen *equalizer, EqualizerTextError error)
+RIPPL_CODE2 static void show_preset_error(EqualizerScreen *equalizer, EqualizerTextError error)
 {
     StringId text = error.line > 0 ? STR_SETTINGS_EQ_PRESET_ERROR : STR_SETTINGS_EQ_PRESET_FAILED;
     for (size_t index = 0; index < sizeof PROBLEM_TEXTS / sizeof PROBLEM_TEXTS[0]; index++) {
@@ -178,7 +180,7 @@ static void show_preset_error(EqualizerScreen *equalizer, EqualizerTextError err
     toast_show(equalizer->config.toast, equalizer->notice, equalizer->now_ms);
 }
 
-static void show_skipped(EqualizerScreen *equalizer, uint32_t skipped)
+RIPPL_CODE2 static void show_skipped(EqualizerScreen *equalizer, uint32_t skipped)
 {
     StringBuilder notice = string_builder_make(equalizer->notice, sizeof equalizer->notice);
     if (skipped == 1) {
@@ -193,7 +195,7 @@ static void show_skipped(EqualizerScreen *equalizer, uint32_t skipped)
     toast_show(equalizer->config.toast, equalizer->notice, equalizer->now_ms);
 }
 
-static void enter_picker(void *context, uint32_t now_ms)
+RIPPL_CODE2 static void enter_picker(void *context, uint32_t now_ms)
 {
     EqualizerScreen *equalizer = context;
     equalizer->now_ms = now_ms;
@@ -214,13 +216,13 @@ static void enter_picker(void *context, uint32_t now_ms)
     }
 }
 
-static void update_picker(void *context, uint32_t now_ms)
+RIPPL_CODE2 static void update_picker(void *context, uint32_t now_ms)
 {
     EqualizerScreen *equalizer = context;
     equalizer->now_ms = now_ms;
 }
 
-static void draw_picker(void *context, Canvas *canvas)
+RIPPL_CODE2 static void draw_picker(void *context, Canvas *canvas)
 {
     const EqualizerScreen *equalizer = context;
     const Theme *theme = equalizer->config.theme;
@@ -228,7 +230,7 @@ static void draw_picker(void *context, Canvas *canvas)
     list_view_draw(&equalizer->list, canvas, theme_content_area(theme), equalizer->now_ms);
 }
 
-static bool preview_file(EqualizerScreen *equalizer, int index)
+RIPPL_CODE2 static bool preview_file(EqualizerScreen *equalizer, int index)
 {
     int file = index - EQUALIZER_PRESET_FILE;
     if (file < 0 || file >= equalizer->files.count) {
@@ -283,6 +285,10 @@ ScreenAction equalizer_screen_open(void *context)
 {
     EqualizerScreen *equalizer = context;
     uint32_t now_ms = hal_clock_milliseconds();
+    if (!hal_system_code2_ready()) {
+        toast_show(equalizer->config.toast, i18n_text(STR_CODE2_MISSING), now_ms);
+        return screen_action_none();
+    }
     equalizer_screen_refresh(equalizer);
     if (!equalizer_screen_has_presets(equalizer)) {
         toast_show(equalizer->config.toast, i18n_text(STR_SETTINGS_EQ_NO_PRESETS), now_ms);

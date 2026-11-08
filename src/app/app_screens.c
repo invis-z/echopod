@@ -264,7 +264,7 @@ Screen *app_screens_init(AppScreens *screens, AppScreensContext context)
         .store = context.equalizer, .toast = context.toast, .theme = theme};
     now_playing.equalizer = equalizer_screen_init(&screens->equalizer, equalizer);
     message_screen_init(&screens->no_library, no_library);
-    bluetooth_screen_init(&screens->bluetooth, context.bluetooth, theme);
+    bluetooth_screen_init(&screens->bluetooth, context.bluetooth, theme, context.toast);
     now_playing_screen_init(&screens->now_playing, now_playing);
     build_music(screens, context);
     build_settings(screens, context);

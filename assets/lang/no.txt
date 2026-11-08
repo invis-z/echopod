@@ -409,4 +409,5 @@ STR_DIAG_STACK_USED = {0}/{1} B
 STR_DIAG_STACK_USED_STALL = {0}/{1} B, stopp {2}
 STR_DIAG_POWER = Strøm
 STR_DIAG_SAVINGS = Strømsparing
+STR_CODE2_MISSING = Del av fastvaren mangler: installer oppdateringen på nytt
 STR_SETTINGS_EQ_WIDE_HINT = EQ er av for 32-biters spor

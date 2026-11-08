@@ -410,4 +410,5 @@ STR_DIAG_STACK_USED = {0}/{1} B
 STR_DIAG_STACK_USED_STALL = {0}/{1} B, bloqueio {2}
 STR_DIAG_POWER = Energia
 STR_DIAG_SAVINGS = Poupança
+STR_CODE2_MISSING = Parte do firmware em falta: reinstale
 STR_SETTINGS_EQ_WIDE_HINT = EQ desligado para faixas de 32 bits

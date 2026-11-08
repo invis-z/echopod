@@ -409,4 +409,5 @@ STR_DIAG_STACK_USED = {0}/{1} B
 STR_DIAG_STACK_USED_STALL = {0}/{1} B, 정지 {2}
 STR_DIAG_POWER = 전원
 STR_DIAG_SAVINGS = 절전
+STR_CODE2_MISSING = 펌웨어 일부 없음: 업데이트를 다시 설치하세요
 STR_SETTINGS_EQ_WIDE_HINT = 32비트 곡은 EQ가 꺼집니다

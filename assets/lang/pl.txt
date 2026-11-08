@@ -408,5 +408,6 @@ STR_SETTINGS_LIBRARY = Biblioteka
 STR_SETTINGS_BUTTONS = Przyciski
 STR_SETTINGS_SYSTEM = System
 STR_MENU_CHAPTERS = Rozdziały
+STR_CODE2_MISSING = Brak części oprogramowania: zainstaluj aktualizację ponownie
 STR_SETTINGS_EQ_WIDE_HINT = Korektor wyłączony dla utworów 32-bitowych
 STR_SETTINGS_EQ_NO_PRESETS = Brak presetów w /EQ

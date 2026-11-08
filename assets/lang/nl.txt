@@ -410,4 +410,5 @@ STR_DIAG_STACK_USED = {0}/{1} B
 STR_DIAG_STACK_USED_STALL = {0}/{1} B, vastloper {2}
 STR_DIAG_POWER = Voeding
 STR_DIAG_SAVINGS = Besparing
+STR_CODE2_MISSING = Deel van de firmware ontbreekt: installeer opnieuw
 STR_SETTINGS_EQ_WIDE_HINT = EQ is uit voor 32-bits nummers

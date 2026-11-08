@@ -5,6 +5,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from unittest import mock
 from pathlib import Path
 
@@ -32,11 +33,11 @@ def vector_table(stack=0x03004000, reset=RESET, size=256):
 
 
 def firmware(code_tail=b"\xAA" * 64, data_tail=b"", bss_size=0x100, stack=0x03004000,
-             reset=RESET, code_reset=RESET, resident=b"", np_faces=b""):
+             reset=RESET, code_reset=RESET, resident=b"", np_faces=b"", code2=b""):
     return make_image.Firmware(
         code=vector_table(reset=code_reset) + code_tail,
         data=struct.pack("<II", stack, reset) + data_tail,
-        bss_size=bss_size, resident=resident, np_faces=np_faces)
+        bss_size=bss_size, resident=resident, np_faces=np_faces, code2=code2)
 
 
 def mock_nm(output):
@@ -525,7 +526,9 @@ class OverlayTest(unittest.TestCase):
         self.assertEqual(make_image.FW_SIZE, end)
         self.assertEqual(0, make_image.USB_OVERLAY_OFFSET % 512)
         self.assertIn((make_image.GLYPH_TABLE_OFFSET + make_image.GLYPH_TABLE_SIZE,
-                       make_image.USB_OVERLAY_OFFSET), make_image.GLYPH_REGIONS)
+                       make_image.CODE2_OFFSET), make_image.GLYPH_REGIONS)
+        self.assertLessEqual(make_image.CODE2_OFFSET + make_image.CODE2_CAPACITY,
+                             make_image.USB_OVERLAY_OFFSET)
 
     def test_a_usb_overlay_bigger_than_its_space_is_refused(self):
         with self.assertRaises(make_image.ImageError):
@@ -583,6 +586,39 @@ class OverlayCopiesTest(unittest.TestCase):
         overlay = symbol_elf([("hash_update", 1, 2, 1)])
         with self.assertRaises(make_image.ImageError):
             make_image.check_overlay_copies(symbol_elf(self.MAIN), overlay, "rescan overlay")
+
+
+class Code2Test(unittest.TestCase):
+    def code2(self, body=b"\x5A" * 200):
+        return bytes(16) + body
+
+    def test_code_2_lands_at_its_offset_with_size_crc_and_the_code_it_belongs_to(self):
+        parts = firmware(code_tail=b"!D" * 40, code2=self.code2())
+        image = build(parts)
+        offset = make_image.CODE2_OFFSET
+        self.assertEqual(b"ECD2", image[offset:offset + 4])
+        self.assertEqual(len(parts.code2), word(image, offset + 4))
+        self.assertEqual(make_image.crc32(parts.code2[16:]), word(image, offset + 8))
+        self.assertEqual(make_image.crc32(parts.code), word(image, offset + 12))
+        self.assertEqual(parts.code2[16:], image[offset + 16:offset + len(parts.code2)])
+        self.assertEqual([], make_image.validate_image(image))
+
+    def test_code_2_is_not_loaded_at_start_or_counted_in_the_loaded_total(self):
+        with_code2 = build(firmware(code2=self.code2()))
+        without = build()
+        self.assertEqual(row(without, 0), row(with_code2, 0))
+        self.assertEqual(row(without, 1), row(with_code2, 1))
+
+    def test_code_2_bigger_than_28_sectors_or_in_odd_bytes_is_refused(self):
+        with self.assertRaises(make_image.ImageError):
+            build(firmware(code2=self.code2(bytes(make_image.CODE2_CAPACITY))))
+        with self.assertRaises(make_image.ImageError):
+            build(firmware(code2=self.code2(b"\x01" * 7)))
+
+    def test_an_empty_code_2_section_writes_nothing(self):
+        image = build(firmware(code2=bytes(16)))
+        offset = make_image.CODE2_OFFSET
+        self.assertNotEqual(b"ECD2", image[offset:offset + 4])
 
 
 class ResidentTablesTest(unittest.TestCase):
@@ -715,8 +751,9 @@ class NpFacesTest(unittest.TestCase):
         with self.assertRaises(make_image.ImageError):
             make_image.firmware_from_elf(firmware_elf(parts, [section]))
 
-    def test_the_new_field_is_last_in_the_image_parts(self):
-        self.assertEqual("np_faces", list(make_image.ImageParts.__dataclass_fields__)[-1])
+    def test_the_new_fields_come_last_in_the_image_parts(self):
+        self.assertEqual(["usb_overlay", "np_faces", "code2"],
+                         list(make_image.ImageParts.__dataclass_fields__)[-3:])
 
 
 class WindowReferenceTest(unittest.TestCase):
@@ -765,6 +802,28 @@ class WindowReferenceTest(unittest.TestCase):
 
     def test_a_bl_to_the_main_program_is_fine(self):
         self.build_code(self.code_with(encode_branch(self.HERE, make_image.CODE_BASE + 0x2000)))
+
+    CODE2_HERE = make_image.CODE2_BASE + 32
+
+    def build_code2(self, patch, regions=()):
+        code2 = bytearray(64)
+        code2[32:32 + len(patch)] = patch
+        parts = firmware(code2=bytes(code2))
+        return build(replace(parts, code2_regions=regions))
+
+    def test_a_bl_from_code_2_into_the_faces_region_stops_the_build(self):
+        with self.assertRaises(make_image.ImageError) as raised:
+            self.build_code2(encode_branch(self.CODE2_HERE, self.INSIDE))
+        self.assertIn("code 2", str(raised.exception))
+        self.assertIn(f"{self.CODE2_HERE:#010x}", str(raised.exception))
+
+    def test_a_pool_word_in_code_2_pointing_at_the_faces_stops_the_build(self):
+        regions = ((make_image.CODE2_BASE, "t"), (self.CODE2_HERE, "d"))
+        with self.assertRaises(make_image.ImageError):
+            self.build_code2(struct.pack("<I", self.INSIDE), regions)
+
+    def test_code_2_calling_the_main_program_is_fine(self):
+        self.build_code2(encode_branch(self.CODE2_HERE, make_image.CODE_BASE + 0x2000))
 
     def pool(self, *values):
         code = self.code_with(b"".join(struct.pack("<I", value) for value in values))

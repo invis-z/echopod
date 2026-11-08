@@ -409,4 +409,5 @@ STR_DIAG_STACK_USED = {0}/{1} B
 STR_DIAG_STACK_USED_STALL = {0}/{1} B、ストール {2}
 STR_DIAG_POWER = 電源
 STR_DIAG_SAVINGS = 省電力
+STR_CODE2_MISSING = ファームウェアの一部がありません：更新を再インストールしてください
 STR_SETTINGS_EQ_WIDE_HINT = 32ビットの曲ではEQはオフです

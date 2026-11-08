@@ -409,4 +409,5 @@ STR_DIAG_STACK_USED = {0}/{1} B
 STR_DIAG_STACK_USED_STALL = {0}/{1} B, Hänger {2}
 STR_DIAG_POWER = Strom
 STR_DIAG_SAVINGS = Sparen
+STR_CODE2_MISSING = Teil der Firmware fehlt: Update neu installieren
 STR_SETTINGS_EQ_WIDE_HINT = EQ aus bei 32-Bit-Titeln

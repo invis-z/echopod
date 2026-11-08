@@ -409,4 +409,5 @@ STR_DIAG_STACK_USED = {0}/{1} o
 STR_DIAG_STACK_USED_STALL = {0}/{1} o, blocage {2}
 STR_DIAG_POWER = Alimentation
 STR_DIAG_SAVINGS = Économies
+STR_CODE2_MISSING = Partie du firmware absente: réinstaller la mise à jour
 STR_SETTINGS_EQ_WIDE_HINT = EQ désactivé pour les titres en 32 bits

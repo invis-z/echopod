@@ -1,0 +1,18 @@
+hal_bluetooth_set_power calls returns before power_on unless hal_system_code2_ready()
+hal_bluetooth_scan calls calls into code 2 only while powered, which only set_power can make true
+hal_bluetooth_stop_scan calls only while powered
+hal_bluetooth_connect calls only while powered
+hal_bluetooth_disconnect calls only while powered
+hal_bluetooth_set_stream calls only while powered
+hal_bluetooth_service calls only while powered
+power_off calls routes only when routed, which only code 2 sets
+equalizer_screen_open calls returns before pushing unless hal_system_code2_ready()
+equalizer_screen_init addresses stores code 2 handlers in its screen, called only after equalizer_screen_open
+folders_screen_open calls returns before listing unless hal_system_code2_ready()
+folders_screen_init addresses stores code 2 handlers in its screen, called only after folders_screen_open
+date_time_screen_open calls returns before pushing unless hal_system_code2_ready()
+date_time_screen_init addresses stores code 2 handlers in its screen, called only after date_time_screen_open
+bluetooth_screen_open calls returns before pushing unless hal_system_code2_ready()
+bluetooth_screen_open_details calls returns before pushing unless hal_system_code2_ready()
+bluetooth_screen_init addresses stores code 2 handlers in its screen, called only after a guarded open
+app_start addresses inlines the screen inits, which store code 2 handlers without calling them

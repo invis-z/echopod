@@ -8,6 +8,7 @@
 #include "ui/list_view.h"
 #include "ui/screen.h"
 #include "ui/theme.h"
+#include "ui/toast.h"
 
 enum {
     BLUETOOTH_SCREEN_HINT_LINE = 0,
@@ -21,6 +22,7 @@ typedef struct BluetoothScreen {
     Screen screen;
     const Theme *theme;
     BluetoothLink *link;
+    Toast *toast;
     bool details;
     bool pairing;
     HalBluetoothDevice paired;
@@ -32,7 +34,8 @@ typedef struct BluetoothScreen {
     char lines[BLUETOOTH_SCREEN_LINE_COUNT][BLUETOOTH_SCREEN_LINE_CAPACITY];
 } BluetoothScreen;
 
-Screen *bluetooth_screen_init(BluetoothScreen *bluetooth, BluetoothLink *link, const Theme *theme);
+Screen *bluetooth_screen_init(BluetoothScreen *bluetooth, BluetoothLink *link, const Theme *theme,
+                              Toast *toast);
 ScreenAction bluetooth_screen_open(void *bluetooth);
 ScreenAction bluetooth_screen_open_details(void *bluetooth);
 const char *bluetooth_screen_summary(const void *bluetooth);

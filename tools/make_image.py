@@ -42,6 +42,10 @@ NP_FACES_MAGIC = b"ENPF"
 NP_FACES_SOURCES = "/src/np_faces/"
 NP_FACES_SANCTIONED_SOURCE = "/platform/device/board/overlay.c"
 NP_FACES_SANCTIONED_TABLE = "NP_FACES_OVERLAY"
+CODE2_OFFSET = 0x438000
+CODE2_BASE = 0x03076670
+CODE2_CAPACITY = 28 * 512
+CODE2_MAGIC = b"ECD2"
 CORE1_MODULE_CAPACITY = 0x20000
 CORE1_MODULE_HEADER_SIZE = 512
 CORE1_MODULE_MAGIC = b"EC1M"
@@ -58,7 +62,7 @@ LARGE_FW_SIZE = 0x74C000
 def glyph_regions(fw_size):
     regions = [
         (GLYPH_PAYLOAD_LIMIT, OVERLAY_OFFSET),
-        (GLYPH_TABLE_OFFSET + GLYPH_TABLE_SIZE, USB_OVERLAY_OFFSET),
+        (GLYPH_TABLE_OFFSET + GLYPH_TABLE_SIZE, CODE2_OFFSET),
         (CORE1_MP3_OFFSET + CORE1_MODULE_HEADER_SIZE + CORE1_MODULE_CAPACITY, CORE1_FLAC_OFFSET),
     ]
     if fw_size > FW_SIZE:
@@ -108,7 +112,7 @@ SHN_UNDEF = 0
 SHN_ABS = 0xFFF1
 SHF_ALLOC = 2
 SHT_NOBITS = 8
-FIRMWARE_SECTIONS = (".code", ".data", ".bss", ".resident", ".np_faces")
+FIRMWARE_SECTIONS = (".code", ".data", ".bss", ".resident", ".np_faces", ".code2")
 
 
 class ImageError(Exception):
@@ -133,6 +137,8 @@ class Firmware:
     np_faces: bytes = b""
     sanctioned: tuple = ()
     regions: tuple = ()
+    code2: bytes = b""
+    code2_regions: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -150,6 +156,7 @@ class ImageParts:
     resident: bytes = b""
     usb_overlay: bytes = b""
     np_faces: bytes = b""
+    code2: bytes = b""
 
 
 def crc_table():
@@ -244,6 +251,7 @@ def assemble(parts, shape=SHAPES[5]):
                   USB_OVERLAY_MAGIC)
     place_resident(image, parts)
     place_np_faces(image, parts)
+    place_code2(image, parts)
     place_core1_module(image, parts.core1_mp3, CORE1_MP3_OFFSET)
     place_core1_module(image, parts.core1_flac, CORE1_FLAC_OFFSET)
     place_core1_module(image, parts.core1_aac, CORE1_AAC_OFFSET, CORE1_AAC_CAPACITY)
@@ -290,6 +298,17 @@ def place_resident(image, parts):
 def place_np_faces(image, parts):
     place_headed(image, parts, (parts.np_faces, NP_FACES_OFFSET, NP_FACES_CAPACITY,
                                 NP_FACES_MAGIC, "Now Playing faces"))
+
+
+def place_code2(image, parts):
+    code2 = parts.code2
+    if len(code2) <= RESIDENT_HEADER_SIZE:
+        return
+    if len(code2) > CODE2_CAPACITY or len(code2) % 4:
+        raise ImageError(f"code 2 must be whole words and at most {CODE2_CAPACITY:#x} bytes")
+    header = CODE2_MAGIC + struct.pack("<III", len(code2), crc32(code2[RESIDENT_HEADER_SIZE:]),
+                                       code_crc(parts))
+    image[CODE2_OFFSET:CODE2_OFFSET + len(code2)] = header + code2[RESIDENT_HEADER_SIZE:]
 
 
 def place_core1_module(image, program, offset, capacity=CORE1_MODULE_CAPACITY):
@@ -378,28 +397,28 @@ def in_np_faces(address):
     return NP_FACES_BASE <= address < NP_FACES_END
 
 
-def code_runs(code, regions):
+def code_runs(code, regions, base=CODE_BASE):
     """(start, stop, kind) for each stretch of `code` between mapping symbols; "t" is Thumb code."""
-    end = CODE_BASE + len(code)
+    end = base + len(code)
     marks = sorted(regions)
-    if not marks or marks[0][0] > CODE_BASE:
-        marks.insert(0, (CODE_BASE, "t"))
+    if not marks or marks[0][0] > base:
+        marks.insert(0, (base, "t"))
     stops = [mark[0] for mark in marks[1:]] + [end]
     return [(start, min(stop, end), kind) for (start, kind), stop in zip(marks, stops)
             if start < end]
 
 
-def window_branches(code, regions=()):
+def window_branches(code, regions=(), base=CODE_BASE):
     """Addresses of the instructions in `code` that branch into the Now Playing faces region.
 
     Decoding starts at each Thumb run and steps by whole instructions, so the second half of a
     32-bit instruction is never read as one of its own.
     """
     found = []
-    for start, stop, kind in code_runs(code, regions):
+    for start, stop, kind in code_runs(code, regions, base):
         address = start
         while kind == "t" and address + 4 <= stop:
-            first, second = struct.unpack_from("<HH", code, address - CODE_BASE)
+            first, second = struct.unpack_from("<HH", code, address - base)
             target = thumb_branch_target(address, first, second)
             if target is not None and in_np_faces(target):
                 found.append(address)
@@ -407,24 +426,24 @@ def window_branches(code, regions=()):
     return found
 
 
-def window_literals(code, sanctioned, regions=()):
+def window_literals(code, sanctioned, regions=(), base=CODE_BASE):
     """Addresses of the aligned data words in `code` that point into the faces region."""
     found = []
-    for start, stop, kind in code_runs(code, regions):
+    for start, stop, kind in code_runs(code, regions, base):
         first = (start + 3) & ~3
         for address in range(first, stop - 3, 4) if kind == "d" else ():
-            value = struct.unpack_from("<I", code, address - CODE_BASE)[0]
+            value = struct.unpack_from("<I", code, address - base)[0]
             if in_np_faces(value) and not any(low <= address < high for low, high in sanctioned):
                 found.append(address)
     return found
 
 
-def check_window_references(code, sanctioned=(), regions=()):
-    """The code window must never call or point into the lazily loaded Now Playing faces."""
-    branches = window_branches(code, regions)
-    literals = window_literals(code, sanctioned, regions)
+def check_window_references(code, sanctioned=(), regions=(), base=CODE_BASE, label="code window"):
+    """Code that stays loaded must never call or point into the lazily loaded Now Playing faces."""
+    branches = window_branches(code, regions, base)
+    literals = window_literals(code, sanctioned, regions, base)
     if branches or literals:
-        raise ImageError("the code window refers into the Now Playing faces region "
+        raise ImageError(f"the {label} refers into the Now Playing faces region "
                          f"{NP_FACES_BASE:#010x}-{NP_FACES_END:#010x}: "
                          + ", ".join(f"{address:#010x}" for address in sorted(branches + literals)))
 
@@ -445,6 +464,8 @@ def check_firmware(firmware):
                               len(firmware.np_faces) < NP_FACES_HEADER_SIZE):
         raise ImageError("the Now Playing faces must start with a 16-byte header, in whole words")
     check_window_references(code, firmware.sanctioned, firmware.regions)
+    check_window_references(firmware.code2, firmware.sanctioned, firmware.code2_regions, CODE2_BASE,
+                            "code 2")
     stack, reset = struct.unpack_from("<II", data)
     if stack != DATA_BASE:
         raise ImageError(f"the entry stack must be {DATA_BASE:#010x}")
@@ -521,7 +542,8 @@ def build_image(firmware, brand, build_tag, date, overlay=b"", core1_mp3=b"", co
     rows += [(0, 0, 0, 0)] * (TABLE_CAPACITY - len(rows))
     return assemble(ImageParts(bytes(header), tuple(rows), payload, bytes(MARKER_SIZE), overlay,
                                core1_mp3, core1_flac, tuple(glyph_faces), core1_aac, core1_opus,
-                               firmware.resident, usb_overlay, firmware.np_faces), shape)
+                               firmware.resident, usb_overlay, firmware.np_faces, firmware.code2),
+                    shape)
 
 
 def validate_image(image):
@@ -586,6 +608,9 @@ def check_sections(sections):
     faces = sections.get(".np_faces")
     if faces is not None and faces.size and faces.address != NP_FACES_BASE:
         raise ImageError(f".np_faces must be at {NP_FACES_BASE:#010x}")
+    code2 = sections.get(".code2")
+    if code2 is not None and code2.size and code2.address != CODE2_BASE:
+        raise ImageError(f".code2 must be at {CODE2_BASE:#010x}")
 
 
 def firmware_from_elf(elf):
@@ -596,10 +621,13 @@ def firmware_from_elf(elf):
     if bss is not None and bss.size and bss.address != DATA_BASE + len(data):
         raise ImageError(".bss must directly follow .data")
     resident, faces = sections.get(".resident"), sections.get(".np_faces")
+    code2 = sections.get(".code2")
     return Firmware(code=code, data=data, bss_size=bss.size if bss is not None else 0,
                     resident=resident.content if resident is not None else b"",
                     np_faces=faces.content if faces is not None else b"",
-                    regions=mapping_regions(elf))
+                    code2=code2.content if code2 is not None else b"",
+                    regions=mapping_regions(elf),
+                    code2_regions=mapping_regions(elf, ".code2"))
 
 
 def overlay_from_elf(elf, zeroed=False):
@@ -636,10 +664,10 @@ def elf_symbols(elf):
     return symbols
 
 
-def mapping_regions(elf):
-    """(address, kind) of the ARM mapping symbols: "t" starts Thumb code, "d" starts data."""
+def mapping_regions(elf, section=".code"):
+    """(address, kind) of the ARM mapping symbols in `section`: "t" starts Thumb, "d" data."""
     sections = elf_sections(elf)
-    symtab, strtab, code = sections.get(".symtab"), sections.get(".strtab"), sections.get(".code")
+    symtab, strtab, code = sections.get(".symtab"), sections.get(".strtab"), sections.get(section)
     if symtab is None or strtab is None or code is None:
         return ()
     found = []
@@ -826,6 +854,7 @@ def main(argv=None):
           f"code {len(firmware.code):,} bytes, "
           f"overlay {len(overlay):,} bytes, resident {len(firmware.resident):,} bytes, "
           f"np_faces {len(firmware.np_faces):,} bytes, "
+          f"code 2 {len(firmware.code2):,} bytes, "
           f"USB overlay {len(usb_overlay):,} bytes, "
           f"core 1 MP3 {len(core1_mp3):,} bytes, "
           f"core 1 FLAC {len(core1_flac):,} bytes, core 1 AAC {len(core1_aac):,} bytes, core 1 Opus {len(core1_opus):,} bytes, "

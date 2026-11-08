@@ -409,4 +409,5 @@ STR_DIAG_STACK_USED = {0}/{1} t
 STR_DIAG_STACK_USED_STALL = {0}/{1} t, jumi {2}
 STR_DIAG_POWER = Virta
 STR_DIAG_SAVINGS = Säästö
+STR_CODE2_MISSING = Osa laiteohjelmistosta puuttuu: asenna päivitys uudelleen
 STR_SETTINGS_EQ_WIDE_HINT = EQ pois 32-bittisillä raidoilla

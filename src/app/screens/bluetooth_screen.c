@@ -3,7 +3,10 @@
 #include <stddef.h>
 
 #include "core/i18n.h"
+#include "core/resident.h"
 #include "core/string_builder.h"
+#include "hal/clock.h"
+#include "hal/system.h"
 #include "ui/header.h"
 #include "ui/label.h"
 #include "ui/list_navigation.h"
@@ -23,7 +26,8 @@ typedef enum RowKind {
 
 static const char SEPARATOR[] = " · ";
 
-static bool same_address(const HalBluetoothDevice *first, const HalBluetoothDevice *second)
+RIPPL_CODE2 static bool same_address(const HalBluetoothDevice *first,
+                                     const HalBluetoothDevice *second)
 {
     for (int index = 0; index < HAL_BLUETOOTH_ADDRESS_SIZE; index++) {
         if (first->address[index] != second->address[index]) {
@@ -33,22 +37,22 @@ static bool same_address(const HalBluetoothDevice *first, const HalBluetoothDevi
     return true;
 }
 
-static bool enabled(const BluetoothScreen *bluetooth)
+RIPPL_CODE2 static bool enabled(const BluetoothScreen *bluetooth)
 {
     return bluetooth->link->saved.enabled;
 }
 
-static int known_count(const BluetoothScreen *bluetooth)
+RIPPL_CODE2 static int known_count(const BluetoothScreen *bluetooth)
 {
     return enabled(bluetooth) ? bluetooth->link->saved.count : 0;
 }
 
-static int search_row(const BluetoothScreen *bluetooth)
+RIPPL_CODE2 static int search_row(const BluetoothScreen *bluetooth)
 {
     return 1 + known_count(bluetooth);
 }
 
-static RowKind row_kind(const BluetoothScreen *bluetooth, int index)
+RIPPL_CODE2 static RowKind row_kind(const BluetoothScreen *bluetooth, int index)
 {
     if (index == 0) {
         return ROW_POWER;
@@ -59,13 +63,14 @@ static RowKind row_kind(const BluetoothScreen *bluetooth, int index)
     return index == search_row(bluetooth) ? ROW_SEARCH : ROW_NEARBY;
 }
 
-static const HalBluetoothDevice *nearby_device(const BluetoothScreen *bluetooth, int index)
+RIPPL_CODE2 static const HalBluetoothDevice *nearby_device(const BluetoothScreen *bluetooth,
+                                                           int index)
 {
     int position = index - search_row(bluetooth) - 1;
     return &hal_bluetooth_status()->devices[bluetooth->nearby[position]];
 }
 
-static int row_count(const void *context)
+RIPPL_CODE2 static int row_count(const void *context)
 {
     const BluetoothScreen *bluetooth = context;
     if (!enabled(bluetooth)) {
@@ -74,7 +79,7 @@ static int row_count(const void *context)
     return search_row(bluetooth) + 1 + bluetooth->nearby_count;
 }
 
-static const char *row_label(const void *context, int index)
+RIPPL_CODE2 static const char *row_label(const void *context, int index)
 {
     const BluetoothScreen *bluetooth = context;
     switch (row_kind(bluetooth, index)) {
@@ -89,7 +94,7 @@ static const char *row_label(const void *context, int index)
     }
 }
 
-static const char *known_value(const BluetoothScreen *bluetooth, int index)
+RIPPL_CODE2 static const char *known_value(const BluetoothScreen *bluetooth, int index)
 {
     switch (bluetooth_link_device_state(bluetooth->link, index)) {
     case BLUETOOTH_DEVICE_PLAYING:
@@ -103,12 +108,12 @@ static const char *known_value(const BluetoothScreen *bluetooth, int index)
     }
 }
 
-static bool scanning(const BluetoothScreen *bluetooth)
+RIPPL_CODE2 static bool scanning(const BluetoothScreen *bluetooth)
 {
     return bluetooth_link_searching(bluetooth->link);
 }
 
-static const char *nearby_value(const BluetoothScreen *bluetooth, int index)
+RIPPL_CODE2 static const char *nearby_value(const BluetoothScreen *bluetooth, int index)
 {
     if (!bluetooth->pairing || !same_address(nearby_device(bluetooth, index), &bluetooth->paired)) {
         return NULL;
@@ -118,7 +123,7 @@ static const char *nearby_value(const BluetoothScreen *bluetooth, int index)
     return i18n_text(trying ? STR_BT_CONNECTING_DOTS : STR_BT_DIDNT_CONNECT);
 }
 
-static const char *row_value(const void *context, int index)
+RIPPL_CODE2 static const char *row_value(const void *context, int index)
 {
     const BluetoothScreen *bluetooth = context;
     switch (row_kind(bluetooth, index)) {
@@ -133,7 +138,7 @@ static const char *row_value(const void *context, int index)
     }
 }
 
-static void find_nearby(BluetoothScreen *bluetooth)
+RIPPL_CODE2 static void find_nearby(BluetoothScreen *bluetooth)
 {
     const HalBluetoothStatus *status = hal_bluetooth_status();
     bluetooth->nearby_count = 0;
@@ -147,7 +152,7 @@ static void find_nearby(BluetoothScreen *bluetooth)
     }
 }
 
-static const char *known_hint(const BluetoothScreen *bluetooth, int index)
+RIPPL_CODE2 static const char *known_hint(const BluetoothScreen *bluetooth, int index)
 {
     switch (bluetooth_link_device_state(bluetooth->link, index)) {
     case BLUETOOTH_DEVICE_PLAYING:
@@ -160,7 +165,7 @@ static const char *known_hint(const BluetoothScreen *bluetooth, int index)
     }
 }
 
-static const char *hint(const BluetoothScreen *bluetooth)
+RIPPL_CODE2 static const char *hint(const BluetoothScreen *bluetooth)
 {
     int selected = bluetooth->list.selected;
     switch (row_kind(bluetooth, selected)) {
@@ -175,7 +180,7 @@ static const char *hint(const BluetoothScreen *bluetooth)
     }
 }
 
-static const char *state_text(HalBluetoothState state)
+RIPPL_CODE2 static const char *state_text(HalBluetoothState state)
 {
     switch (state) {
     case HAL_BLUETOOTH_STARTING:
@@ -195,7 +200,7 @@ static const char *state_text(HalBluetoothState state)
     }
 }
 
-static void write_state(const HalBluetoothStatus *status, char *text)
+RIPPL_CODE2 static void write_state(const HalBluetoothStatus *status, char *text)
 {
     StringBuilder builder = string_builder_make(text, BLUETOOTH_SCREEN_LINE_CAPACITY);
     string_builder_append(&builder, state_text(status->state));
@@ -219,7 +224,7 @@ static void write_state(const HalBluetoothStatus *status, char *text)
     }
 }
 
-static void write_link(const HalBluetoothLink *link, char *text)
+RIPPL_CODE2 static void write_link(const HalBluetoothLink *link, char *text)
 {
     StringBuilder builder = string_builder_make(text, BLUETOOTH_SCREEN_LINE_CAPACITY);
     string_builder_append(&builder, "RX ");
@@ -237,7 +242,7 @@ static void write_link(const HalBluetoothLink *link, char *text)
     string_builder_append_unsigned(&builder, link->fifo_depth);
 }
 
-static void write_events(const HalBluetoothLink *link, char *text, uint8_t first)
+RIPPL_CODE2 static void write_events(const HalBluetoothLink *link, char *text, uint8_t first)
 {
     StringBuilder builder = string_builder_make(text, BLUETOOTH_SCREEN_LINE_CAPACITY);
     if (first == 0) {
@@ -258,13 +263,13 @@ static void write_events(const HalBluetoothLink *link, char *text, uint8_t first
     }
 }
 
-static void write_line(char *line, const char *text)
+RIPPL_CODE2 static void write_line(char *line, const char *text)
 {
     StringBuilder builder = string_builder_make(line, BLUETOOTH_SCREEN_LINE_CAPACITY);
     string_builder_append(&builder, text);
 }
 
-static void refresh(BluetoothScreen *bluetooth)
+RIPPL_CODE2 static void refresh(BluetoothScreen *bluetooth)
 {
     const HalBluetoothStatus *status = hal_bluetooth_status();
     if (bluetooth->pairing && (bluetooth->link->connected || !enabled(bluetooth))) {
@@ -282,19 +287,19 @@ static void refresh(BluetoothScreen *bluetooth)
     write_events(&status->link, bluetooth->lines[4], BLUETOOTH_SCREEN_EVENTS_PER_LINE);
 }
 
-static int footer_lines(const BluetoothScreen *bluetooth)
+RIPPL_CODE2 static int footer_lines(const BluetoothScreen *bluetooth)
 {
     return bluetooth->details ? BLUETOOTH_SCREEN_LINE_COUNT : 1;
 }
 
-static Rect list_area(const BluetoothScreen *bluetooth)
+RIPPL_CODE2 static Rect list_area(const BluetoothScreen *bluetooth)
 {
     Rect content = theme_content_area(bluetooth->theme);
     content.height -= footer_lines(bluetooth) * FOOTER_LINE_HEIGHT + FOOTER_GAP;
     return content;
 }
 
-static void enter(void *context, uint32_t now_ms)
+RIPPL_CODE2 static void enter(void *context, uint32_t now_ms)
 {
     BluetoothScreen *bluetooth = context;
     bluetooth->now_ms = now_ms;
@@ -306,7 +311,7 @@ static void enter(void *context, uint32_t now_ms)
     refresh(bluetooth);
 }
 
-static ScreenAction choose(void *context, int index)
+RIPPL_CODE2 static ScreenAction choose(void *context, int index)
 {
     BluetoothScreen *bluetooth = context;
     BluetoothLink *link = bluetooth->link;
@@ -334,7 +339,7 @@ static ScreenAction choose(void *context, int index)
     return screen_action_none();
 }
 
-static ScreenAction hold(void *context, int index)
+RIPPL_CODE2 static ScreenAction hold(void *context, int index)
 {
     BluetoothScreen *bluetooth = context;
     if (row_kind(bluetooth, index) == ROW_KNOWN) {
@@ -344,7 +349,7 @@ static ScreenAction hold(void *context, int index)
     return screen_action_none();
 }
 
-static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
+RIPPL_CODE2 static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
 {
     BluetoothScreen *bluetooth = context;
     bluetooth->now_ms = now_ms;
@@ -358,14 +363,14 @@ static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
     return action;
 }
 
-static void update(void *context, uint32_t now_ms)
+RIPPL_CODE2 static void update(void *context, uint32_t now_ms)
 {
     BluetoothScreen *bluetooth = context;
     bluetooth->now_ms = now_ms;
     refresh(bluetooth);
 }
 
-static void draw(void *context, Canvas *canvas)
+RIPPL_CODE2 static void draw(void *context, Canvas *canvas)
 {
     const BluetoothScreen *bluetooth = context;
     const Theme *theme = bluetooth->theme;
@@ -387,9 +392,10 @@ static void draw(void *context, Canvas *canvas)
     }
 }
 
-Screen *bluetooth_screen_init(BluetoothScreen *bluetooth, BluetoothLink *link, const Theme *theme)
+Screen *bluetooth_screen_init(BluetoothScreen *bluetooth, BluetoothLink *link, const Theme *theme,
+                              Toast *toast)
 {
-    *bluetooth = (BluetoothScreen){.theme = theme, .link = link};
+    *bluetooth = (BluetoothScreen){.theme = theme, .link = link, .toast = toast};
     bluetooth->model = (ListModel){
         .context = bluetooth, .count = row_count, .label = row_label, .detail = row_value};
     list_view_init(&bluetooth->list, &bluetooth->model, theme, 0);
@@ -408,6 +414,10 @@ Screen *bluetooth_screen_init(BluetoothScreen *bluetooth, BluetoothLink *link, c
 ScreenAction bluetooth_screen_open(void *bluetooth)
 {
     BluetoothScreen *screen = bluetooth;
+    if (!hal_system_code2_ready()) {
+        toast_show(screen->toast, i18n_text(STR_CODE2_MISSING), hal_clock_milliseconds());
+        return screen_action_none();
+    }
     screen->details = false;
     return screen_action_push(&screen->screen);
 }
@@ -415,27 +425,31 @@ ScreenAction bluetooth_screen_open(void *bluetooth)
 ScreenAction bluetooth_screen_open_details(void *bluetooth)
 {
     BluetoothScreen *screen = bluetooth;
+    if (!hal_system_code2_ready()) {
+        toast_show(screen->toast, i18n_text(STR_CODE2_MISSING), hal_clock_milliseconds());
+        return screen_action_none();
+    }
     screen->details = true;
     return screen_action_push(&screen->screen);
 }
 
-int bluetooth_screen_row_count(const BluetoothScreen *bluetooth)
+RIPPL_CODE2 int bluetooth_screen_row_count(const BluetoothScreen *bluetooth)
 {
     return row_count(bluetooth);
 }
 
-const char *bluetooth_screen_row(const BluetoothScreen *bluetooth, int index)
+RIPPL_CODE2 const char *bluetooth_screen_row(const BluetoothScreen *bluetooth, int index)
 {
     return row_label(bluetooth, index);
 }
 
-const char *bluetooth_screen_row_value(const BluetoothScreen *bluetooth, int index)
+RIPPL_CODE2 const char *bluetooth_screen_row_value(const BluetoothScreen *bluetooth, int index)
 {
     const char *value = row_value(bluetooth, index);
     return value != NULL ? value : "";
 }
 
-const char *bluetooth_screen_line(const BluetoothScreen *bluetooth, int index)
+RIPPL_CODE2 const char *bluetooth_screen_line(const BluetoothScreen *bluetooth, int index)
 {
     return bluetooth->lines[index];
 }

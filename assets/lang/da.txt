@@ -409,4 +409,5 @@ STR_DIAG_STACK_USED = {0}/{1} B
 STR_DIAG_STACK_USED_STALL = {0}/{1} B, stop {2}
 STR_DIAG_POWER = Strøm
 STR_DIAG_SAVINGS = Strømspar
+STR_CODE2_MISSING = Del af firmwaren mangler: geninstaller opdateringen
 STR_SETTINGS_EQ_WIDE_HINT = EQ er slået fra for 32-bit-spor

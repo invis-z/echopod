@@ -28,7 +28,7 @@ static Screen *open_screen(bool enabled, const HalBluetoothDevice *saved, bool d
     bluetooth_store_save(&stored);
     toast = (Toast){0};
     bluetooth_link_start(&link, &toast, START_MS);
-    Screen *screen = bluetooth_screen_init(&bluetooth, &link, &DEFAULT_THEME);
+    Screen *screen = bluetooth_screen_init(&bluetooth, &link, &DEFAULT_THEME, &toast);
     ScreenAction open =
         details ? bluetooth_screen_open_details(&bluetooth) : bluetooth_screen_open(&bluetooth);
     CHECK_EQUAL(SCREEN_ACTION_PUSH, open.type);

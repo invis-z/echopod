@@ -390,4 +390,5 @@ STR_DIAG_STACK_USED = {0}/{1} B
 STR_DIAG_STACK_USED_STALL = {0}/{1} B, macet {2}
 STR_DIAG_POWER = Daya
 STR_DIAG_SAVINGS = Hemat daya
+STR_CODE2_MISSING = Sebagian firmware tidak ada: pasang ulang pembaruan
 STR_SETTINGS_EQ_WIDE_HINT = EQ nonaktif untuk lagu 32-bit
