@@ -173,6 +173,7 @@ set(RIPPL_OVERLAY_IMPORTS
     hal_display_set_power
     hal_input_next_transition
     hal_power_battery
+    hash64_update
     hash_update
     i18n_format
     i18n_text

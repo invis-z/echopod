@@ -491,8 +491,23 @@ static bool read_id(const Library *library, uint32_t row, uint64_t *id, uint32_t
     return true;
 }
 
+static bool scan_for_track(const Library *library, uint64_t id, uint32_t *track)
+{
+    for (uint32_t index = 0; index < library->sections[LIBRARY_TRACKS].count; index++) {
+        uint64_t value = 0;
+        if (library_track_id(library, index, &value) && value == id) {
+            *track = index;
+            return true;
+        }
+    }
+    return false;
+}
+
 bool library_find_track(const Library *library, uint64_t id, uint32_t *track)
 {
+    if (!library->wide) {
+        return scan_for_track(library, id, track);
+    }
     uint32_t low = 0;
     uint32_t high = library->ids.count;
     while (low < high) {

@@ -3,11 +3,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "library/library.h"
+
 enum {
     UP_NEXT_CAPACITY = 100,
-    UP_NEXT_HEADER_SIZE = 12,
+    UP_NEXT_HEADER_SIZE = 8,
+    UP_NEXT_ID_SIZE = 8,
     UP_NEXT_CHECKSUM_SIZE = 4,
-    UP_NEXT_STATE_SIZE = UP_NEXT_HEADER_SIZE + 4 * UP_NEXT_CAPACITY + UP_NEXT_CHECKSUM_SIZE
+    UP_NEXT_STATE_SIZE = UP_NEXT_HEADER_SIZE + UP_NEXT_ID_SIZE * UP_NEXT_CAPACITY +
+        UP_NEXT_CHECKSUM_SIZE
 };
 
 typedef struct UpNext {
@@ -20,5 +24,5 @@ bool up_next_add(UpNext *up_next, uint32_t track);
 bool up_next_play_next(UpNext *up_next, uint32_t track);
 bool up_next_first(const UpNext *up_next, uint32_t *track);
 void up_next_drop(UpNext *up_next, uint32_t count);
-void up_next_encode(const UpNext *up_next, uint32_t fingerprint, uint8_t *bytes);
-bool up_next_decode(const uint8_t *bytes, uint32_t length, uint32_t fingerprint, UpNext *up_next);
+void up_next_encode(const UpNext *up_next, const Library *library, uint8_t *bytes);
+bool up_next_decode(const uint8_t *bytes, uint32_t length, const Library *library, UpNext *up_next);

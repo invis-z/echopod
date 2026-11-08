@@ -1,7 +1,7 @@
 #include "check.h"
+#include "core/hash.h"
+#include "fixture_library.h"
 #include "playback/up_next.h"
-
-static const uint32_t FINGERPRINT = 0xCAFEF00Du;
 
 static UpNext with_tracks(const uint32_t *tracks, int count)
 {
@@ -70,42 +70,62 @@ static void dropping_removes_from_the_front(void)
     CHECK_EQUAL(0, up_next.count);
 }
 
-static void a_list_survives_a_round_trip(void)
+static FixtureLibrary fixture;
+
+static void rewrite_checksum(uint8_t *bytes)
 {
-    static const uint32_t TRACKS[] = {7, 3, 1200};
-    UpNext saved = with_tracks(TRACKS, 3);
-    uint8_t bytes[UP_NEXT_STATE_SIZE];
-    up_next_encode(&saved, FINGERPRINT, bytes);
-    UpNext loaded;
-    CHECK(up_next_decode(bytes, sizeof bytes, FINGERPRINT, &loaded));
-    CHECK_EQUAL(3, loaded.count);
-    CHECK_EQUAL(7, loaded.tracks[0]);
-    CHECK_EQUAL(3, loaded.tracks[1]);
-    CHECK_EQUAL(1200, loaded.tracks[2]);
+    uint32_t checksum = hash_update(HASH_START, bytes, UP_NEXT_STATE_SIZE - UP_NEXT_CHECKSUM_SIZE);
+    for (int index = 0; index < 4; index++) {
+        bytes[UP_NEXT_STATE_SIZE - UP_NEXT_CHECKSUM_SIZE + index] =
+            (uint8_t)(checksum >> (8 * index));
+    }
 }
 
-static void another_library_is_rejected(void)
+static void a_list_survives_a_round_trip(void)
 {
-    static const uint32_t TRACKS[] = {7};
-    UpNext saved = with_tracks(TRACKS, 1);
+    const Library *library = fixture_library_open(&fixture);
+    static const uint32_t TRACKS[] = {7, 3, 0, 3};
+    UpNext saved = with_tracks(TRACKS, 4);
     uint8_t bytes[UP_NEXT_STATE_SIZE];
-    up_next_encode(&saved, FINGERPRINT, bytes);
+    up_next_encode(&saved, library, bytes);
     UpNext loaded;
-    CHECK(!up_next_decode(bytes, sizeof bytes, FINGERPRINT + 1, &loaded));
+    CHECK(up_next_decode(bytes, sizeof bytes, library, &loaded));
+    CHECK_EQUAL(4, loaded.count);
+    CHECK_EQUAL(7, loaded.tracks[0]);
+    CHECK_EQUAL(3, loaded.tracks[1]);
+    CHECK_EQUAL(0, loaded.tracks[2]);
+    CHECK_EQUAL(3, loaded.tracks[3]);
+}
+
+static void songs_that_left_the_library_are_skipped(void)
+{
+    const Library *library = fixture_library_open(&fixture);
+    static const uint32_t TRACKS[] = {7, 1200, 3, 5};
+    UpNext saved = with_tracks(TRACKS, 4);
+    uint8_t bytes[UP_NEXT_STATE_SIZE];
+    up_next_encode(&saved, library, bytes);
+    bytes[UP_NEXT_HEADER_SIZE + UP_NEXT_ID_SIZE] ^= 1;
+    rewrite_checksum(bytes);
+    UpNext loaded;
+    CHECK(up_next_decode(bytes, sizeof bytes, library, &loaded));
+    CHECK_EQUAL(2, loaded.count);
+    CHECK_EQUAL(7, loaded.tracks[0]);
+    CHECK_EQUAL(5, loaded.tracks[1]);
 }
 
 static void a_corrupted_or_blank_file_is_rejected(void)
 {
+    const Library *library = fixture_library_open(&fixture);
     static const uint32_t TRACKS[] = {7, 3};
     UpNext saved = with_tracks(TRACKS, 2);
     uint8_t bytes[UP_NEXT_STATE_SIZE];
-    up_next_encode(&saved, FINGERPRINT, bytes);
-    bytes[16] ^= 1;
+    up_next_encode(&saved, library, bytes);
+    bytes[12] ^= 1;
     UpNext loaded;
-    CHECK(!up_next_decode(bytes, sizeof bytes, FINGERPRINT, &loaded));
+    CHECK(!up_next_decode(bytes, sizeof bytes, library, &loaded));
     uint8_t blank[UP_NEXT_STATE_SIZE] = {0};
-    CHECK(!up_next_decode(blank, sizeof blank, FINGERPRINT, &loaded));
-    CHECK(!up_next_decode(bytes, UP_NEXT_STATE_SIZE - 1, FINGERPRINT, &loaded));
+    CHECK(!up_next_decode(blank, sizeof blank, library, &loaded));
+    CHECK(!up_next_decode(bytes, UP_NEXT_STATE_SIZE - 1, library, &loaded));
 }
 
 int main(void)
@@ -117,7 +137,7 @@ int main(void)
         TEST_CASE(a_full_list_refuses_more),
         TEST_CASE(dropping_removes_from_the_front),
         TEST_CASE(a_list_survives_a_round_trip),
-        TEST_CASE(another_library_is_rejected),
+        TEST_CASE(songs_that_left_the_library_are_skipped),
         TEST_CASE(a_corrupted_or_blank_file_is_rejected),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

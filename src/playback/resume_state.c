@@ -18,10 +18,10 @@ enum {
     ANCHOR_FIELD = 28,
     CURSOR_POSITION_FIELD = 32,
     CURSOR_ALBUM_TRACK_FIELD = 36,
-    TRACK_FIELD = 40,
-    POSITION_FIELD = 44,
-    FROM_UP_NEXT_FIELD = 48,
-    CHECKSUM_FIELD = 52,
+    TRACK_ID_FIELD = 40,
+    POSITION_FIELD = 48,
+    FROM_UP_NEXT_FIELD = 52,
+    CHECKSUM_FIELD = 56,
     MAGIC_SIZE = 4,
     BITS_PER_BYTE = 8
 };
@@ -77,7 +77,8 @@ void resume_state_encode(const ResumeState *state, uint8_t *bytes)
     encode_plan(&state->plan, bytes);
     put_u32(bytes, CURSOR_POSITION_FIELD, state->cursor.position);
     put_u32(bytes, CURSOR_ALBUM_TRACK_FIELD, state->cursor.album_track);
-    put_u32(bytes, TRACK_FIELD, state->track);
+    put_u32(bytes, TRACK_ID_FIELD, (uint32_t)state->track_id);
+    put_u32(bytes, TRACK_ID_FIELD + 4, (uint32_t)(state->track_id >> 32));
     bytes[VOLUME_FIELD] = state->volume;
     put_u32(bytes, POSITION_FIELD, state->position_ms);
     bytes[FROM_UP_NEXT_FIELD] = state->from_up_next ? 1 : 0;
@@ -134,7 +135,8 @@ bool resume_state_decode(const uint8_t *bytes, uint32_t length, ResumeState *sta
         .repeat = (RepeatMode)bytes[REPEAT_FIELD],
         .volume = bytes[VOLUME_FIELD],
         .cursor = {get_u32(bytes, CURSOR_POSITION_FIELD), get_u32(bytes, CURSOR_ALBUM_TRACK_FIELD)},
-        .track = get_u32(bytes, TRACK_FIELD),
+        .track_id =
+            (uint64_t)get_u32(bytes, TRACK_ID_FIELD + 4) << 32 | get_u32(bytes, TRACK_ID_FIELD),
         .position_ms = get_u32(bytes, POSITION_FIELD),
         .from_up_next = bytes[FROM_UP_NEXT_FIELD] != 0,
     };
