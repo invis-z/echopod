@@ -350,6 +350,9 @@ static bool parse_filter(Token *tokens, int count, EqualizerCurve *curve, uint16
         return fail(error, line, EQUALIZER_TEXT_SYNTAX);
     }
     ids[(*filter_count)++] = (uint16_t)id;
+    if (!enabled) {
+        return true;
+    }
     FilterKind kind = filter_kind(&tokens[3]);
     FilterFields fields = {.found = 0};
     FieldsResult result = kind == KIND_OTHER
@@ -357,9 +360,6 @@ static bool parse_filter(Token *tokens, int count, EqualizerCurve *curve, uint16
                               : read_fields(tokens, count, kind, &fields, error, line);
     if (result == FIELDS_BAD) {
         return false;
-    }
-    if (!enabled) {
-        return true;
     }
     if (result == FIELDS_OTHER_FORM) {
         error->skipped++;

@@ -50,6 +50,50 @@ static void crlf_bom_comments_and_off_filters_are_accepted(void)
     CHECK_EQUAL(70, curve.bands[0].q_hundredths);
 }
 
+static void autoeq_padding_with_empty_off_filters_is_ignored(void)
+{
+    static const char TEXT[] = "Preamp: -2.5 dB\n"
+                               "Filter 1: ON PK Fc 20 Hz Gain -1.0 dB Q 2.000\n"
+                               "Filter 2: ON PK Fc 31 Hz Gain -6.4 dB Q 0.500\n"
+                               "Filter 3: ON PK Fc 37 Hz Gain 0.6 dB Q 1.900\n"
+                               "Filter 4: ON PK Fc 170 Hz Gain -1.6 dB Q 2.000\n"
+                               "Filter 5: ON PK Fc 470 Hz Gain 2.3 dB Q 1.000\n"
+                               "Filter 6: ON PK Fc 530 Hz Gain 0.5 dB Q 0.500\n"
+                               "Filter 7: ON PK Fc 1400 Hz Gain -1.1 dB Q 1.700\n"
+                               "Filter 8: ON PK Fc 10000 Hz Gain -4.2 dB Q 0.600\n"
+                               "Filter 9: OFF PK Fc 0 Hz Gain 0.0 dB Q 0.000\n"
+                               "Filter 10: OFF PK Fc 0 Hz Gain 0.0 dB Q 0.000\n";
+    EqualizerCurve curve;
+    EqualizerTextError error;
+    CHECK(parse(TEXT, &curve, &error));
+    CHECK_EQUAL(8, curve.band_count);
+    CHECK_EQUAL(-25, curve.preamp_tenths);
+    CHECK_EQUAL(10000, curve.bands[7].frequency_hz);
+    CHECK_EQUAL(0u, error.skipped);
+}
+
+static void ten_active_filters_load_with_padding_after_them(void)
+{
+    static const char TEXT[] = "Preamp: -6.0 dB\n"
+                               "Filter 1: ON PK Fc 20 Hz Gain -1.0 dB Q 2.000\n"
+                               "Filter 2: ON PK Fc 31 Hz Gain -6.4 dB Q 0.500\n"
+                               "Filter 3: ON PK Fc 37 Hz Gain 0.6 dB Q 1.900\n"
+                               "Filter 4: ON PK Fc 170 Hz Gain -1.6 dB Q 2.000\n"
+                               "Filter 5: ON PK Fc 470 Hz Gain 2.3 dB Q 1.000\n"
+                               "Filter 6: ON PK Fc 530 Hz Gain 0.5 dB Q 0.500\n"
+                               "Filter 7: ON PK Fc 1400 Hz Gain -1.1 dB Q 1.700\n"
+                               "Filter 8: ON PK Fc 10000 Hz Gain -4.2 dB Q 0.600\n"
+                               "Filter 9: ON LSC Fc 105 Hz Gain 5.5 dB Q 0.70\n"
+                               "Filter 10: ON HSC Fc 10000 Hz Gain -3.0 dB Q 0.70\n"
+                               "Filter 11: OFF PK Fc 0 Hz Gain 0.0 dB Q 0.000\n"
+                               "Filter 12: OFF PK Fc 0 Hz Gain 0.0 dB Q 0.000\n";
+    EqualizerCurve curve;
+    EqualizerTextError error;
+    CHECK(parse(TEXT, &curve, &error));
+    CHECK_EQUAL(EQUALIZER_MAX_BANDS, curve.band_count);
+    CHECK_EQUAL(10000, curve.bands[9].frequency_hz);
+}
+
 static void a_preamp_only_preset_is_valid(void)
 {
     static const char TEXT[] = "Preamp: -5.5 dB\n";
@@ -242,6 +286,8 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(the_example_preset_is_understood),
         TEST_CASE(crlf_bom_comments_and_off_filters_are_accepted),
+        TEST_CASE(autoeq_padding_with_empty_off_filters_is_ignored),
+        TEST_CASE(ten_active_filters_load_with_padding_after_them),
         TEST_CASE(a_preamp_only_preset_is_valid),
         TEST_CASE(an_autoeq_parametric_export_loads_whole),
         TEST_CASE(shelf_names_and_peak_aliases_are_understood),
