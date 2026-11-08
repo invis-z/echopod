@@ -70,21 +70,26 @@ static bool offsets_are_valid(const uint8_t *pack, uint32_t size)
     return true;
 }
 
-bool i18n_attach(const uint8_t *pack, size_t size)
+bool i18n_header_valid(const uint8_t *header, size_t file_size)
 {
-    i18n_detach();
-    if (pack == NULL || size < I18N_HEADER_BYTES) {
+    if (header == NULL || file_size < I18N_HEADER_BYTES) {
         return false;
     }
     for (int index = 0; index < MAGIC_SIZE; index++) {
-        if (pack[index] != MAGIC[index]) {
+        if (header[index] != MAGIC[index]) {
             return false;
         }
     }
-    uint32_t declared = read_u32(pack + SIZE_FIELD);
-    if (read_u16(pack + VERSION_FIELD) != I18N_VERSION ||
-        read_u16(pack + COUNT_FIELD) != STRING_COUNT || declared > size ||
-        text_base() >= declared || !offsets_are_valid(pack, declared)) {
+    uint32_t declared = read_u32(header + SIZE_FIELD);
+    return read_u16(header + VERSION_FIELD) == I18N_VERSION &&
+           read_u16(header + COUNT_FIELD) == STRING_COUNT && declared <= file_size &&
+           text_base() < declared;
+}
+
+bool i18n_attach(const uint8_t *pack, size_t size)
+{
+    i18n_detach();
+    if (!i18n_header_valid(pack, size) || !offsets_are_valid(pack, read_u32(pack + SIZE_FIELD))) {
         return false;
     }
     pack_bytes = pack;

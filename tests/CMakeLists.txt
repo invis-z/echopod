@@ -212,6 +212,11 @@ rippl_add_unit_test(NAME test_equalizer_files
     LIBRARIES rippl_app rippl_library_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
 )
+rippl_add_unit_test(NAME test_language_files
+    SOURCES app/test_language_files.c app/fake_hal.c
+    LIBRARIES rippl_app rippl_library_fixtures
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
 rippl_add_unit_test(NAME test_equalizer_screen
     SOURCES app/test_equalizer_screen.c app/fake_hal.c
     LIBRARIES rippl_app rippl_library_scan

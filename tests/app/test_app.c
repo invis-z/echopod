@@ -5,6 +5,7 @@
 #include "check.h"
 #include "clock_store.h"
 #include "core/hash.h"
+#include "core/i18n.h"
 #include "default_theme.h"
 #include "fake_hal.h"
 #include "fixture_library.h"
@@ -926,16 +927,82 @@ static void the_screen_starts_in_the_saved_orientation(void)
     CHECK(drew_the_bottom_of_a_portrait_screen());
 }
 
+static uint8_t language_pack[I18N_HEADER_BYTES + STRING_COUNT * 2 + 16];
+
+static uint32_t one_text_pack(const char *text)
+{
+    uint32_t base = I18N_HEADER_BYTES + STRING_COUNT * 2;
+    uint32_t size = base + (uint32_t)strlen(text) + 1;
+    memset(language_pack, 0, sizeof language_pack);
+    memcpy(language_pack, "ELNG", 4);
+    language_pack[4] = I18N_VERSION;
+    language_pack[6] = (uint8_t)STRING_COUNT;
+    language_pack[7] = (uint8_t)(STRING_COUNT >> 8);
+    language_pack[8] = (uint8_t)size;
+    language_pack[9] = (uint8_t)(size >> 8);
+    memcpy(language_pack + base, text, strlen(text) + 1);
+    return size;
+}
+
+static Language saved_language(void)
+{
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    return settings.language;
+}
+
 static void the_chosen_language_is_loaded_when_the_app_starts_again(void)
 {
     start_app_with_library();
     open_setting(SETTINGS_SYSTEM, SYSTEM_LANGUAGE_ROW);
     CHECK(title_is("Language"));
-    move_down((int)LANGUAGE_GERMAN);
+    move_down(1);
     tap(KEY_PLAY);
     CHECK(toast_is("Restart to apply"));
+    CHECK_EQUAL(LANGUAGE_CHINESE, saved_language());
+    fake_hal_set_language_pack(language_pack, one_text_pack("zh"));
     restart_app();
-    CHECK_EQUAL(LANGUAGE_GERMAN, fake_hal_language_requested());
+    CHECK_EQUAL(LANGUAGE_CHINESE, fake_hal_language_requested());
+    CHECK(strcmp("zh", i18n_text(STR_LANGUAGE_TITLE)) == 0);
+    fake_hal_set_language_pack(NULL, 0);
+}
+
+static void a_pack_on_the_internal_drive_is_listed_and_loaded(void)
+{
+    start_app_with_library();
+    uint32_t size = one_text_pack("Sprache");
+    fake_hal_add_file("/:internal/Languages/de.bin", language_pack, size);
+    open_setting(SETTINGS_SYSTEM, SYSTEM_LANGUAGE_ROW);
+    move_down(2);
+    tap(KEY_PLAY);
+    CHECK_EQUAL(LANGUAGE_GERMAN, saved_language());
+    restart_app();
+    CHECK(strcmp("Sprache", i18n_text(STR_LANGUAGE_TITLE)) == 0);
+    i18n_detach();
+}
+
+static void only_english_and_chinese_are_listed_without_packs(void)
+{
+    start_app_with_library();
+    open_setting(SETTINGS_SYSTEM, SYSTEM_LANGUAGE_ROW);
+    move_down(5);
+    tap(KEY_PLAY);
+    CHECK_EQUAL(LANGUAGE_CHINESE, saved_language());
+}
+
+static void a_language_whose_pack_is_gone_starts_in_english(void)
+{
+    start_app_with_library();
+    uint32_t size = one_text_pack("Sprache");
+    fake_hal_add_file("/:internal/Languages/de.bin", language_pack, size);
+    open_setting(SETTINGS_SYSTEM, SYSTEM_LANGUAGE_ROW);
+    move_down(2);
+    tap(KEY_PLAY);
+    CHECK_EQUAL(LANGUAGE_GERMAN, saved_language());
+    CHECK(hal_file_write("/:internal/Languages/de.bin", NULL, 0));
+    restart_app();
+    CHECK_EQUAL(LANGUAGE_ENGLISH, fake_hal_language_requested());
+    CHECK(strcmp("Language", i18n_text(STR_LANGUAGE_TITLE)) == 0);
 }
 
 static void english_is_requested_before_the_saved_language_is_known(void)
@@ -2816,6 +2883,9 @@ int main(void)
         TEST_CASE(the_flipped_portrait_turns_the_panel_the_other_way),
         TEST_CASE(the_screen_starts_in_the_saved_orientation),
         TEST_CASE(the_chosen_language_is_loaded_when_the_app_starts_again),
+        TEST_CASE(a_pack_on_the_internal_drive_is_listed_and_loaded),
+        TEST_CASE(only_english_and_chinese_are_listed_without_packs),
+        TEST_CASE(a_language_whose_pack_is_gone_starts_in_english),
         TEST_CASE(english_is_requested_before_the_saved_language_is_known),
         TEST_CASE(choosing_landscape_again_turns_the_screen_back),
         TEST_CASE(a_new_screen_slides_in_from_the_right),

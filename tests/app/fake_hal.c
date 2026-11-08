@@ -1415,6 +1415,13 @@ bool hal_system_restart_pending(void)
 static const uint8_t *language_pack;
 static uint32_t language_pack_size;
 static uint32_t language_requested;
+static uint8_t language_buffer[0x4000];
+
+uint8_t *hal_language_buffer(uint32_t *capacity)
+{
+    *capacity = sizeof language_buffer;
+    return language_buffer;
+}
 
 void fake_hal_set_language_pack(const uint8_t *pack, uint32_t size)
 {

@@ -5,6 +5,7 @@
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/storage.h"
+#include "language_files.h"
 
 enum {
     BRIGHTNESS_LEVEL_COUNT = SETTINGS_BRIGHTNESS_MAX - SETTINGS_BRIGHTNESS_MIN + 1,
@@ -307,6 +308,49 @@ static void choose_language(void *context, int index)
     toast_show(settings->toast, i18n_text(STR_LANGUAGE_RESTART), hal_clock_milliseconds());
 }
 
+static int current_shown_language(const void *context)
+{
+    const SettingsScreens *screens = context;
+    Language language = settings_of(&screens->context)->language;
+    for (int index = 0; index < screens->language_shown; index++) {
+        if (screens->language_map[index] == language) {
+            return index;
+        }
+    }
+    return -1;
+}
+
+static void choose_shown_language(void *context, int index)
+{
+    SettingsScreens *screens = context;
+    if (index >= 0 && index < screens->language_shown) {
+        choose_language(&screens->context, screens->language_map[index]);
+    }
+}
+
+static ScreenAction open_languages(SettingsScreens *screens, const SettingChoice *choice)
+{
+    screens->language_shown = 0;
+    for (int language = 0; language < LANGUAGE_COUNT; language++) {
+        if (language_files_available((Language)language)) {
+            screens->language_options[screens->language_shown] = LANGUAGE_OPTIONS[language];
+            screens->language_map[screens->language_shown] = (uint8_t)language;
+            screens->language_shown++;
+        }
+    }
+    ChoiceConfig config = {
+        .title = i18n_text(choice->title),
+        .options = NULL,
+        .option_ids = screens->language_options,
+        .option_count = screens->language_shown,
+        .current = current_shown_language,
+        .choose = choose_shown_language,
+        .context = screens,
+        .theme = screens->theme,
+    };
+    return screen_action_push(choice_screen_init(&screens->choice, config));
+}
+
 static uint8_t *option_of(const SettingsEntry *entry)
 {
     return &entry->owner->context.store->settings.options[entry->choice->slot - 1];
@@ -385,6 +429,9 @@ static ScreenAction open_choice(void *context)
     SettingsEntry *entry = context;
     SettingsScreens *screens = entry->owner;
     const SettingChoice *choice = entry->choice;
+    if (choice->choose == choose_language) {
+        return open_languages(screens, choice);
+    }
     bool slot = choice->slot != 0;
     ChoiceConfig config = {
         .title = i18n_text(choice->title),
