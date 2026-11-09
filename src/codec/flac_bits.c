@@ -145,8 +145,26 @@ int32_t flac_bits_read_signed(FlacBits *bits, uint32_t count)
         return 0;
     }
     uint32_t value = flac_bits_read(bits, count);
+    if (count >= WORD_BITS) {
+        return (int32_t)value;
+    }
     uint32_t sign = 1u << (count - 1);
     return (int32_t)(value ^ sign) - (int32_t)sign;
+}
+
+int64_t flac_bits_read_signed_wide(FlacBits *bits, uint32_t count)
+{
+    if (count <= WORD_BITS) {
+        return flac_bits_read_signed(bits, count);
+    }
+    if (count > 2 * WORD_BITS) {
+        bits->failed = true;
+        return 0;
+    }
+    uint64_t high = flac_bits_read(bits, count - WORD_BITS);
+    uint64_t value = high << WORD_BITS | flac_bits_read(bits, WORD_BITS);
+    uint64_t sign = UINT64_C(1) << (count - 1);
+    return (int64_t)(value ^ sign) - (int64_t)sign;
 }
 
 uint32_t flac_bits_read_unary(FlacBits *bits)

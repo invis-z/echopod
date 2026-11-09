@@ -161,10 +161,11 @@ static bool hi_res(Core1Program program, uint32_t rate)
     return program == CORE1_PROGRAM_FLAC && rate > EQUALIZER_MAX_RATE;
 }
 
-static uint32_t stream_divider(Core1Program program, uint32_t rate, uint32_t pll_mhz)
+static uint32_t stream_divider(Core1Program program, uint32_t rate, bool wide, uint32_t pll_mhz)
 {
     bool heavy = program == CORE1_PROGRAM_AAC || program == CORE1_PROGRAM_OPUS ||
-                 equalizing(program, rate) || hi_res(program, rate) || upsampler_factor(rate) > 1;
+                 equalizing(program, rate) || hi_res(program, rate) || upsampler_factor(rate) > 1 ||
+                 (program == CORE1_PROGRAM_FLAC && wide);
     return heavy && pll_mhz <= FULL_SPEED_MHZ ? 1 : core1_divider_for(pll_mhz);
 }
 
@@ -198,11 +199,11 @@ void board_core1_follow_savings(void)
     }
 }
 
-bool board_core1_needs_restart(Core1Program program, uint32_t rate)
+bool board_core1_needs_restart(Core1Program program, uint32_t rate, bool wide)
 {
     return streaming &&
            (streaming_program != program ||
-            streaming_divider != stream_divider(program, rate, hal_system_clock_mhz()));
+            streaming_divider != stream_divider(program, rate, wide, hal_system_clock_mhz()));
 }
 
 bool board_core1_equalizer_waits(void)
@@ -211,9 +212,9 @@ bool board_core1_equalizer_waits(void)
            core1_region().control->bits_per_sample <= EQUALIZER_MAX_BITS;
 }
 
-bool board_core1_start_stream(Core1Program program, uint32_t rate)
+bool board_core1_start_stream(Core1Program program, uint32_t rate, bool wide)
 {
-    if (streaming && !board_core1_needs_restart(program, rate)) {
+    if (streaming && !board_core1_needs_restart(program, rate, wide)) {
         return true;
     }
     board_core1_stop();
@@ -226,7 +227,7 @@ bool board_core1_start_stream(Core1Program program, uint32_t rate)
         return false;
     }
     board_start_record_step(HAL_START_STEP_CORE1_START);
-    uint32_t divider = stream_divider(program, rate, pll_mhz);
+    uint32_t divider = stream_divider(program, rate, wide, pll_mhz);
     Core1Result result = core1_power_up(&BUS, pll_mhz, divider);
     if (result == CORE1_OK) {
         result = place_program(program);

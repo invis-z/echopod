@@ -153,6 +153,8 @@ static const char *refusal_reason(HalAudioProblem problem)
         return "can't play this format";
     case HAL_AUDIO_PROBLEM_RATE:
         return "can't play this sample rate";
+    case HAL_AUDIO_PROBLEM_DEPTH:
+        return "can't play this sample depth at this rate";
     case HAL_AUDIO_PROBLEM_UNREADABLE:
     case HAL_AUDIO_PROBLEM_NONE:
         break;
@@ -731,10 +733,19 @@ void player_refusal_text(HalAudioRefusal refusal, char *text, size_t capacity)
 {
     StringBuilder builder = string_builder_make(text, capacity);
     switch (refusal.problem) {
-    case HAL_AUDIO_PROBLEM_RATE: {
+    case HAL_AUDIO_PROBLEM_RATE:
+    case HAL_AUDIO_PROBLEM_DEPTH: {
         char rate[16];
         format_sample_rate(refusal.sample_rate, rate, sizeof rate);
-        const char *arguments[] = {rate};
+        char label[24];
+        StringBuilder labelled = string_builder_make(label, sizeof label);
+        string_builder_append(&labelled, rate);
+        if (refusal.problem == HAL_AUDIO_PROBLEM_DEPTH) {
+            string_builder_append_char(&labelled, ' ');
+            string_builder_append_unsigned(&labelled, refusal.bits);
+            string_builder_append(&labelled, "-bit");
+        }
+        const char *arguments[] = {label};
         i18n_format(&builder, STR_PLAYER_RATE_UNSUPPORTED, arguments, 1);
         return;
     }

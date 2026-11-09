@@ -621,6 +621,12 @@ static void a_24_bit_96k_track_streams_through_core_1_exactly(void)
     CHECK(streams_exactly("lpc_24_96k_stereo", 2, BIG_RING_BYTES));
 }
 
+static void a_32_bit_track_streams_through_core_1_whole(void)
+{
+    CHECK(streams_exactly("stereo_32_mid_side", 2, BIG_RING_BYTES));
+    CHECK(streams_exactly("mono_32", 1, SMALL_RING_BYTES));
+}
+
 static void a_16_bit_track_streams_through_core_1_exactly(void)
 {
     CHECK(streams_exactly("lpc_16_44k_stereo", 2, BIG_RING_BYTES));
@@ -1522,6 +1528,7 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(a_24_bit_96k_track_streams_through_core_1_exactly),
         TEST_CASE(a_16_bit_track_streams_through_core_1_exactly),
+        TEST_CASE(a_32_bit_track_streams_through_core_1_whole),
         TEST_CASE(core_1_equalizes_exactly_like_the_main_core),
         TEST_CASE(core_1_leaves_the_audio_alone_unless_asked),
         TEST_CASE(a_wav_streams_through_core_1_exactly_at_every_depth),

@@ -160,6 +160,22 @@ static void fixed_predictors_never_reach_the_hook(void)
     CHECK_EQUAL(0, hook_log.calls);
 }
 
+static void thirty_two_bit_audio_decodes_exactly_in_every_stereo_mode(void)
+{
+    CHECK(decodes_exactly("stereo_32_independent", 48000, 2, 32));
+    CHECK(decodes_exactly("stereo_32_left_side", 48000, 2, 32));
+    CHECK(decodes_exactly("stereo_32_side_right", 48000, 2, 32));
+    CHECK(decodes_exactly("stereo_32_mid_side", 48000, 2, 32));
+    CHECK(decodes_exactly("stereo_32_mid_side_fixed", 44100, 2, 32));
+    CHECK(decodes_exactly("mono_32", 96000, 1, 32));
+}
+
+static void thirty_two_bit_frames_never_reach_the_hook(void)
+{
+    CHECK(decodes_through_hook("stereo_32_mid_side", 48000, 2, 32, true));
+    CHECK_EQUAL(0, hook_log.calls);
+}
+
 static void sixteen_bit_lpc_stereo_decodes_exactly(void)
 {
     CHECK(decodes_exactly("lpc_16_44k_stereo", 44100, 2, 16));
@@ -430,12 +446,25 @@ static void a_corrupt_fixed_subframe_wraps_instead_of_overflowing(void)
     free(flac.bytes);
 }
 
+static void a_corrupt_32_bit_subframe_wraps_instead_of_overflowing(void)
+{
+    Buffer flac = load("corrupt_wide_overflow", "flac");
+    CHECK(flac.size > 0);
+    CHECK_EQUAL(FLAC_OK, flac_open(&decoder, input_of(&flac)));
+    CHECK_EQUAL(32, decoder.info.bits_per_sample);
+    CHECK_EQUAL(FLAC_ERROR, flac_decode_frame(&decoder));
+    free(flac.bytes);
+}
+
 int main(void)
 {
     flac_set_buffers(&decoder, first_bank, second_bank, FLAC_MAX_BLOCK);
     static const TestCase cases[] = {
         TEST_CASE(sixteen_bit_lpc_stereo_decodes_exactly),
         TEST_CASE(a_corrupt_fixed_subframe_wraps_instead_of_overflowing),
+        TEST_CASE(a_corrupt_32_bit_subframe_wraps_instead_of_overflowing),
+        TEST_CASE(thirty_two_bit_audio_decodes_exactly_in_every_stereo_mode),
+        TEST_CASE(thirty_two_bit_frames_never_reach_the_hook),
         TEST_CASE(an_lpc_hook_that_restores_gives_the_same_samples),
         TEST_CASE(a_hook_that_declines_leaves_the_restore_to_software),
         TEST_CASE(fixed_predictors_never_reach_the_hook),

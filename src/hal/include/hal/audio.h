@@ -42,12 +42,14 @@ typedef enum HalAudioProblem {
     HAL_AUDIO_PROBLEM_NONE,
     HAL_AUDIO_PROBLEM_UNREADABLE,
     HAL_AUDIO_PROBLEM_FORMAT,
-    HAL_AUDIO_PROBLEM_RATE
+    HAL_AUDIO_PROBLEM_RATE,
+    HAL_AUDIO_PROBLEM_DEPTH
 } HalAudioProblem;
 
 typedef struct HalAudioRefusal {
     HalAudioProblem problem;
     uint32_t sample_rate;
+    uint32_t bits;
 } HalAudioRefusal;
 
 typedef enum HalAudioCodec {

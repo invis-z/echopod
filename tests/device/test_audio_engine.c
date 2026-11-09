@@ -120,6 +120,7 @@ typedef struct ScriptedSource {
     uint32_t rate;
     uint32_t play_rate;
     uint8_t bits;
+    AudioCodec codec;
 } ScriptedSource;
 
 static ScriptedSource scripted;
@@ -133,7 +134,8 @@ static bool scripted_open(void *context, const char *path, uint32_t start_ms, Au
     uint8_t bits = source_state->bits == 0 ? 16 : source_state->bits;
     *track = (AudioTrackInfo){
         .stream = {.sample_rate = rate, .channels = 2, .bits_per_sample = bits, .max_block = 16},
-        .play_rate = source_state->play_rate};
+        .play_rate = source_state->play_rate,
+        .codec = source_state->codec};
     return true;
 }
 
@@ -552,6 +554,29 @@ static void rates_up_to_192_khz_play_and_higher_ones_are_refused(void)
     CHECK_EQUAL(384000u, audio_engine_refusal(&engine).sample_rate);
 }
 
+static bool scripted_depth_plays(AudioCodec codec, uint32_t rate, uint8_t bits)
+{
+    start_scripted_engine(0, 1);
+    scripted.codec = codec;
+    scripted.rate = rate;
+    scripted.bits = bits;
+    return audio_engine_play(&engine, "scripted", 0, 1);
+}
+
+static void compressed_samples_wider_than_24_bits_are_refused_above_96_khz(void)
+{
+    CHECK(scripted_depth_plays(AUDIO_CODEC_FLAC, 88200, 32));
+    CHECK(scripted_depth_plays(AUDIO_CODEC_ALAC, 96000, 32));
+    CHECK(scripted_depth_plays(AUDIO_CODEC_FLAC, 192000, 24));
+    CHECK(scripted_depth_plays(AUDIO_CODEC_WAV, 192000, 32));
+    CHECK(!scripted_depth_plays(AUDIO_CODEC_ALAC, 176400, 32));
+    CHECK(!scripted_depth_plays(AUDIO_CODEC_FLAC, 192000, 32));
+    AudioRefusal refusal = audio_engine_refusal(&engine);
+    CHECK_EQUAL(AUDIO_REFUSAL_DEPTH, refusal.problem);
+    CHECK_EQUAL(192000u, refusal.sample_rate);
+    CHECK_EQUAL(32u, refusal.bits);
+}
+
 static void a_missing_file_is_refused(void)
 {
     start_engine();
@@ -703,6 +728,7 @@ int main(void)
         TEST_CASE(an_unsupported_rate_is_refused),
         TEST_CASE(rates_up_to_192_khz_play_and_higher_ones_are_refused),
         TEST_CASE(a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate),
+        TEST_CASE(compressed_samples_wider_than_24_bits_are_refused_above_96_khz),
         TEST_CASE(a_missing_file_is_refused),
         TEST_CASE(the_ring_never_runs_ahead_of_the_dma_by_more_than_its_size),
     };

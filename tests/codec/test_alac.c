@@ -264,6 +264,164 @@ static void a_cut_frame_is_an_error(void)
     free(file.bytes);
 }
 
+typedef struct BitCursor {
+    const uint8_t *bytes;
+    uint32_t bit;
+} BitCursor;
+
+typedef struct BitOut {
+    uint8_t *bytes;
+    uint32_t bit;
+} BitOut;
+
+static uint32_t take(BitCursor *cursor, uint32_t count)
+{
+    uint32_t value = 0;
+    for (uint32_t index = 0; index < count; index++, cursor->bit++) {
+        uint32_t bit = (uint32_t)cursor->bytes[cursor->bit / 8] >> (7 - cursor->bit % 8) & 1u;
+        value = value << 1 | bit;
+    }
+    return value;
+}
+
+static void put(BitOut *out, uint32_t value, uint32_t count)
+{
+    for (uint32_t index = count; index > 0; index--, out->bit++) {
+        uint8_t mask = (uint8_t)(0x80u >> (out->bit % 8));
+        if ((value >> (index - 1) & 1u) != 0) {
+            out->bytes[out->bit / 8] |= mask;
+        }
+    }
+}
+
+static void pass(BitOut *out, BitCursor *cursor, uint32_t count)
+{
+    for (uint32_t index = 0; index < count; index++) {
+        put(out, take(cursor, 1), 1);
+    }
+}
+
+static uint16_t low_part(uint32_t sample, uint32_t channel)
+{
+    return (uint16_t)((sample * 2654435761u >> 7) ^ (channel * 0x5A5Au));
+}
+
+static int32_t widened(int32_t high, uint32_t sample, uint32_t channel)
+{
+    return (int32_t)((uint32_t)high << 16 | low_part(sample, channel));
+}
+
+static uint32_t widen_frame(const uint8_t *frame, uint32_t length, uint32_t frame_length,
+                            uint32_t first, const Buffer *pcm, uint8_t *out_bytes)
+{
+    BitCursor cursor = {frame, 0};
+    BitOut out = {out_bytes, 0};
+    pass(&out, &cursor, 3 + 4 + 12);
+    uint32_t header = take(&cursor, 4);
+    bool escape = (header & 1u) != 0;
+    put(&out, escape ? header : header | 2u << 1, 4);
+    uint32_t samples = frame_length;
+    if ((header & 8u) != 0) {
+        samples = take(&cursor, 32);
+        put(&out, samples, 32);
+    }
+    if (escape) {
+        for (uint32_t index = 0; index < samples; index++) {
+            for (uint32_t channel = 0; channel < 2; channel++) {
+                int32_t high = (int16_t)take(&cursor, 16);
+                put(&out, (uint32_t)widened(high, first + index, channel), 32);
+            }
+        }
+    } else {
+        pass(&out, &cursor, 16);
+        for (uint32_t channel = 0; channel < 2; channel++) {
+            pass(&out, &cursor, 8);
+            uint32_t order = take(&cursor, 8);
+            put(&out, order, 8);
+            pass(&out, &cursor, 16 * (order & 31u));
+        }
+        for (uint32_t index = 0; index < samples; index++) {
+            for (uint32_t channel = 0; channel < 2; channel++) {
+                put(&out, low_part(first + index, channel), 16);
+            }
+        }
+    }
+    (void)pcm;
+    pass(&out, &cursor, 8 * length - cursor.bit);
+    return (out.bit + 7) / 8;
+}
+
+static bool thirty_two_bit_frames_decode_exactly(const char *name, bool *saw_escape)
+{
+    Buffer file = load("alac", name, "m4a");
+    Buffer pcm = load("alac", name, "pcm");
+    Mp4Track track;
+    Mp4Stream stream;
+    uint32_t first = 0;
+    bool ok = file.size > 0 && pcm.size > 0 && mp4_probe(input_of(&file), &track) &&
+              track.channels == 2 && track.bits_per_sample == 16 &&
+              mp4_stream_open(&stream, input_of(&file), &track, 0, &first);
+    Buffer records = ok ? drain(mp4_stream_input(&stream)) : (Buffer){NULL, 0};
+    uint32_t config_bytes = records.size >= 4 ? mp4_record_length(records.bytes) : 0;
+    uint8_t cookie[ALAC_CONFIG_BYTES];
+    AlacConfig config = {0};
+    ok = ok && records.bytes != NULL && config_bytes == ALAC_CONFIG_BYTES;
+    if (ok) {
+        memcpy(cookie, records.bytes + 4, sizeof cookie);
+        cookie[5] = 32;
+        ok = alac_parse_config(cookie, sizeof cookie, &config) && config.bit_depth == 32;
+    }
+    alac_start(&decoder, config);
+    uint8_t *widened_frame = malloc(4 * 2 * ALAC_MAX_FRAME * 2 + 64);
+    uint32_t at = 4 + config_bytes;
+    uint32_t sample = 0;
+    while (ok && widened_frame != NULL && at + 4 <= records.size) {
+        uint32_t length = mp4_record_length(records.bytes + at);
+        uint32_t header = records.bytes[at + 4 + 2] >> 1 & 15u;
+        *saw_escape = *saw_escape || (header & 1u) != 0;
+        memset(widened_frame, 0, 4 * 2 * ALAC_MAX_FRAME * 2 + 64);
+        uint32_t size = widen_frame(records.bytes + at + 4, length, config.frame_length, sample,
+                                    &pcm, widened_frame);
+        Buffer piece = {widened_frame, size};
+        ok = alac_decode_frame(&decoder, input_of(&piece), 0, size) == ALAC_OK;
+        for (uint32_t index = 0; ok && index < decoder.block_samples; index++) {
+            for (uint32_t channel = 0; ok && channel < 2; channel++) {
+                int32_t high = expected_at(&pcm, (sample + index) * 2 + channel);
+                ok = alac_channel(&decoder, (int)channel)[index] ==
+                     widened(high, sample + index, channel);
+            }
+        }
+        sample += decoder.block_samples;
+        at += 4 + length;
+    }
+    ok = ok && sample == track.total_samples;
+    free(widened_frame);
+    free(records.bytes);
+    free(file.bytes);
+    free(pcm.bytes);
+    return ok;
+}
+
+static void thirty_two_bit_stereo_decodes_exactly(void)
+{
+    bool saw_escape = false;
+    CHECK(thirty_two_bit_frames_decode_exactly("stereo_16_44k", &saw_escape));
+    CHECK(thirty_two_bit_frames_decode_exactly("noise_16", &saw_escape));
+    CHECK(saw_escape);
+}
+
+static void a_32_bit_frame_without_shifted_bytes_is_refused(void)
+{
+    uint8_t cookie[ALAC_CONFIG_BYTES] = {0, 0, 0x10, 0, 0, 32, 40, 10, 14, 2, 0,    255,
+                                         0, 0, 0,    0, 0, 0,  0,  0,  0,  0, 0xAC, 0x44};
+    AlacConfig config;
+    CHECK(alac_parse_config(cookie, sizeof cookie, &config));
+    alac_start(&decoder, config);
+    uint8_t frame[16] = {0x20, 0x00, 0x00, 0x00, 0x00, 0x00};
+    Buffer piece = {frame, sizeof frame};
+    CHECK(alac_decode_frame(&decoder, input_of(&piece), 0, sizeof frame) != ALAC_OK);
+}
+
 static void unsupported_configs_are_refused(void)
 {
     uint8_t bytes[ALAC_CONFIG_BYTES] = {0, 0, 0x10, 0, 0, 16, 40, 10, 14, 2, 0,    255,
@@ -274,8 +432,10 @@ static void unsupported_configs_are_refused(void)
     CHECK_EQUAL(44100, config.sample_rate);
     CHECK_EQUAL(255, config.max_run);
     CHECK(!alac_parse_config(bytes, sizeof bytes - 1, &config));
-    bytes[5] = 32;
+    bytes[5] = 28;
     CHECK(!alac_parse_config(bytes, sizeof bytes, &config));
+    bytes[5] = 32;
+    CHECK(alac_parse_config(bytes, sizeof bytes, &config));
     bytes[5] = 20;
     CHECK(alac_parse_config(bytes, sizeof bytes, &config));
     bytes[9] = 3;
@@ -303,6 +463,8 @@ int main(void)
         TEST_CASE(the_tagged_fixture_plays_a_steady_tone),
         TEST_CASE(a_cut_frame_is_an_error),
         TEST_CASE(unsupported_configs_are_refused),
+        TEST_CASE(thirty_two_bit_stereo_decodes_exactly),
+        TEST_CASE(a_32_bit_frame_without_shifted_bytes_is_refused),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

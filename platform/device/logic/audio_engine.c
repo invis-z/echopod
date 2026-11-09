@@ -10,7 +10,9 @@ enum {
     SAMPLE_MAX = 8388607,
     SAMPLE_MIN = -8388608,
     MILLISECONDS_PER_SECOND = 1000,
-    CHUNK_FRAMES = 32
+    CHUNK_FRAMES = 32,
+    WIDE_SAMPLE_MAX_RATE = 96000,
+    NARROW_SAMPLE_BITS = 24
 };
 
 static const uint32_t SUPPORTED_RATES[] = {32000, 44100, 48000, 88200, 96000, 176400, 192000};
@@ -23,6 +25,13 @@ static void copy_path(char *destination, const char *source)
         index++;
     }
     destination[index] = '\0';
+}
+
+static bool decodes_in_time(const AudioTrackInfo *track, uint32_t rate)
+{
+    bool compressed = track->codec == AUDIO_CODEC_FLAC || track->codec == AUDIO_CODEC_ALAC;
+    return !compressed || rate <= WIDE_SAMPLE_MAX_RATE ||
+           track->stream.bits_per_sample <= NARROW_SAMPLE_BITS;
 }
 
 static bool rate_supported(uint32_t rate)
@@ -77,6 +86,13 @@ static bool open_track(AudioEngine *engine, const char *path, uint32_t start_ms)
         close_file(engine);
         engine->refusal =
             (AudioRefusal){.problem = AUDIO_REFUSAL_RATE, .sample_rate = info.sample_rate};
+        return false;
+    }
+    if (!decodes_in_time(&track, rate)) {
+        close_file(engine);
+        engine->refusal = (AudioRefusal){.problem = AUDIO_REFUSAL_DEPTH,
+                                         .sample_rate = info.sample_rate,
+                                         .bits = info.bits_per_sample};
         return false;
     }
     engine->skip_frames = (uint32_t)((uint64_t)start_ms * rate / MILLISECONDS_PER_SECOND);

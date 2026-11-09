@@ -22,7 +22,10 @@ enum {
     SEEK_LINEAR_BYTES = 16384,
     SYNC_FIRST_BYTE = 0xFF,
     SYNC_SECOND_MASK = 0xFE,
-    SYNC_SECOND_BYTE = 0xF8
+    SYNC_SECOND_BYTE = 0xF8,
+    NARROW_FIXED_WIDTH = 27,
+    HOOK_MAX_WIDTH = 25,
+    SAMPLE_BITS = 32
 };
 
 typedef enum Subframe {
@@ -41,7 +44,7 @@ typedef struct FrameHeader {
     uint32_t channels;
 } FrameHeader;
 
-static const uint8_t SAMPLE_SIZES[8] = {0, 8, 12, 0, 16, 20, 24, 0};
+static const uint8_t SAMPLE_SIZES[8] = {0, 8, 12, 0, 16, 20, 24, 32};
 
 static uint32_t read(FlacDecoder *decoder, uint32_t count)
 {
@@ -321,6 +324,43 @@ static void restore_fixed(int32_t *samples, uint32_t block_size, uint32_t order)
     }
 }
 
+static int64_t fixed_prediction(const int64_t *last, uint32_t order)
+{
+    switch (order) {
+    case 1:
+        return last[0];
+    case 2:
+        return 2 * last[0] - last[1];
+    case 3:
+        return 3 * last[0] - 3 * last[1] + last[2];
+    case 4:
+        return 4 * last[0] - 6 * last[1] + 4 * last[2] - last[3];
+    default:
+        return 0;
+    }
+}
+
+static int32_t wrapped(int64_t value)
+{
+    return (int32_t)(uint32_t)(uint64_t)value;
+}
+
+static void restore_fixed_wide(int32_t *samples, uint32_t block_size, uint32_t order)
+{
+    for (uint32_t index = order; index < block_size; index++) {
+        int64_t last[MAX_FIXED_ORDER];
+        for (uint32_t tap = 0; tap < order; tap++) {
+            last[tap] = samples[index - 1 - tap];
+        }
+        samples[index] = wrapped(samples[index] + fixed_prediction(last, order));
+    }
+}
+
+static int64_t floor_shift(int64_t sum, uint32_t shift)
+{
+    return sum >= 0 ? sum >> shift : -((-sum - 1) >> shift) - 1;
+}
+
 static void restore_lpc(int32_t *samples, uint32_t block_size, const int32_t *coefficients,
                         uint32_t order, uint32_t shift)
 {
@@ -329,8 +369,7 @@ static void restore_lpc(int32_t *samples, uint32_t block_size, const int32_t *co
         for (uint32_t tap = 0; tap < order; tap++) {
             sum += (int64_t)coefficients[tap] * samples[index - 1 - tap];
         }
-        int64_t predicted = sum >= 0 ? sum >> shift : -((-sum - 1) >> shift) - 1;
-        samples[index] += (int32_t)predicted;
+        samples[index] = wrapped(samples[index] + floor_shift(sum, shift));
     }
 }
 
@@ -367,7 +406,8 @@ static bool read_lpc(FlacDecoder *decoder, int32_t *samples, uint32_t block_size
                       .shift = (uint32_t)shift,
                       .width = width,
                       .precision = precision};
-    if (hook.restore == NULL || !hook.restore(hook.context, samples, job)) {
+    if (hook.restore == NULL || width > HOOK_MAX_WIDTH ||
+        !hook.restore(hook.context, samples, job)) {
         restore_lpc(samples, block_size, coefficients, order, (uint32_t)shift);
     }
     return true;
@@ -404,7 +444,9 @@ static bool read_subframe(FlacDecoder *decoder, int32_t *samples, uint32_t block
     case SUBFRAME_FIXED:
         ok = read_warmup(decoder, samples, order, width) &&
              read_residual(decoder, samples, block_size, order);
-        if (ok) {
+        if (ok && width > NARROW_FIXED_WIDTH) {
+            restore_fixed_wide(samples, block_size, order);
+        } else if (ok) {
             restore_fixed(samples, block_size, order);
         }
         break;
@@ -422,6 +464,127 @@ static bool read_subframe(FlacDecoder *decoder, int32_t *samples, uint32_t block
     return ok && !decoder->bits.failed;
 }
 
+typedef struct SideJoin {
+    uint32_t assignment;
+    int32_t *first;
+    int32_t *second;
+    uint32_t wasted;
+} SideJoin;
+
+static void join_side(const SideJoin *join, uint32_t index, int64_t value)
+{
+    int64_t side = value * ((int64_t)1 << join->wasted);
+    switch (join->assignment) {
+    case CHANNEL_LEFT_SIDE:
+        join->second[index] = wrapped(join->first[index] - side);
+        break;
+    case CHANNEL_MID_SIDE: {
+        int64_t mid = (int64_t)join->first[index] * 2 + (side & 1);
+        int64_t left = floor_shift(mid + side, 1);
+        join->first[index] = wrapped(left);
+        join->second[index] = wrapped(left - side);
+        break;
+    }
+    default:
+        join->first[index] = wrapped(side);
+        break;
+    }
+}
+
+static int64_t wrapped_to(int64_t value, uint32_t width)
+{
+    uint64_t sign = UINT64_C(1) << (width - 1);
+    uint64_t bits = (uint64_t)value & ((sign << 1) - 1);
+    return (int64_t)(bits ^ sign) - (int64_t)sign;
+}
+
+static void push_history(int64_t *history, uint32_t order, int64_t value)
+{
+    for (uint32_t tap = order; tap > 1; tap--) {
+        history[tap - 1] = history[tap - 2];
+    }
+    history[0] = value;
+}
+
+static bool read_wide_predictor(FlacDecoder *decoder, int32_t *coefficients, uint32_t order,
+                                uint32_t *shift)
+{
+    uint32_t precision = read(decoder, 4) + 1;
+    int32_t value = flac_bits_read_signed(&decoder->bits, 5);
+    if (precision == 16 || value < 0) {
+        return false;
+    }
+    *shift = (uint32_t)value;
+    for (uint32_t tap = 0; tap < order; tap++) {
+        coefficients[tap] = flac_bits_read_signed(&decoder->bits, precision);
+    }
+    return true;
+}
+
+static int64_t predicted(Subframe kind, const int64_t *history, const int32_t *coefficients,
+                         uint32_t order, uint32_t shift)
+{
+    if (kind == SUBFRAME_FIXED) {
+        return fixed_prediction(history, order);
+    }
+    int64_t sum = 0;
+    for (uint32_t tap = 0; tap < order; tap++) {
+        sum += (int64_t)coefficients[tap] * history[tap];
+    }
+    return floor_shift(sum, shift);
+}
+
+static bool read_wide_subframe(FlacDecoder *decoder, const FrameHeader *header, int channel,
+                               uint32_t width)
+{
+    uint32_t block_size = header->block_size;
+    uint32_t order = 0;
+    if (read(decoder, 1) != 0) {
+        return false;
+    }
+    Subframe kind = subframe_kind(read(decoder, 6), &order);
+    uint32_t wasted = 0;
+    if (read(decoder, 1) != 0) {
+        wasted = flac_bits_read_unary(&decoder->bits) + 1;
+    }
+    if (kind == SUBFRAME_RESERVED || wasted >= width || order > block_size) {
+        return false;
+    }
+    width -= wasted;
+    SideJoin join = {header->channel_assignment, decoder->samples[0], decoder->samples[1], wasted};
+    if (kind == SUBFRAME_CONSTANT || kind == SUBFRAME_VERBATIM) {
+        int64_t value = flac_bits_read_signed_wide(&decoder->bits, width);
+        for (uint32_t index = 0; index < block_size; index++) {
+            if (kind == SUBFRAME_VERBATIM && index > 0) {
+                value = flac_bits_read_signed_wide(&decoder->bits, width);
+            }
+            join_side(&join, index, value);
+        }
+        return !decoder->bits.failed;
+    }
+    int64_t history[MAX_LPC_ORDER] = {0};
+    int32_t coefficients[MAX_LPC_ORDER];
+    uint32_t shift = 0;
+    for (uint32_t index = 0; index < order; index++) {
+        push_history(history, order, flac_bits_read_signed_wide(&decoder->bits, width));
+    }
+    int32_t *residual = decoder->samples[channel];
+    if ((kind == SUBFRAME_LPC && !read_wide_predictor(decoder, coefficients, order, &shift)) ||
+        !read_residual(decoder, residual, block_size, order)) {
+        return false;
+    }
+    for (uint32_t index = 0; index < order; index++) {
+        join_side(&join, index, history[order - 1 - index]);
+    }
+    for (uint32_t index = order; index < block_size; index++) {
+        int64_t value = wrapped_to(
+            residual[index] + predicted(kind, history, coefficients, order, shift), width);
+        push_history(history, order, value);
+        join_side(&join, index, value);
+    }
+    return !decoder->bits.failed;
+}
+
 static uint32_t channel_width(const FrameHeader *header, int channel)
 {
     bool side = (header->channel_assignment == CHANNEL_LEFT_SIDE && channel == 1) ||
@@ -435,17 +598,27 @@ static int32_t floor_half(int32_t value)
     return value >= 0 ? value / 2 : -((-value - 1) / 2) - 1;
 }
 
+static bool side_joined(const FrameHeader *header)
+{
+    return header->bits_per_sample == SAMPLE_BITS &&
+           (header->channel_assignment == CHANNEL_LEFT_SIDE ||
+            header->channel_assignment == CHANNEL_MID_SIDE);
+}
+
 static void decorrelate(FlacDecoder *decoder, const FrameHeader *header)
 {
     int32_t *first = decoder->samples[0];
     int32_t *second = decoder->samples[1];
+    if (side_joined(header)) {
+        return;
+    }
     for (uint32_t index = 0; index < header->block_size; index++) {
         switch (header->channel_assignment) {
         case CHANNEL_LEFT_SIDE:
-            second[index] = first[index] - second[index];
+            second[index] = wrapped((int64_t)first[index] - second[index]);
             break;
         case CHANNEL_SIDE_RIGHT:
-            first[index] += second[index];
+            first[index] = wrapped((int64_t)first[index] + second[index]);
             break;
         case CHANNEL_MID_SIDE: {
             int32_t side = second[index];
@@ -481,7 +654,11 @@ FlacResult flac_decode_frame(FlacDecoder *decoder)
     }
     for (uint32_t channel = 0; channel < header.channels; channel++) {
         uint32_t width = channel_width(&header, (int)channel);
-        if (!read_subframe(decoder, decoder->samples[channel], header.block_size, width)) {
+        bool read_ok =
+            width > SAMPLE_BITS
+                ? read_wide_subframe(decoder, &header, (int)channel, width)
+                : read_subframe(decoder, decoder->samples[channel], header.block_size, width);
+        if (!read_ok) {
             return FLAC_ERROR;
         }
     }

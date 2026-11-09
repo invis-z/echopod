@@ -66,12 +66,14 @@ typedef struct AudioEngineConfig {
 typedef enum AudioRefusalProblem {
     AUDIO_REFUSAL_NONE,
     AUDIO_REFUSAL_UNREADABLE,
-    AUDIO_REFUSAL_RATE
+    AUDIO_REFUSAL_RATE,
+    AUDIO_REFUSAL_DEPTH
 } AudioRefusalProblem;
 
 typedef struct AudioRefusal {
     AudioRefusalProblem problem;
     uint32_t sample_rate;
+    uint32_t bits;
 } AudioRefusal;
 
 typedef struct AudioSegment {

@@ -207,10 +207,43 @@ static void running_out_of_input_fails(void)
     CHECK(!flac_bits_read_rice(&bits, decoded, 400, 3));
 }
 
+static void signed_reads_cover_32_and_33_bits(void)
+{
+    start_writing();
+    put_bits(0x80000000u, 32);
+    put_bits(0x7FFFFFFFu, 32);
+    put_bits(1, 1);
+    put_bits(0, 32);
+    put_bits(0, 1);
+    put_bits(0xFFFFFFFFu, 32);
+    put_bits(1, 1);
+    put_bits(0xFFFFFFFFu, 32);
+    start_reading();
+    CHECK(flac_bits_read_signed(&bits, 32) == INT32_MIN);
+    CHECK(flac_bits_read_signed(&bits, 32) == INT32_MAX);
+    CHECK(flac_bits_read_signed_wide(&bits, 33) == -(INT64_C(1) << 32));
+    CHECK(flac_bits_read_signed_wide(&bits, 33) == (INT64_C(1) << 32) - 1);
+    CHECK(flac_bits_read_signed_wide(&bits, 33) == -1);
+    CHECK(!bits.failed);
+}
+
+static void a_wide_read_beyond_64_bits_fails(void)
+{
+    start_writing();
+    put_bits(0xFFFFFFFFu, 32);
+    put_bits(0xFFFFFFFFu, 32);
+    put_bits(0xFFFFFFFFu, 32);
+    start_reading();
+    CHECK(flac_bits_read_signed_wide(&bits, 65) == 0);
+    CHECK(bits.failed);
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(rice_values_decode_across_buffer_refills),
+        TEST_CASE(a_wide_read_beyond_64_bits_fails),
+        TEST_CASE(signed_reads_cover_32_and_33_bits),
         TEST_CASE(a_zero_parameter_reads_only_the_unary_part),
         TEST_CASE(long_unary_runs_span_several_bytes),
         TEST_CASE(parameters_above_twenty_four_bits_decode),

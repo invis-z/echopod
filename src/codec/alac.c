@@ -76,7 +76,8 @@ bool alac_parse_config(const uint8_t *bytes, uint32_t length, AlacConfig *config
         .max_run = (uint16_t)big_endian(bytes + 10, 2),
         .sample_rate = big_endian(bytes + 20, 4),
     };
-    bool depth_ok = config->bit_depth == 16 || config->bit_depth == 20 || config->bit_depth == 24;
+    bool depth_ok = config->bit_depth == 16 || config->bit_depth == 20 || config->bit_depth == 24 ||
+                    config->bit_depth == 32;
     return depth_ok && config->channels >= 1 && config->channels <= FLAC_MAX_CHANNELS &&
            config->frame_length > 0 && config->frame_length <= ALAC_MAX_FRAME &&
            config->sample_rate > 0 && config->kb <= MAX_KB;
@@ -166,6 +167,9 @@ static uint32_t reader_read_wide(AlacReader *reader, uint32_t count)
 static int32_t reader_read_signed(AlacReader *reader, uint32_t count)
 {
     uint32_t value = reader_read_wide(reader, count);
+    if (count >= WORD_BITS) {
+        return (int32_t)value;
+    }
     uint32_t sign = 1u << (count - 1);
     return (int32_t)(value ^ sign) - (int32_t)sign;
 }
@@ -505,6 +509,9 @@ static AlacResult decode_element(AlacDecoder *decoder, uint32_t first, uint32_t 
     }
     uint32_t shift = bytes_shifted * BYTE_BITS;
     uint32_t chan_bits = config->bit_depth - shift + count - 1;
+    if (chan_bits > WORD_BITS) {
+        return ALAC_ERROR;
+    }
     uint32_t mix_bits = reader_read(reader, BYTE_BITS);
     int32_t mix_res = (int32_t)(reader_read(reader, BYTE_BITS) ^ 0x80u) - 0x80;
     Prediction predictions[FLAC_MAX_CHANNELS];

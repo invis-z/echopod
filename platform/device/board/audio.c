@@ -44,6 +44,7 @@ enum {
     JACK_POLL_MS = 10,
     SNIFF_BYTES = 12,
     LIGHT_SNIFF_BYTES = 28,
+    WIDEST_LIGHT_BITS = 24,
     COLD_LEAD_MS = 60,
     COLD_SETTLE_MS = 40,
     WARM_LEAD_MS = 20,
@@ -68,6 +69,7 @@ typedef enum SourceKind {
 typedef struct TrackProbe {
     SourceKind kind;
     uint32_t rate;
+    uint8_t bits;
 } TrackProbe;
 
 static FlacDecoder header_decoder __attribute__((section(".high_ram")));
@@ -191,37 +193,40 @@ static TrackProbe probe_mp4(FlacInput input)
 {
     Mp4Track track;
     if (!mp4_probe(input, &track)) {
-        return (TrackProbe){SOURCE_UNKNOWN, 0};
+        return (TrackProbe){SOURCE_UNKNOWN, 0, 0};
     }
     if (track.codec == MP4_CODEC_ALAC) {
-        return (TrackProbe){SOURCE_ALAC, track.sample_rate};
+        return (TrackProbe){SOURCE_ALAC, track.sample_rate, track.bits_per_sample};
     }
     bool aac = track.object_type == MP4_OBJECT_AAC_LC;
-    return (TrackProbe){aac ? SOURCE_AAC : SOURCE_UNKNOWN, aac ? track.sample_rate : 0};
+    return (TrackProbe){aac ? SOURCE_AAC : SOURCE_UNKNOWN, aac ? track.sample_rate : 0, 0};
 }
 
 static TrackProbe probe_ogg(FlacInput input)
 {
     OggOpusInfo opus;
-    return (TrackProbe){ogg_opus_probe(input, &opus) ? SOURCE_OPUS : SOURCE_UNKNOWN, 0};
+    return (TrackProbe){ogg_opus_probe(input, &opus) ? SOURCE_OPUS : SOURCE_UNKNOWN, 0, 0};
 }
 
 static TrackProbe probe_header(const uint8_t *magic, bool read)
 {
     if (!read || tag_is(magic, "fLaC")) {
         const uint8_t *rate = magic + FLAC_RATE_OFFSET;
-        return (TrackProbe){SOURCE_FLAC, (uint32_t)rate[0] << 12 | (uint32_t)rate[1] << 4 |
-                                             (uint32_t)rate[2] >> 4};
+        uint32_t bits = ((uint32_t)(rate[2] & 1u) << 4 | (uint32_t)rate[3] >> 4) + 1u;
+        return (TrackProbe){
+            SOURCE_FLAC, (uint32_t)rate[0] << 12 | (uint32_t)rate[1] << 4 | (uint32_t)rate[2] >> 4,
+            (uint8_t)bits};
     }
     if (tag_is(magic, "qoaf")) {
-        return (TrackProbe){SOURCE_QOA, (uint32_t)magic[9] << 16 | (uint32_t)magic[10] << 8 |
-                                            (uint32_t)magic[11]};
+        return (TrackProbe){
+            SOURCE_QOA, (uint32_t)magic[9] << 16 | (uint32_t)magic[10] << 8 | (uint32_t)magic[11],
+            0};
     }
     if (tag_is(magic, "RIFF") && tag_is(magic + 8, "WAVE")) {
         bool format_first = tag_is(magic + WAV_FORMAT_OFFSET, "fmt ");
-        return (TrackProbe){SOURCE_WAV, format_first ? le32_at(magic + WAV_RATE_OFFSET) : 0};
+        return (TrackProbe){SOURCE_WAV, format_first ? le32_at(magic + WAV_RATE_OFFSET) : 0, 0};
     }
-    return (TrackProbe){mp3_signature(magic) ? SOURCE_MP3 : SOURCE_UNKNOWN, 0};
+    return (TrackProbe){mp3_signature(magic) ? SOURCE_MP3 : SOURCE_UNKNOWN, 0, 0};
 }
 
 static TrackProbe probe_input(FlacInput input)
@@ -260,7 +265,7 @@ static TrackProbe probe_path(const char *path)
 {
     HalFile open;
     if (path == NULL || !hal_file_open(&open, path)) {
-        return (TrackProbe){SOURCE_FLAC, 0};
+        return (TrackProbe){SOURCE_FLAC, 0, 0};
     }
     TrackProbe probe =
         probe_input((FlacInput){.read = read_file, .context = &open, .size = open.size});
@@ -277,6 +282,12 @@ static Core1Program program_for(SourceKind kind)
         return CORE1_PROGRAM_OPUS;
     }
     return kind == SOURCE_AAC ? CORE1_PROGRAM_AAC : CORE1_PROGRAM_FLAC;
+}
+
+static bool wide_probe(TrackProbe probe)
+{
+    return (probe.kind == SOURCE_FLAC || probe.kind == SOURCE_ALAC) &&
+           probe.bits > WIDEST_LIGHT_BITS;
 }
 
 static AudioSource chosen_source(void)
@@ -318,7 +329,7 @@ static bool open_chosen(void *context, const char *path, uint32_t start_ms, Audi
     if (unknown_format) {
         return false;
     }
-    using_core1 = board_core1_start_stream(program_for(source_kind), probe.rate);
+    using_core1 = board_core1_start_stream(program_for(source_kind), probe.rate, wide_probe(probe));
     if (!using_core1) {
         return false;
     }
@@ -539,7 +550,7 @@ static void ensure_audio_clock(void)
 
 static bool light_probe(TrackProbe probe)
 {
-    if (upsampler_factor(probe.rate) > 1) {
+    if (upsampler_factor(probe.rate) > 1 || wide_probe(probe)) {
         return false;
     }
     if (probe.kind == SOURCE_MP3) {
@@ -585,7 +596,7 @@ static bool core1_restart_for(TrackProbe probe)
     if (probe.kind == SOURCE_UNKNOWN) {
         return false;
     }
-    return board_core1_needs_restart(program_for(probe.kind), probe.rate);
+    return board_core1_needs_restart(program_for(probe.kind), probe.rate, wide_probe(probe));
 }
 
 static void follow_queue(void)
@@ -862,6 +873,10 @@ HalAudioRefusal hal_audio_refusal(void)
     case AUDIO_REFUSAL_RATE:
         return (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_RATE,
                                  .sample_rate = refusal.sample_rate};
+    case AUDIO_REFUSAL_DEPTH:
+        return (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_DEPTH,
+                                 .sample_rate = refusal.sample_rate,
+                                 .bits = refusal.bits};
     case AUDIO_REFUSAL_UNREADABLE:
         return (HalAudioRefusal){.problem = unknown_format ? HAL_AUDIO_PROBLEM_FORMAT
                                                            : HAL_AUDIO_PROBLEM_UNREADABLE};
