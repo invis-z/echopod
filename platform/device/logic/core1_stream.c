@@ -13,6 +13,10 @@ enum {
     OPUS_OUTPUT_BITS = 16,
     OPUS_FRAME_SAMPLES = 960,
     EQUALIZED_BITS = 24,
+    LOW_RING_PARTS = 4,
+    LOW_RING_BOOST = 4,
+    WORD_BYTES = 4,
+    READ_SECTOR_BYTES = 512,
     MILLISECONDS_PER_SECOND = 1000
 };
 
@@ -198,17 +202,29 @@ void core1_stream_set_decoder(Core1Stream *stream, uint32_t codec, Core1Decoder 
     }
 }
 
+static void copy_run(uint8_t *out, const volatile uint8_t *in, uint32_t length)
+{
+    uint32_t index = 0;
+    for (; index < length && ((uintptr_t)(in + index) & (WORD_BYTES - 1u)) != 0; index++) {
+        out[index] = in[index];
+    }
+    const volatile uint32_t *words = (const volatile uint32_t *)(uintptr_t)(in + index);
+    for (; index + WORD_BYTES <= length; index += WORD_BYTES) {
+        uint32_t word = *words++;
+        __builtin_memcpy(&out[index], &word, sizeof word);
+    }
+    for (; index < length; index++) {
+        out[index] = in[index];
+    }
+}
+
 static void copy_from_ring(const StreamRegion *region, uint32_t position, uint8_t *out,
                            uint32_t length)
 {
     uint32_t first = position % region->ring_bytes;
     uint32_t part = smaller(length, region->ring_bytes - first);
-    for (uint32_t index = 0; index < part; index++) {
-        out[index] = region->ring[first + index];
-    }
-    for (uint32_t index = part; index < length; index++) {
-        out[index] = region->ring[index - part];
-    }
+    copy_run(out, &region->ring[first], part);
+    copy_run(out + part, region->ring, length - part);
 }
 
 static bool read_ring(void *context, uint32_t offset, void *buffer, uint32_t length)
@@ -621,10 +637,17 @@ void core1_source_fill(Core1Source *source)
     observe();
     uint32_t target = smaller(released + source->region.ring_bytes, source->end_offset);
     uint32_t budget = source->fill_budget;
+    if (source->written - released < source->region.ring_bytes / LOW_RING_PARTS) {
+        budget *= LOW_RING_BOOST;
+    }
     while (source->written < target && budget > 0) {
         uint32_t position = source->written % source->region.ring_bytes;
         uint32_t length = smaller(smaller(target - source->written, budget),
                                   source->region.ring_bytes - position);
+        uint32_t past_sector = (source->written + length) % READ_SECTOR_BYTES;
+        if (length > READ_SECTOR_BYTES && past_sector != 0) {
+            length -= past_sector;
+        }
         void *destination = (void *)(uintptr_t)&source->region.ring[position];
         if (!source->input.read(source->input.context, source->written, destination, length)) {
             source->read_failed = true;

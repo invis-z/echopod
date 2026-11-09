@@ -293,7 +293,7 @@ static void a_long_read_of_consecutive_sectors_takes_one_block_read(void)
     sparse_card_free(&card->sparse);
 }
 
-static void a_read_that_starts_inside_the_cached_run_reads_only_the_rest(void)
+static void a_read_that_starts_inside_a_sector_reads_its_ends_through_the_cache(void)
 {
     Card *card = mounted("exfat_mbr");
     FatFile file;
@@ -304,8 +304,104 @@ static void a_read_that_starts_inside_the_cached_run_reads_only_the_rest(void)
     card->sparse.reads = 0;
     CHECK(fat_read(&card->volume, &file, 3000, bytes, 4096));
     check_pattern(bytes, 5, 3000, 4096);
+    CHECK_EQUAL(2u, card->sparse.calls);
+    CHECK_EQUAL(16u, card->sparse.reads);
+    sparse_card_free(&card->sparse);
+}
+
+static void a_long_aligned_read_goes_to_the_buffer_in_one_card_read(void)
+{
+    Card *card = mounted("exfat_mbr");
+    FatFile file;
+    static uint32_t words[16384 / 4];
+    CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
+    card->sparse.calls = 0;
+    card->sparse.reads = 0;
+    CHECK(fat_read(&card->volume, &file, 0, words, sizeof words));
+    check_pattern((const uint8_t *)words, 5, 0, sizeof words);
     CHECK_EQUAL(1u, card->sparse.calls);
-    CHECK_EQUAL(8u, card->sparse.reads);
+    CHECK_EQUAL(32u, card->sparse.reads);
+    sparse_card_free(&card->sparse);
+}
+
+static void a_buffer_off_a_word_boundary_reads_through_the_cache(void)
+{
+    Card *card = mounted("exfat_mbr");
+    FatFile file;
+    static uint32_t words[8192 / 4 + 1];
+    uint8_t *bytes = (uint8_t *)words + 1;
+    CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
+    card->sparse.calls = 0;
+    CHECK(fat_read(&card->volume, &file, 512, bytes, 8192));
+    check_pattern(bytes, 5, 512, 8192);
+    CHECK_EQUAL(2u, card->sparse.calls);
+    sparse_card_free(&card->sparse);
+}
+
+static uint32_t fat32_entry_at(const Card *card, uint32_t cluster)
+{
+    const uint8_t *at = card->sparse.bytes + card->volume.fat_start * 512u + cluster * 4u;
+    return (uint32_t)at[0] | (uint32_t)at[1] << 8 | (uint32_t)at[2] << 16 | (uint32_t)at[3] << 24;
+}
+
+static void set_fat32_entry(Card *card, uint32_t cluster, uint32_t value)
+{
+    uint8_t *at = card->sparse.bytes + card->volume.fat_start * 512u + cluster * 4u;
+    for (int index = 0; index < 4; index++) {
+        at[index] = (uint8_t)(value >> (8 * index));
+    }
+}
+
+static uint8_t *cluster_bytes(const Card *card, uint32_t cluster)
+{
+    uint32_t lba = card->volume.data_start + ((cluster - 2u) << card->volume.cluster_shift);
+    return card->sparse.bytes + lba * 512u;
+}
+
+static uint32_t scatter_backwards(Card *card, const char *path)
+{
+    FatFile file;
+    CHECK(fat_open(&card->volume, path, &file));
+    uint32_t size = 512u << card->volume.cluster_shift;
+    uint32_t clusters = (file.size + size - 1u) / size;
+    uint32_t moved[64];
+    uint32_t candidate = card->volume.cluster_count + 1u;
+    for (uint32_t index = 1; index < clusters && index < 64; index++) {
+        while (fat32_entry_at(card, candidate) != 0) {
+            candidate--;
+        }
+        moved[index] = candidate--;
+    }
+    uint32_t cluster = file.first_cluster;
+    uint32_t previous = file.first_cluster;
+    for (uint32_t index = 1; index < clusters; index++) {
+        uint32_t next = fat32_entry_at(card, cluster);
+        memcpy(cluster_bytes(card, moved[index]), cluster_bytes(card, next), size);
+        memset(cluster_bytes(card, next), 0, size);
+        set_fat32_entry(card, previous, moved[index]);
+        cluster = next;
+        previous = moved[index];
+    }
+    set_fat32_entry(card, previous, 0x0FFFFFFFu);
+    CHECK(fat_mount(&card->volume, sparse_card_device(&card->sparse)));
+    return clusters;
+}
+
+static void a_scattered_file_reads_back_one_card_read_per_piece(void)
+{
+    Card *card = mounted("fat32_mbr");
+    uint32_t clusters = scatter_backwards(card, LONG_NAME_PATH);
+    CHECK(clusters > 2);
+    FatFile file;
+    static uint32_t words[20000 / 4];
+    CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
+    card->sparse.calls = 0;
+    CHECK(fat_read(&card->volume, &file, 0, words, sizeof words));
+    check_pattern((const uint8_t *)words, 5, 0, sizeof words);
+    CHECK(card->sparse.calls >= clusters);
+    uint8_t piece[3000];
+    CHECK(fat_read(&card->volume, &file, 7000, piece, sizeof piece));
+    check_pattern(piece, 5, 7000, sizeof piece);
     sparse_card_free(&card->sparse);
 }
 
@@ -406,7 +502,7 @@ static uint32_t calls_to_open(Card *card, const char *path)
     FatFile file;
     uint8_t bytes[4096];
     CHECK(fat_open(&card->volume, LONG_NAME_PATH, &file));
-    CHECK(fat_read(&card->volume, &file, 4096, bytes, sizeof bytes));
+    CHECK(fat_read(&card->volume, &file, 4100, bytes, sizeof bytes));
     card->sparse.calls = 0;
     CHECK(fat_open(&card->volume, path, &file));
     return card->sparse.calls;
@@ -614,7 +710,10 @@ int main(void)
         TEST_CASE(an_exfat_folder_with_a_cluster_chain_is_searched_to_its_end),
         TEST_CASE(exfat_reads_at_offsets_cross_cluster_boundaries),
         TEST_CASE(a_long_read_of_consecutive_sectors_takes_one_block_read),
-        TEST_CASE(a_read_that_starts_inside_the_cached_run_reads_only_the_rest),
+        TEST_CASE(a_read_that_starts_inside_a_sector_reads_its_ends_through_the_cache),
+        TEST_CASE(a_long_aligned_read_goes_to_the_buffer_in_one_card_read),
+        TEST_CASE(a_buffer_off_a_word_boundary_reads_through_the_cache),
+        TEST_CASE(a_scattered_file_reads_back_one_card_read_per_piece),
         TEST_CASE(exfat_names_match_like_fat_names),
         TEST_CASE(fat32_writes_land_in_place_across_sectors_and_clusters),
         TEST_CASE(fat16_writes_land_in_place_across_sectors_and_clusters),

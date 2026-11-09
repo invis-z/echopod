@@ -118,9 +118,25 @@ static Fixture load(const char *name, const char *extension)
     return fixture;
 }
 
+static uint32_t ring_reads;
+static uint32_t ragged_ring_reads;
+
+static void note_ring_read(const Fixture *fixture, uint32_t offset, const void *destination,
+                           uint32_t length)
+{
+    const uint8_t *at = destination;
+    if (at < ring || at >= ring + sizeof ring) {
+        return;
+    }
+    ring_reads++;
+    bool ends_on_sector = (offset + length) % 512u == 0 || offset + length == fixture->size;
+    ragged_ring_reads += length > 512u && !ends_on_sector;
+}
+
 static bool read_fixture(void *context, uint32_t offset, void *destination, uint32_t length)
 {
     const Fixture *fixture = context;
+    note_ring_read(fixture, offset, destination, length);
     if (offset > fixture->size || length > fixture->size - offset) {
         return false;
     }
@@ -641,6 +657,15 @@ static void a_ring_smaller_than_the_track_wraps_and_stays_exact(void)
 {
     CHECK(streams_exactly("lpc_24_96k_stereo", 2, SMALL_RING_BYTES));
     CHECK(control.released > SMALL_RING_BYTES);
+}
+
+static void ring_fills_end_on_card_sectors_so_the_next_starts_on_one(void)
+{
+    ring_reads = 0;
+    ragged_ring_reads = 0;
+    CHECK(streams_exactly("lpc_24_96k_stereo", 2, SMALL_RING_BYTES));
+    CHECK(ring_reads > 2);
+    CHECK_EQUAL(0u, ragged_ring_reads);
 }
 
 static void core_1_waits_while_its_slots_are_full(void)
@@ -1538,6 +1563,7 @@ int main(void)
         TEST_CASE(a_file_core_0_cannot_parse_is_refused),
         TEST_CASE(a_mono_track_plays_its_channel_on_both_sides),
         TEST_CASE(a_ring_smaller_than_the_track_wraps_and_stays_exact),
+        TEST_CASE(ring_fills_end_on_card_sectors_so_the_next_starts_on_one),
         TEST_CASE(core_1_waits_while_its_slots_are_full),
         TEST_CASE(a_sleeping_core_1_is_woken_for_every_change_and_plays_exactly),
         TEST_CASE(a_sleeping_core_1_streams_mp3_and_alac_exactly),

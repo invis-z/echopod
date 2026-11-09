@@ -12,7 +12,8 @@ enum {
     MILLISECONDS_PER_SECOND = 1000,
     CHUNK_FRAMES = 32,
     WIDE_SAMPLE_MAX_RATE = 96000,
-    NARROW_SAMPLE_BITS = 24
+    NARROW_SAMPLE_BITS = 24,
+    FRAMES_PER_PUMP = 4
 };
 
 static const uint32_t SUPPORTED_RATES[] = {32000, 44100, 48000, 88200, 96000, 176400, 192000};
@@ -372,23 +373,23 @@ static void finish_decoding(AudioEngine *engine)
     push_segment(engine, engine->next_path, engine->next_token, engine->produced, 0);
 }
 
-static void decode_one(AudioEngine *engine)
+static bool decode_one(AudioEngine *engine)
 {
     AudioFrame frame;
     AudioFrameResult result = engine->config.source.next(engine->config.source.context, &frame);
     if (result == AUDIO_FRAME_WAIT) {
-        return;
+        return false;
     }
     if (result == AUDIO_FRAME_END) {
         finish_decoding(engine);
-        return;
+        return false;
     }
     if (result != AUDIO_FRAME_READY) {
         engine->failed = true;
         close_file(engine);
         engine->ended = true;
         engine->end_at = engine->produced;
-        return;
+        return false;
     }
     uint32_t skip = 0;
     if (engine->skip_frames > frame.first_sample) {
@@ -401,6 +402,7 @@ static void decode_one(AudioEngine *engine)
     engine->pending_offset = skip;
     engine->pending_frames = frame.samples - skip;
     engine->stats.frames++;
+    return true;
 }
 
 static void drop_finished_segments(AudioEngine *engine)
@@ -467,11 +469,13 @@ void audio_engine_pump(AudioEngine *engine, uint32_t consumed)
         return;
     }
     copy_pending(engine);
-    if (engine->pending_frames == 0 && engine->decoding && free_space(engine) > 0) {
-        decode_one(engine);
-        if (!engine->rate_pending) {
-            copy_pending(engine);
+    for (uint32_t taken = 0; taken < FRAMES_PER_PUMP && engine->pending_frames == 0 &&
+                             engine->decoding && !engine->rate_pending && free_space(engine) > 0;
+         taken++) {
+        if (!decode_one(engine) || engine->rate_pending) {
+            break;
         }
+        copy_pending(engine);
     }
     if (!engine->decoding) {
         uint32_t room = free_space(engine);

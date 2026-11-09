@@ -357,6 +357,30 @@ bool fat_next_entry(FatVolume *volume, FatDirCursor *cursor, FatDirEntry *entry)
     return next_fat_entry(volume, cursor, entry);
 }
 
+static bool read_whole_sectors(FatVolume *volume, FatFile *file, uint32_t offset, uint8_t *out,
+                               uint32_t length, uint32_t *taken)
+{
+    uint32_t sectors = length / FAT_SECTOR_SIZE;
+    if (offset % FAT_SECTOR_SIZE != 0 || sectors == 0 || (uintptr_t)out % sizeof(uint32_t) != 0) {
+        return true;
+    }
+    uint32_t sector_index = offset / FAT_SECTOR_SIZE;
+    uint32_t lba = 0;
+    if (!fat_file_sector(volume, file, sector_index, &lba)) {
+        return false;
+    }
+    if (fat_sector_cached(volume, lba)) {
+        return true;
+    }
+    uint32_t limit = sectors < FAT_DIRECT_SECTORS ? sectors : FAT_DIRECT_SECTORS;
+    uint32_t run = fat_run_length(volume, file, sector_index, limit);
+    if (run == 0 || !volume->device.read(volume->device.context, lba, run, out)) {
+        return false;
+    }
+    *taken = run * FAT_SECTOR_SIZE;
+    return true;
+}
+
 bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, uint32_t length)
 {
     if (offset > file->size || length > file->size - offset) {
@@ -365,6 +389,16 @@ bool fat_read(FatVolume *volume, FatFile *file, uint32_t offset, void *buffer, u
     uint8_t *out = buffer;
     uint32_t last_sector = (file->size - 1) / FAT_SECTOR_SIZE;
     while (length > 0) {
+        uint32_t taken = 0;
+        if (!read_whole_sectors(volume, file, offset, out, length, &taken)) {
+            return false;
+        }
+        if (taken > 0) {
+            out += taken;
+            offset += taken;
+            length -= taken;
+            continue;
+        }
         uint32_t within = offset % FAT_SECTOR_SIZE;
         uint32_t chunk = FAT_SECTOR_SIZE - within < length ? FAT_SECTOR_SIZE - within : length;
         uint32_t sector_index = offset / FAT_SECTOR_SIZE;
