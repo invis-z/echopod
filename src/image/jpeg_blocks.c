@@ -85,12 +85,6 @@ static CoverRect block_rect(const JpegDecoder *decoder, uint32_t component, uint
     return (CoverRect){block_x * width, block_y * height, width, height};
 }
 
-bool jpeg_block_needed(const JpegDecoder *decoder, uint32_t component, uint32_t block_x,
-                       uint32_t block_y)
-{
-    return cover_grid_touches(decoder->grid, block_rect(decoder, component, block_x, block_y));
-}
-
 bool jpeg_block_row_past_crop(const JpegDecoder *decoder, uint32_t component, uint32_t block_y)
 {
     CoverRect rect = block_rect(decoder, component, 0, block_y);

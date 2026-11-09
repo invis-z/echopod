@@ -33,4 +33,3 @@ uint32_t image_reader_be16(ImageReader *reader);
 uint32_t image_reader_be32(ImageReader *reader);
 bool image_reader_read(ImageReader *reader, uint8_t *out, uint32_t count);
 bool image_reader_skip(ImageReader *reader, uint32_t count);
-bool image_reader_at_end(ImageReader *reader);

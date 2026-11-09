@@ -101,6 +101,4 @@ void jpeg_prepare_kernel(JpegDecoder *decoder);
 bool jpeg_coefficient_used(const JpegDecoder *decoder, uint32_t natural);
 void jpeg_output_block(JpegDecoder *decoder, uint32_t component, uint32_t block_x, uint32_t block_y,
                        JpegBlockKind kind);
-bool jpeg_block_needed(const JpegDecoder *decoder, uint32_t component, uint32_t block_x,
-                       uint32_t block_y);
 bool jpeg_block_row_past_crop(const JpegDecoder *decoder, uint32_t component, uint32_t block_y);

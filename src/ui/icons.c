@@ -58,11 +58,6 @@ void icon_draw_pause(Canvas *canvas, Rect area, Color color)
     canvas_fill_rect(canvas, (Rect){area.x + area.width - bar, area.y, bar, area.height}, color);
 }
 
-void icon_draw_stop(Canvas *canvas, Rect area, Color color)
-{
-    canvas_fill_rect(canvas, (Rect){area.x, area.y + 1, area.width - 2, area.height - 2}, color);
-}
-
 static void fill_row(Canvas *canvas, Rect area, int row, int left, int width, Color color)
 {
     int clipped_left = left < 0 ? 0 : left;

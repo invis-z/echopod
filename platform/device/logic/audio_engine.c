@@ -3,7 +3,6 @@
 #include <stddef.h>
 
 enum {
-    UNITY_GAIN = 65536,
     GAIN_SHIFT = 16,
     OUTPUT_BITS = 24,
     WORD_BITS = 32,
@@ -11,7 +10,6 @@ enum {
     SAMPLE_MAX = 8388607,
     SAMPLE_MIN = -8388608,
     MILLISECONDS_PER_SECOND = 1000,
-    STEP_GAIN_Q16 = 58409,
     CHUNK_FRAMES = 32
 };
 
@@ -49,20 +47,7 @@ static uint32_t repeat_for(uint32_t rate)
 
 void audio_engine_init(AudioEngine *engine, AudioEngineConfig config)
 {
-    *engine = (AudioEngine){.config = config, .state = AUDIO_ENGINE_STOPPED, .gain = UNITY_GAIN};
-}
-
-void audio_engine_set_volume(AudioEngine *engine, uint8_t level)
-{
-    if (level == 0) {
-        engine->gain = 0;
-        return;
-    }
-    uint32_t gain = UNITY_GAIN;
-    for (int step = level; step < AUDIO_ENGINE_VOLUME_MAX; step++) {
-        gain = (uint32_t)(((uint64_t)gain * STEP_GAIN_Q16 + UNITY_GAIN / 2) >> GAIN_SHIFT);
-    }
-    engine->gain = gain;
+    *engine = (AudioEngine){.config = config, .state = AUDIO_ENGINE_STOPPED};
 }
 
 void audio_engine_set_equalizer(AudioEngine *engine, const EqualizerCurve *curve)
@@ -256,16 +241,10 @@ static int64_t floor_shift(int64_t value, int shift)
     return value >= 0 ? value >> shift : -((-value - 1) >> shift) - 1;
 }
 
-static int32_t to_output(int32_t sample, int bits, uint32_t gain)
+static int32_t to_output(int32_t sample, int bits)
 {
-    int64_t value = (int64_t)sample * gain;
-    int shift = GAIN_SHIFT;
-    if (bits > OUTPUT_BITS) {
-        shift += bits - OUTPUT_BITS;
-    } else {
-        value *= INT64_C(1) << (OUTPUT_BITS - bits);
-    }
-    int64_t rounded = floor_shift(value + (INT64_C(1) << (shift - 1)), shift);
+    int shift = bits - OUTPUT_BITS;
+    int64_t rounded = floor_shift((int64_t)sample + (INT64_C(1) << (shift - 1)), shift);
     return rounded > SAMPLE_MAX ? SAMPLE_MAX : rounded < SAMPLE_MIN ? SAMPLE_MIN : (int32_t)rounded;
 }
 
@@ -305,11 +284,11 @@ static void widen_chunk(const int32_t *source, int32_t *chunk, uint32_t count, i
     }
 }
 
-static void scale_chunk(const AudioEngine *engine, const int32_t *source, int32_t *chunk,
-                        uint32_t count)
+static void narrow_chunk(const AudioEngine *engine, const int32_t *source, int32_t *chunk,
+                         uint32_t count)
 {
     for (uint32_t index = 0; index < count; index++) {
-        chunk[WORDS_PER_FRAME * index] = to_output(source[index], engine->frame.bits, engine->gain);
+        chunk[WORDS_PER_FRAME * index] = to_output(source[index], engine->frame.bits);
     }
 }
 
@@ -318,13 +297,13 @@ static void convert_chunk(const AudioEngine *engine, int32_t *chunk, uint32_t co
     const int32_t *left = engine->frame.left + engine->pending_offset;
     const int32_t *right = engine->frame.right + engine->pending_offset;
     int bits = engine->frame.bits;
-    if (engine->gain == UNITY_GAIN && bits <= OUTPUT_BITS) {
+    if (bits <= OUTPUT_BITS) {
         widen_chunk(left, chunk, count, OUTPUT_BITS - bits);
         widen_chunk(right, chunk + 1, count, OUTPUT_BITS - bits);
         return;
     }
-    scale_chunk(engine, left, chunk, count);
-    scale_chunk(engine, right, chunk + 1, count);
+    narrow_chunk(engine, left, chunk, count);
+    narrow_chunk(engine, right, chunk + 1, count);
 }
 
 static void write_chunk(AudioEngine *engine, const int32_t *chunk, uint32_t count)

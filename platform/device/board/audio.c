@@ -103,7 +103,6 @@ static uint32_t ring_words;
 static bool stopped_waiting;
 static uint32_t stopped_since_ms;
 static bool tone_active;
-static char last_path[AUDIO_ENGINE_PATH_CAPACITY];
 static uint8_t volume_level;
 static uint8_t stream_hardware_value;
 static void (*stream_service)(void);
@@ -314,15 +313,9 @@ static void remember(char *copy, const char *path)
     copy[index] = '\0';
 }
 
-const char *board_audio_last_path(void)
-{
-    return last_path[0] != '\0' ? last_path : NULL;
-}
-
 static bool open_chosen(void *context, const char *path, uint32_t start_ms, AudioTrackInfo *track)
 {
     (void)context;
-    remember(last_path, path);
     TrackProbe probe = probe_path(path);
     source_kind = probe.kind;
     unknown_format = source_kind == SOURCE_UNKNOWN;

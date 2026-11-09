@@ -36,7 +36,7 @@ What is known:
 
 - The DAC is a pair of Cirrus Logic CS43131 chips (one per channel) set up over I2C0 and fed by I2S1 (`docs/hardware.md`, `platform/device/logic/dac_sequence.c`). The register sequence Rippl writes is copied from stock and only sets up the PCM path: the serial port, the PCM filter (`0x090000`), the PCM volume (`0x090001`/`0x090002`) and the PCM path controls. Nothing in the code configures a DSD input or mode.
 - I2S1 runs at 44.1 to 192 kHz with 32-bit words (`platform/device/board/dac.c`); 176.4 kHz, the rate DSD64 over PCM (DoP) needs, is one of them.
-- The audio engine passes 24-bit samples through unchanged on the device when the equalizer is off: the software gain stays at unity, and the equalizer is already off at 176.4 and 192 kHz (`docs/known-issues.md`). So the bits a DoP stream needs would reach the DAC intact.
+- The audio engine passes 24-bit samples through unchanged on the device when the equalizer is off: the engine has no software volume, and the equalizer is already off at 176.4 and 192 kHz (`docs/known-issues.md`). So the bits a DoP stream needs would reach the DAC intact.
 
 Unknown:
 

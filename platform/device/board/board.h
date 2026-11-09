@@ -44,7 +44,6 @@ void board_watchdog_kick(void);
 void board_watchdog_after_clock_change(void);
 uint16_t board_battery_boot_reading(void);
 const char *board_audio_current_path(void);
-const char *board_audio_last_path(void);
 typedef enum Core1Program {
     CORE1_PROGRAM_FLAC,
     CORE1_PROGRAM_MP3,

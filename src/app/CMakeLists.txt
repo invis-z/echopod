@@ -32,7 +32,6 @@ add_library(rippl_app STATIC
     screens/date_time_screen.c
     screens/equalizer_screen.c
     screens/folders_screen.c
-    screens/font_sample_screen.c
     screens/now_playing_screen.c
     screens/up_next_screen.c
     screens/stopwatch_screen.c

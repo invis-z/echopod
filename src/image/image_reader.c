@@ -107,8 +107,3 @@ bool image_reader_skip(ImageReader *reader, uint32_t count)
     }
     return !reader->failed;
 }
-
-bool image_reader_at_end(ImageReader *reader)
-{
-    return reader->filled == reader->cursor && remaining_in_source(reader) == 0;
-}

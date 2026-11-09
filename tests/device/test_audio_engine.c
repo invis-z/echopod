@@ -8,8 +8,7 @@
 
 enum {
     RING_FRAMES = 8192,
-    RING_WORDS = 2 * RING_FRAMES,
-    FULL_VOLUME = 50
+    RING_WORDS = 2 * RING_FRAMES
 };
 
 typedef struct Fixture {
@@ -77,7 +76,6 @@ static void start_engine(void)
     audio_engine_init(&engine, (AudioEngineConfig){.source = flac_source_interface(&source),
                                                    .ring = ring,
                                                    .ring_words = RING_WORDS});
-    audio_engine_set_volume(&engine, FULL_VOLUME);
 }
 
 typedef struct ScriptedSource {
@@ -145,7 +143,6 @@ static void start_scripted_engine(int waits, int frames)
                              &scripted};
     audio_engine_init(
         &engine, (AudioEngineConfig){.source = interface, .ring = ring, .ring_words = RING_WORDS});
-    audio_engine_set_volume(&engine, FULL_VOLUME);
 }
 
 static int32_t expected_at(const Fixture *pcm, uint32_t index)
@@ -164,11 +161,6 @@ static bool frame_is(uint32_t frame, int32_t left, int32_t right, int bits)
 {
     uint32_t slot = frame % RING_FRAMES;
     return ring[2 * slot] == word_of(left, bits) && ring[2 * slot + 1] == word_of(right, bits);
-}
-
-static int32_t sixteen_bit_left(uint32_t frame)
-{
-    return (int32_t)ring[2 * (frame % RING_FRAMES)] / 65536;
 }
 
 static bool ring_holds(const char *name, uint32_t first_frame, uint32_t ring_start, uint32_t frames,
@@ -461,26 +453,6 @@ static void closing_the_source_keeps_the_pause_and_the_position(void)
     CHECK(ring_holds("lpc_16_44k_stereo", 2205, 0, 1000, 16));
 }
 
-static void volume_scales_the_samples(void)
-{
-    start_engine();
-    audio_engine_set_volume(&engine, 0);
-    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 1));
-    pump_until_full(0);
-    CHECK(frame_is(1000, 0, 0, 16));
-    start_engine();
-    audio_engine_set_volume(&engine, FULL_VOLUME - 6);
-    CHECK(audio_engine_play(&engine, "lpc_16_44k_stereo", 0, 1));
-    pump_until_full(0);
-    Fixture pcm = load("lpc_16_44k_stereo", "pcm");
-    int32_t full = expected_at(&pcm, 2 * 1000);
-    int32_t scaled = sixteen_bit_left(1000);
-    int32_t error = scaled * 2 - full;
-    int32_t allowed = (full < 0 ? -full : full) / 100 + 2;
-    CHECK(error >= -allowed && error <= allowed);
-    free(pcm.bytes);
-}
-
 static void mono_plays_on_both_channels(void)
 {
     start_engine();
@@ -707,7 +679,6 @@ int main(void)
         TEST_CASE(seeking_after_the_next_track_opened_queues_it_again),
         TEST_CASE(a_seek_while_a_new_rate_waits_keeps_the_next_track),
         TEST_CASE(closing_the_source_keeps_the_pause_and_the_position),
-        TEST_CASE(volume_scales_the_samples),
         TEST_CASE(mono_plays_on_both_channels),
         TEST_CASE(low_rates_play_at_a_rate_they_divide),
         TEST_CASE(a_22_khz_track_fills_in_every_other_sample),
