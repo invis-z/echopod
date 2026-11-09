@@ -14,9 +14,15 @@ enum {
     RECORD_MAGIC_BYTES = 4,
     RECORD_VERSION_AT = 4,
     RECORD_VERSION = 1,
+    RECORD_FLAGS_AT = 5,
+    RECORD_HAS_RULE = 1,
     RECORD_TIME_AT = 8,
     RECORD_OFFSET_AT = 12,
-    RECORD_CHECK_AT = 16,
+    RECORD_SAVE_AT = 14,
+    RECORD_START_AT = 16,
+    RECORD_END_AT = 22,
+    RECORD_EDGE_MINUTES_AT = 4,
+    RECORD_CHECK_AT = 28,
     RECORD_EARLIEST_YEAR = 2024,
     BITS_PER_BYTE = 8,
     SECONDS_PER_MINUTE = 60,
@@ -45,22 +51,59 @@ static uint32_t latest_unix_time(void)
     return wall_clock_days_from_civil(WALL_CLOCK_LAST_YEAR, 12, 31) * SECONDS_PER_DAY;
 }
 
-bool clock_store_record_decode(const uint8_t *bytes, uint32_t *unix_time, int32_t *offset_minutes)
+static int16_t get_i16(const uint8_t *bytes)
 {
+    return (int16_t)(bytes[0] | bytes[1] << BITS_PER_BYTE);
+}
+
+static DaylightEdge get_edge(const uint8_t *bytes)
+{
+    return (DaylightEdge){.month = bytes[0],
+                          .week = bytes[1],
+                          .weekday = bytes[2],
+                          .minutes = get_i16(bytes + RECORD_EDGE_MINUTES_AT)};
+}
+
+static bool decode_rule(const uint8_t *bytes, ClockRecord *record)
+{
+    uint8_t flags = bytes[RECORD_FLAGS_AT];
+    if ((flags & ~RECORD_HAS_RULE) != 0) {
+        return false;
+    }
+    record->has_rule = (flags & RECORD_HAS_RULE) != 0;
+    if (!record->has_rule) {
+        return true;
+    }
+    record->rule = (DaylightRule){.save_minutes = get_i16(bytes + RECORD_SAVE_AT),
+                                  .start = get_edge(bytes + RECORD_START_AT),
+                                  .end = get_edge(bytes + RECORD_END_AT)};
+    return daylight_rule_valid(&record->rule);
+}
+
+bool clock_store_record_decode(const uint8_t *bytes, uint32_t size, ClockRecord *record)
+{
+    *record = (ClockRecord){0};
+    if (size < CLOCK_RECORD_BYTES) {
+        return false;
+    }
     for (int index = 0; index < RECORD_MAGIC_BYTES; index++) {
         if (bytes[index] != RECORD_MAGIC[index]) {
             return false;
         }
     }
-    *unix_time = get_u32(bytes + RECORD_TIME_AT);
-    *offset_minutes =
-        (int16_t)(bytes[RECORD_OFFSET_AT] | bytes[RECORD_OFFSET_AT + 1] << BITS_PER_BYTE);
-    return bytes[RECORD_VERSION_AT] == RECORD_VERSION &&
-           get_u32(bytes + RECORD_CHECK_AT) == hash_update(HASH_START, bytes, RECORD_CHECK_AT) &&
-           *unix_time >= earliest_unix_time() && *unix_time < latest_unix_time();
+    if (bytes[RECORD_VERSION_AT] != RECORD_VERSION ||
+        get_u32(bytes + RECORD_CHECK_AT) != hash_update(HASH_START, bytes, RECORD_CHECK_AT)) {
+        return false;
+    }
+    record->unix_time = get_u32(bytes + RECORD_TIME_AT);
+    record->offset_minutes = get_i16(bytes + RECORD_OFFSET_AT);
+    return decode_rule(bytes, record) && record->unix_time >= earliest_unix_time() &&
+           record->unix_time < latest_unix_time() &&
+           record->offset_minutes >= WALL_CLOCK_ZONE_FIRST_MINUTES &&
+           record->offset_minutes <= WALL_CLOCK_ZONE_LAST_MINUTES;
 }
 
-static bool read_record(uint32_t *unix_time, int32_t *offset_minutes)
+static bool read_record(ClockRecord *record)
 {
     HalFile file;
     uint8_t bytes[CLOCK_RECORD_BYTES];
@@ -69,7 +112,39 @@ static bool read_record(uint32_t *unix_time, int32_t *offset_minutes)
     }
     bool read = file.size >= CLOCK_RECORD_BYTES && hal_file_read(file, 0, bytes, sizeof bytes);
     hal_file_close(&file);
-    return read && clock_store_record_decode(bytes, unix_time, offset_minutes);
+    return read && clock_store_record_decode(bytes, sizeof bytes, record);
+}
+
+static const DaylightRule *active_rule(const ClockStore *store)
+{
+    if (store->daylight == DAYLIGHT_CHOICE_COMPUTER) {
+        return store->has_computer_rule ? &store->computer_rule : NULL;
+    }
+    if (store->daylight == DAYLIGHT_CHOICE_OFF || store->daylight >= DAYLIGHT_CHOICE_COUNT) {
+        return NULL;
+    }
+    return daylight_region_rule((DaylightRegion)(store->daylight - DAYLIGHT_CHOICE_EUROPE));
+}
+
+static int32_t shift_of(const ClockStore *store, uint32_t standard_seconds)
+{
+    return daylight_shift_seconds(active_rule(store), standard_seconds,
+                                  wall_clock_zone_minutes(store->clock.zone));
+}
+
+static uint32_t shown_of(const ClockStore *store, uint32_t standard_seconds)
+{
+    return standard_seconds + (uint32_t)shift_of(store, standard_seconds);
+}
+
+static uint32_t standard_of(const ClockStore *store, uint32_t shown_seconds)
+{
+    const DaylightRule *rule = active_rule(store);
+    if (rule == NULL) {
+        return shown_seconds;
+    }
+    uint32_t summer = shown_seconds - (uint32_t)(rule->save_minutes * SECONDS_PER_MINUTE);
+    return shift_of(store, summer) != 0 ? summer : shown_seconds;
 }
 
 static void read_chip(ClockStore *store, uint32_t now_ms)
@@ -93,14 +168,16 @@ static void read_chip(ClockStore *store, uint32_t now_ms)
 void clock_store_start(ClockStore *store, const Settings *settings, uint32_t now_ms)
 {
     if (!store->started) {
-        int32_t offset_minutes;
+        ClockRecord record;
         store->started = true;
         store->clock.known = false;
-        if (!read_record(&store->seen_record, &offset_minutes)) {
-            store->seen_record = 0;
-        }
+        bool read = read_record(&record);
+        store->seen_record = read ? record.unix_time : 0;
+        store->has_computer_rule = read && record.has_rule;
+        store->computer_rule = record.rule;
     }
     store->clock.zone = settings->options[OPTION_TIME_ZONE];
+    store->daylight = settings->options[OPTION_DAYLIGHT];
     read_chip(store, now_ms);
 }
 
@@ -145,23 +222,57 @@ static bool adopt(ClockStore *store, Settings *settings, uint32_t local_seconds,
     return write_chip(store, local_seconds);
 }
 
+static void use_daylight(ClockStore *store, Settings *settings, uint8_t choice)
+{
+    settings->options[OPTION_DAYLIGHT] = choice;
+    store->daylight = choice;
+}
+
 bool clock_store_after_usb(ClockStore *store, Settings *settings, uint32_t now_ms)
 {
-    uint32_t unix_time;
-    int32_t offset_minutes;
-    if (!read_record(&unix_time, &offset_minutes) || unix_time == store->seen_record) {
+    ClockRecord record;
+    if (!read_record(&record) || record.unix_time == store->seen_record) {
         return false;
     }
-    store->seen_record = unix_time;
-    uint8_t zone = wall_clock_zone_of(offset_minutes);
-    adopt(store, settings, wall_clock_local_of_unix(unix_time, zone), zone, now_ms);
+    store->seen_record = record.unix_time;
+    store->has_computer_rule = record.has_rule;
+    store->computer_rule = record.rule;
+    use_daylight(store, settings, record.has_rule ? DAYLIGHT_CHOICE_COMPUTER : DAYLIGHT_CHOICE_OFF);
+    uint8_t zone = wall_clock_zone_of(record.offset_minutes);
+    adopt(store, settings, wall_clock_local_of_unix(record.unix_time, zone), zone, now_ms);
     return true;
 }
 
 bool clock_store_set(ClockStore *store, Settings *settings, const WallCivil *civil, uint8_t zone,
                      uint32_t now_ms)
 {
-    return adopt(store, settings, wall_clock_seconds_of(civil), zone, now_ms);
+    store->clock.zone = zone;
+    return adopt(store, settings, standard_of(store, wall_clock_seconds_of(civil)), zone, now_ms);
+}
+
+bool clock_store_set_daylight(ClockStore *store, Settings *settings, uint8_t choice,
+                              uint32_t now_ms)
+{
+    if (choice >= DAYLIGHT_CHOICE_COUNT) {
+        return false;
+    }
+    if (!store->clock.known) {
+        use_daylight(store, settings, choice);
+        return true;
+    }
+    uint32_t standard = wall_clock_local(&store->clock, now_ms);
+    uint32_t shown = shown_of(store, standard);
+    use_daylight(store, settings, choice);
+    uint32_t moved = standard_of(store, shown);
+    if (moved == standard) {
+        return true;
+    }
+    uint8_t zone = store->clock.zone;
+    if (zone != WALL_CLOCK_ZONE_UNSET) {
+        int32_t minutes = (int32_t)(moved - standard) / SECONDS_PER_MINUTE;
+        zone = wall_clock_zone_of(wall_clock_zone_minutes(zone) + minutes);
+    }
+    return adopt(store, settings, moved, zone, now_ms);
 }
 
 bool clock_store_now(const ClockStore *store, uint32_t now_ms, WallCivil *civil)
@@ -169,6 +280,6 @@ bool clock_store_now(const ClockStore *store, uint32_t now_ms, WallCivil *civil)
     if (!store->clock.known) {
         return false;
     }
-    wall_clock_civil_of(wall_clock_local(&store->clock, now_ms), civil);
+    wall_clock_civil_of(shown_of(store, wall_clock_local(&store->clock, now_ms)), civil);
     return true;
 }

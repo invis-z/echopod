@@ -30,6 +30,7 @@ rippl_add_unit_test(NAME test_hash SOURCES core/test_hash.c LIBRARIES rippl_core
 rippl_add_unit_test(NAME test_power_policy SOURCES core/test_power_policy.c LIBRARIES rippl_core)
 rippl_add_unit_test(NAME test_low_battery SOURCES core/test_low_battery.c LIBRARIES rippl_core)
 rippl_add_unit_test(NAME test_wall_clock SOURCES core/test_wall_clock.c LIBRARIES rippl_core)
+rippl_add_unit_test(NAME test_daylight SOURCES core/test_daylight.c LIBRARIES rippl_core)
 rippl_add_unit_test(NAME test_color SOURCES gfx/test_color.c LIBRARIES rippl_gfx)
 rippl_add_unit_test(NAME test_rect SOURCES gfx/test_rect.c LIBRARIES rippl_gfx)
 rippl_add_unit_test(NAME test_canvas SOURCES gfx/test_canvas.c LIBRARIES rippl_gfx)

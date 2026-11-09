@@ -82,8 +82,19 @@ typedef enum SettingOption {
     OPTION_STATUS_BAR,
     OPTION_POWER_ON,
     OPTION_DRE,
+    OPTION_DAYLIGHT,
     SETTINGS_OPTION_COUNT
 } SettingOption;
+
+typedef enum DaylightChoice {
+    DAYLIGHT_CHOICE_OFF,
+    DAYLIGHT_CHOICE_EUROPE,
+    DAYLIGHT_CHOICE_US_CANADA,
+    DAYLIGHT_CHOICE_AUSTRALIA,
+    DAYLIGHT_CHOICE_NEW_ZEALAND,
+    DAYLIGHT_CHOICE_COMPUTER,
+    DAYLIGHT_CHOICE_COUNT
+} DaylightChoice;
 
 typedef enum DreMode {
     DRE_OFF,
@@ -168,7 +179,7 @@ enum {
     SCREEN_TIMEOUT_OPTION_COUNT = 7,
     SLEEP_TIMER_OPTION_COUNT = 7,
     AUTO_OFF_OPTION_COUNT = 4,
-    SETTINGS_FILE_SIZE = 42
+    SETTINGS_FILE_SIZE = 43
 };
 
 typedef struct Settings {

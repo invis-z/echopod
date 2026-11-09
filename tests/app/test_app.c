@@ -63,7 +63,8 @@ enum {
     BUTTONS_POWER_ON_ROW = 3,
     SYSTEM_LANGUAGE_ROW = 0,
     SYSTEM_DATE_TIME_ROW = 1,
-    SYSTEM_USB_PROMPT_ROW = 4,
+    SYSTEM_DAYLIGHT_ROW = 2,
+    SYSTEM_USB_PROMPT_ROW = 5,
     DAC_VOLUME_WINDOW_MS = 3000,
     MUSIC_COVER_FLOW_INDEX = 0,
     MUSIC_PLAYLISTS_INDEX = 7,
@@ -923,6 +924,28 @@ static void the_last_setting_asks_whether_to_prompt_on_usb(void)
     CHECK_EQUAL(USB_PROMPT_OFF, settings.options[OPTION_USB_PROMPT]);
     restart_app();
     CHECK(!fake_hal_usb_prompt());
+}
+
+static void choosing_daylight_saving_keeps_the_time_shown(void)
+{
+    start_app_with_library();
+    fake_hal_set_time((HalTime){.present = true,
+                                .valid = true,
+                                .year = 2026,
+                                .month = 7,
+                                .day = 1,
+                                .hour = 14,
+                                .minute = 0});
+    restart_app();
+    open_setting(SETTINGS_SYSTEM, SYSTEM_DAYLIGHT_ROW);
+    CHECK(title_is("Daylight saving"));
+    move_down(1);
+    tap(KEY_PLAY);
+    CHECK(title_is("System"));
+    Settings settings;
+    CHECK(saved_settings(&settings));
+    CHECK_EQUAL(DAYLIGHT_CHOICE_EUROPE, settings.options[OPTION_DAYLIGHT]);
+    CHECK_EQUAL(13, fake_hal_time().hour);
 }
 
 static bool drew_the_bottom_of_a_portrait_screen(void)
@@ -2829,9 +2852,9 @@ static void a_clock_record_written_over_usb_sets_the_clock(void)
         record[8 + index] = (uint8_t)(unix_time >> (8 * index));
     }
     record[12] = 60;
-    uint32_t check = hash_update(HASH_START, record, 16);
+    uint32_t check = hash_update(HASH_START, record, 28);
     for (int index = 0; index < 4; index++) {
-        record[16 + index] = (uint8_t)(check >> (8 * index));
+        record[28 + index] = (uint8_t)(check >> (8 * index));
     }
     CHECK(hal_file_write(CLOCK_RECORD_PATH, record, sizeof record));
     step();
@@ -3033,6 +3056,7 @@ int main(void)
         TEST_CASE(a_dismissed_usb_choice_keeps_the_saved_one),
         TEST_CASE(the_usb_choice_lights_the_screen_and_keeps_the_audio_served),
         TEST_CASE(the_last_setting_asks_whether_to_prompt_on_usb),
+        TEST_CASE(choosing_daylight_saving_keeps_the_time_shown),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

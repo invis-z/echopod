@@ -44,6 +44,12 @@ static const char *const BALANCE_OPTIONS[SETTINGS_BALANCE_STEPS] = {
     "L12", "L11", "L10", "L9", "L8", "L7", "L6", "L5", "L4", "L3",  "L2",  "L1", "0",
     "R1",  "R2",  "R3",  "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12"};
 static const StringId DRE_OPTIONS[DRE_MODE_COUNT] = {STR_OFF, STR_ON, STR_SETTINGS_DRE_FIX};
+static const StringId DAYLIGHT_OPTIONS[DAYLIGHT_CHOICE_COUNT] = {STR_OFF,
+                                                                 STR_SETTINGS_DAYLIGHT_EUROPE,
+                                                                 STR_SETTINGS_DAYLIGHT_US_CANADA,
+                                                                 STR_SETTINGS_DAYLIGHT_AUSTRALIA,
+                                                                 STR_SETTINGS_DAYLIGHT_NEW_ZEALAND,
+                                                                 STR_SETTINGS_DAYLIGHT_COMPUTER};
 static const StringId OUTPUT_OPTIONS[OUTPUT_JACK_COUNT] = {STR_SETTINGS_AUTO, STR_SETTINGS_JACK_35,
                                                            STR_SETTINGS_JACK_44};
 static const StringId OUTPUT_MESSAGES[OUTPUT_JACK_COUNT] = {
@@ -249,6 +255,23 @@ static void choose_dre(void *context, int index)
     apply_and_save(context);
 }
 
+static int current_daylight(const void *context)
+{
+    return settings_of(context)->options[OPTION_DAYLIGHT];
+}
+
+static void choose_daylight(void *context, int index)
+{
+    SettingsContext *settings = context;
+    if (settings->date_time != NULL) {
+        clock_store_set_daylight(settings->date_time->config.clock, editable_settings(context),
+                                 (uint8_t)index, hal_clock_milliseconds());
+    } else {
+        editable_settings(context)->options[OPTION_DAYLIGHT] = (uint8_t)index;
+    }
+    save(settings);
+}
+
 static int current_output(const void *context)
 {
     return (int)settings_of(context)->output;
@@ -422,6 +445,8 @@ RIPPL_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     OPTION_CHOICE(STR_SETTINGS_STATUS_BAR, STATUS_BAR_OPTIONS, OPTION_STATUS_BAR),
     OPTION_CHOICE(STR_SETTINGS_POWER_ON, POWER_ON_OPTIONS, OPTION_POWER_ON),
     {STR_SETTINGS_DRE, DRE_OPTIONS, NULL, DRE_MODE_COUNT, current_dre, choose_dre, NULL, 0},
+    {STR_SETTINGS_DAYLIGHT, DAYLIGHT_OPTIONS, NULL, DAYLIGHT_CHOICE_COUNT, current_daylight,
+     choose_daylight, NULL, 0},
 };
 
 static ScreenAction open_choice(void *context)
@@ -505,6 +530,7 @@ enum {
     CHOICE_STATUS_BAR,
     CHOICE_POWER_ON,
     CHOICE_DRE,
+    CHOICE_DAYLIGHT,
     ROW_BLUETOOTH = SETTINGS_CHOICE_COUNT,
     ROW_EQUALIZER,
     ROW_DATE_TIME,
@@ -541,15 +567,15 @@ RIPPL_RESIDENT static const uint8_t ROWS[] = {
     CHOICE_ORIENTATION, CHOICE_ANIMATIONS,  CHOICE_BATTERY,   CHOICE_STATUS_BAR, CHOICE_CLOCK,
     ROW_FOLDERS,        ROW_RESCAN,         CHOICE_START,     CHOICE_COVERS,     CHOICE_COVER_ORDER,
     CHOICE_ARTIST_VIEW, CHOICE_FOLDER_VIEW, CHOICE_LYRICS,    CHOICE_ROCKER,     CHOICE_SWAP,
-    CHOICE_MENU_KEY,    CHOICE_POWER_ON,    CHOICE_LANGUAGE,  ROW_DATE_TIME,     CHOICE_AUTO_OFF,
-    CHOICE_USB_MODE,    CHOICE_USB_PROMPT};
+    CHOICE_MENU_KEY,    CHOICE_POWER_ON,    CHOICE_LANGUAGE,  ROW_DATE_TIME,     CHOICE_DAYLIGHT,
+    CHOICE_AUTO_OFF,    CHOICE_USB_MODE,    CHOICE_USB_PROMPT};
 
 RIPPL_RESIDENT static const SettingsGroupRows GROUPS[SETTINGS_GROUP_COUNT] = {
     {STR_SETTINGS_SOUND, 10, 5},
     {STR_SETTINGS_DISPLAY, 15, 10},
     {STR_SETTINGS_LIBRARY, 25, 8},
     {STR_SETTINGS_BUTTONS, 33, 4},
-    {STR_SETTINGS_SYSTEM, 37, 5}};
+    {STR_SETTINGS_SYSTEM, 37, 6}};
 
 static ScreenAction open_group(void *context);
 

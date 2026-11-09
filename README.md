@@ -31,7 +31,7 @@ The hardware knowledge it relies on comes largely from the [ReChord](https://git
 ```sh
 brew install cmake sdl2 clang-format
 brew install --cask gcc-arm-embedded
-python3 -m venv .venv && .venv/bin/pip install -r tools/requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r tools/requirements.txt -r tools/requirements-build.txt
 cmake --preset dev
 cmake --build --preset dev
 ctest --preset dev

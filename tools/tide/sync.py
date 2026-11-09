@@ -14,7 +14,7 @@ from pathlib import Path
 import cover_export
 import library_index
 from tide import covers as tide_covers
-from tide import records, rippl_format, store
+from tide import daylight, records, rippl_format, store
 
 RIPPL_FOLDER = ".rippl"
 MEBIBYTE = 1024 * 1024
@@ -25,8 +25,9 @@ SCAN_PRINT_BYTES = 16
 CLOCK_NAME = "clock.bin"
 CLOCK_MAGIC = b"ECLK"
 CLOCK_VERSION = 1
-CLOCK_RECORD = struct.Struct("<4sBBHIhHI")
-CLOCK_CHECKED_BYTES = 16
+CLOCK_HAS_RULE = 1
+CLOCK_RECORD = struct.Struct("<4sBBHIhh3BxhBBBxhI")
+CLOCK_CHECKED_BYTES = 28
 CLOCK_FIRST_YEAR = 2024
 CLOCK_LAST_YEAR = 2099
 WORD_MASK = 0xFFFFFFFF
@@ -265,44 +266,61 @@ def stored_fingerprint(data):
     return Fingerprint(True, first, second, entries) if magic == SCAN_MAGIC else None
 
 
-def clock_record(utc_seconds, offset_minutes):
-    body = CLOCK_RECORD.pack(CLOCK_MAGIC, CLOCK_VERSION, 0, 0, int(utc_seconds),
-                             int(offset_minutes), 0, 0)[:CLOCK_CHECKED_BYTES]
+def edge_fields(edge):
+    return edge.month, edge.week, edge.weekday, edge.minutes
+
+
+def clock_record(utc_seconds, standard_minutes, rule=None):
+    flags = CLOCK_HAS_RULE if rule is not None else 0
+    save = rule.save_minutes if rule is not None else 0
+    start = edge_fields(rule.start) if rule is not None else (0, 0, 0, 0)
+    end = edge_fields(rule.end) if rule is not None else (0, 0, 0, 0)
+    body = CLOCK_RECORD.pack(CLOCK_MAGIC, CLOCK_VERSION, flags, 0, int(utc_seconds),
+                             int(standard_minutes), save, *start, *end, 0)[:CLOCK_CHECKED_BYTES]
     return body + struct.pack("<I", cover_export.fnv1a(body, cover_export.FNV_OFFSET))
 
 
 def stored_clock(data):
     if len(data) < CLOCK_RECORD.size:
         return None
-    magic, version, _, _, utc_seconds, offset_minutes, _, check = CLOCK_RECORD.unpack_from(data)
+    fields = CLOCK_RECORD.unpack_from(data)
+    magic, version, flags, _, utc_seconds, standard_minutes, save = fields[:7]
     body = bytes(data[:CLOCK_CHECKED_BYTES])
     if (magic, version) != (CLOCK_MAGIC, CLOCK_VERSION):
         return None
-    if check != cover_export.fnv1a(body, cover_export.FNV_OFFSET):
+    if fields[-1] != cover_export.fnv1a(body, cover_export.FNV_OFFSET):
         return None
-    return utc_seconds, offset_minutes
+    rule = None
+    if flags & CLOCK_HAS_RULE:
+        rule = daylight.Rule(save, daylight.Edge(*fields[7:11]), daylight.Edge(*fields[11:15]))
+    return utc_seconds, standard_minutes, rule
 
 
-def clock_text(utc_seconds, offset_minutes):
+def clock_text(utc_seconds, offset_minutes, rule=None):
     local = UNIX_EPOCH + timedelta(seconds=utc_seconds + offset_minutes * 60)
     sign = "-" if offset_minutes < 0 else "+"
     hours, minutes = divmod(abs(offset_minutes), 60)
-    return f"{local:%Y-%m-%d %H:%M} UTC{sign}{hours:02d}:{minutes:02d}"
+    text = f"{local:%Y-%m-%d %H:%M} UTC{sign}{hours:02d}:{minutes:02d}"
+    return text + (", with daylight saving" if rule is not None else "")
 
 
-def write_clock(rippl, options, now=None, offset_minutes=None):
+def write_clock(rippl, options, now=None, offset_at=daylight.local_offset_minutes):
     utc_seconds = int(time.time()) if now is None else int(now)
-    offset_minutes = current_offset() // 60 if offset_minutes is None else offset_minutes
+    offset_minutes = offset_at(utc_seconds)
     local_year = (UNIX_EPOCH + timedelta(seconds=utc_seconds + offset_minutes * 60)).year
     if not CLOCK_FIRST_YEAR <= local_year <= CLOCK_LAST_YEAR:
         print(f"  {CLOCK_NAME:<11} not written: this computer's clock says {local_year}")
         return False
-    text = clock_text(utc_seconds, offset_minutes)
+    try:
+        standard_minutes, rule = daylight.computer_zone(utc_seconds, offset_at)
+    except (OSError, OverflowError, ValueError):
+        standard_minutes, rule = offset_minutes, None
+    text = clock_text(utc_seconds, offset_minutes, rule)
     if options.dry_run:
         print(f"  would write {CLOCK_NAME}: {text}")
         return False
     try:
-        (rippl / CLOCK_NAME).write_bytes(clock_record(utc_seconds, offset_minutes))
+        (rippl / CLOCK_NAME).write_bytes(clock_record(utc_seconds, standard_minutes, rule))
     except OSError as error:
         raise SyncError(f"couldn't write {rippl / CLOCK_NAME}: {error.strerror or error}") from error
     print(f"  {CLOCK_NAME:<11} {text}")

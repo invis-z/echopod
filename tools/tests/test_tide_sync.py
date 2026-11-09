@@ -9,12 +9,15 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
+import zoneinfo
+from zoneinfo import ZoneInfo
 
 TOOLS_DIRECTORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS_DIRECTORY))
 
 import cover_export
 from tide import rippl_format, store as tide_store
+from tide import daylight
 from tide import sync as tide_sync
 import library_index
 from test_cover_export import image_bytes
@@ -439,44 +442,95 @@ class ScanRecordTest(unittest.TestCase):
         self.assertEqual(bytes(16), tide_sync.stored_version(b""))
 
 
+zoneinfo.reset_tzpath(to=[])
+
+
+def zone_offsets(name):
+    zone = ZoneInfo(name)
+
+    def offset_at(utc_seconds):
+        moment = datetime.fromtimestamp(utc_seconds, timezone.utc).astimezone(zone)
+        return int(moment.utcoffset().total_seconds()) // 60
+    return offset_at
+
+
 class ClockRecordTest(unittest.TestCase):
-    def test_the_record_holds_the_time_the_offset_and_a_checksum(self):
+    BERLIN = daylight.Rule(60, daylight.Edge(3, 5, 0, 120), daylight.Edge(10, 5, 0, 120))
+
+    def test_the_record_holds_the_time_the_standard_offset_the_rule_and_a_checksum(self):
+        record = tide_sync.clock_record(1_782_907_200, 60, self.BERLIN)
+        self.assertEqual(32, len(record))
+        self.assertEqual(b"ECLK\x01\x01\x00\x00", record[:8])
+        self.assertEqual(struct.pack("<Ihh", 1_782_907_200, 60, 60), record[8:16])
+        self.assertEqual(bytes([3, 5, 0, 0]) + struct.pack("<h", 120), record[16:22])
+        self.assertEqual(bytes([10, 5, 0, 0]) + struct.pack("<h", 120), record[22:28])
+        self.assertEqual(cover_export.fnv1a(record[:28]), struct.unpack("<I", record[28:])[0])
+        self.assertEqual((1_782_907_200, 60, self.BERLIN), tide_sync.stored_clock(record))
+
+    def test_a_zone_without_daylight_saving_has_no_rule(self):
         record = tide_sync.clock_record(1_793_880_000, -300)
-        self.assertEqual(20, len(record))
-        self.assertEqual(b"ECLK\x01\x00\x00\x00", record[:8])
-        self.assertEqual(struct.pack("<Ih", 1_793_880_000, -300), record[8:14])
-        self.assertEqual(cover_export.fnv1a(record[:16]), struct.unpack("<I", record[16:])[0])
-        self.assertEqual((1_793_880_000, -300), tide_sync.stored_clock(record))
+        self.assertEqual(b"ECLK\x01\x00", record[:6])
+        self.assertEqual(bytes(14), record[14:28])
+        self.assertEqual((1_793_880_000, -300, None), tide_sync.stored_clock(record))
 
     def test_a_damaged_or_foreign_record_reads_as_none(self):
         record = bytearray(tide_sync.clock_record(1_793_880_000, 60))
         record[9] ^= 1
         self.assertIsNone(tide_sync.stored_clock(bytes(record)))
-        self.assertIsNone(tide_sync.stored_clock(b"MESC" + bytes(16)))
+        self.assertIsNone(tide_sync.stored_clock(b"MESC" + bytes(28)))
         self.assertIsNone(tide_sync.stored_clock(b""))
 
     def test_the_record_is_described_in_local_time(self):
         self.assertEqual("2026-11-05 07:00 UTC-05:00", tide_sync.clock_text(1_793_880_000, -300))
         self.assertEqual("2026-11-05 17:30 UTC+05:30", tide_sync.clock_text(1_793_880_000, 330))
+        self.assertEqual("2026-07-01 14:00 UTC+02:00, with daylight saving",
+                         tide_sync.clock_text(1_782_907_200, 120, self.BERLIN))
 
     def test_write_clock_writes_the_record_unless_dry_or_out_of_range(self):
+        def plus_one(_):
+            return 60
         with tempfile.TemporaryDirectory() as directory:
             rippl = Path(directory)
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 dry = tide_sync.write_clock(rippl, tide_sync.SyncOptions(dry_run=True),
-                                            now=1_793_880_000, offset_minutes=60)
+                                            now=1_793_880_000, offset_at=plus_one)
                 self.assertFalse(dry)
                 self.assertFalse((rippl / "clock.bin").exists())
                 self.assertFalse(tide_sync.write_clock(rippl, tide_sync.SyncOptions(),
-                                                       now=1_000_000_000, offset_minutes=0))
+                                                       now=1_000_000_000, offset_at=plus_one))
                 self.assertFalse((rippl / "clock.bin").exists())
                 self.assertTrue(tide_sync.write_clock(rippl, tide_sync.SyncOptions(),
-                                                      now=1_793_880_000, offset_minutes=60))
-            self.assertEqual((1_793_880_000, 60),
+                                                      now=1_793_880_000, offset_at=plus_one))
+            self.assertEqual((1_793_880_000, 60, None),
                              tide_sync.stored_clock((rippl / "clock.bin").read_bytes()))
         self.assertIn("would write clock.bin: 2026-11-05 13:00 UTC+01:00", output.getvalue())
         self.assertIn("clock.bin   2026-11-05 13:00 UTC+01:00", output.getvalue())
+
+    def test_a_computer_that_cant_look_ahead_still_writes_its_offset(self):
+        def offset_at(utc_seconds):
+            if utc_seconds > 1_793_880_000:
+                raise OverflowError("timestamp out of range")
+            return 120
+        with tempfile.TemporaryDirectory() as directory:
+            rippl = Path(directory)
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertTrue(tide_sync.write_clock(rippl, tide_sync.SyncOptions(),
+                                                      now=1_793_880_000, offset_at=offset_at))
+            self.assertEqual((1_793_880_000, 120, None),
+                             tide_sync.stored_clock((rippl / "clock.bin").read_bytes()))
+
+    def test_a_summer_sync_writes_standard_time_and_the_rule(self):
+        berlin = zone_offsets("Europe/Berlin")
+        with tempfile.TemporaryDirectory() as directory:
+            rippl = Path(directory)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertTrue(tide_sync.write_clock(rippl, tide_sync.SyncOptions(),
+                                                      now=1_782_907_200, offset_at=berlin))
+            self.assertEqual((1_782_907_200, 60, self.BERLIN),
+                             tide_sync.stored_clock((rippl / "clock.bin").read_bytes()))
+        self.assertIn("2026-07-01 14:00 UTC+02:00, with daylight saving", output.getvalue())
 
     def test_the_clock_is_written_unless_no_clock_is_given(self):
         self.assertTrue(tide_sync.options_from(tide_sync.parse_arguments([])).clock)
