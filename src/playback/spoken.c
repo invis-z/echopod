@@ -6,7 +6,7 @@
 
 enum {
     NAME_CAPACITY = 64,
-    PATH_CAPACITY = 520,
+    PATH_CAPACITY = 1024,
     ROOT_FOLDER = 0
 };
 

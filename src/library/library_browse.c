@@ -7,7 +7,7 @@
 #include "core/volume_path.h"
 
 enum {
-    PATH_CAPACITY = 256,
+    PATH_CAPACITY = 1024,
     ROOT_FOLDER = 0
 };
 

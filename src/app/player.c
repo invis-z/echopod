@@ -26,18 +26,20 @@ static void save_later(Player *player)
 static bool track_path(const Player *player, uint32_t track, char *buffer, size_t capacity)
 {
     LibraryTrack record;
-    char relative[PLAYER_PATH_CAPACITY];
+    buffer[0] = '/';
     if (!library_read_track(player->library, track, &record) ||
-        !library_read_string(player->library, record.path, relative, sizeof relative)) {
+        !library_read_string(player->library, record.path, buffer + 1, capacity - 1)) {
         return false;
     }
-    StringBuilder builder = string_builder_make(buffer, capacity);
-    string_builder_append_char(&builder, '/');
-    string_builder_append(&builder, relative);
-    if (builder.overflowed) {
-        error_log_add("path too long", buffer);
+    size_t length = 1;
+    while (buffer[length] != '\0') {
+        length++;
     }
-    return !builder.overflowed;
+    if (length + 1 == capacity) {
+        error_log_add("path too long", buffer);
+        return false;
+    }
+    return true;
 }
 
 static uint32_t new_token(Player *player)
