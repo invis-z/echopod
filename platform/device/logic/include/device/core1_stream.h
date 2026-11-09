@@ -91,6 +91,7 @@ typedef struct Core1Block {
     uint32_t samples;
     uint32_t position;
     uint32_t stride;
+    uint8_t join;
 } Core1Block;
 
 typedef struct Core1Decoder {

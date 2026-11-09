@@ -456,6 +456,68 @@ static void a_corrupt_32_bit_subframe_wraps_instead_of_overflowing(void)
     free(flac.bytes);
 }
 
+static int32_t joined_first[FLAC_MAX_BLOCK];
+static int32_t joined_second[FLAC_MAX_BLOCK];
+
+static bool deferred_join_matches(Buffer flac, Buffer pcm, int channels)
+{
+    bool ok = flac.size > 0 && pcm.size > 0 && flac_open(&decoder, input_of(&flac)) == FLAC_OK;
+    flac_set_buffers(&decoder, first_bank, second_bank, FLAC_MAX_BLOCK);
+    flac_defer_join(&decoder, true);
+    uint32_t frame = 0;
+    uint32_t joined = 0;
+    FlacResult result = FLAC_OK;
+    while (ok && (result = flac_decode_frame(&decoder)) == FLAC_OK) {
+        joined += decoder.join != FLAC_JOIN_NONE;
+        const int32_t *first = flac_channel(&decoder, 0);
+        const int32_t *second = flac_channel(&decoder, channels > 1 ? 1 : 0);
+        flac_join((FlacJoin)decoder.join, first, second, joined_first, joined_second,
+                  decoder.block_samples);
+        for (uint32_t sample = 0; ok && sample < decoder.block_samples; sample++) {
+            int32_t pair[2];
+            flac_join_pair((FlacJoin)decoder.join, first[sample], second[sample], &pair[0],
+                           &pair[1]);
+            for (int channel = 0; ok && channel < channels; channel++) {
+                uint32_t index = (frame + sample) * (uint32_t)channels + (uint32_t)channel;
+                int32_t expected = expected_at(&pcm, index);
+                int32_t whole = channel == 0 ? joined_first[sample] : joined_second[sample];
+                ok = 4 * index < pcm.size && whole == expected && pair[channel] == expected;
+            }
+        }
+        frame += decoder.block_samples;
+    }
+    flac_defer_join(&decoder, false);
+    return ok && result == FLAC_END && (channels == 1 || joined > 0);
+}
+
+static void a_deferred_join_gives_the_same_samples_out_of_place(void)
+{
+    static const char *const STEREO[] = {"lpc_16_44k_stereo", "lpc_24_96k_stereo", "odd_blocks_16",
+                                         "stereo_32_side_right", "constant_and_noise"};
+    for (size_t index = 0; index < sizeof STEREO / sizeof STEREO[0]; index++) {
+        Buffer flac = load(STEREO[index], "flac");
+        Buffer pcm = load(STEREO[index], "pcm");
+        CHECK(deferred_join_matches(flac, pcm, 2));
+        free(flac.bytes);
+        free(pcm.bytes);
+    }
+    FlacWriterOutput made = flac_writer_make((FlacWriterSpec){48000, 2, 24, 4096, 9000, 7});
+    Buffer flac = {made.bytes, made.size};
+    Buffer pcm = {(uint8_t *)made.samples, made.sample_bytes};
+    CHECK(deferred_join_matches(flac, pcm, 2));
+    flac_writer_free(&made);
+}
+
+static void the_decoder_joins_in_place_unless_asked_to_defer(void)
+{
+    Buffer flac = load("lpc_16_44k_stereo", "flac");
+    CHECK(flac_open(&decoder, input_of(&flac)) == FLAC_OK);
+    flac_set_buffers(&decoder, first_bank, second_bank, FLAC_MAX_BLOCK);
+    CHECK(flac_decode_frame(&decoder) == FLAC_OK);
+    CHECK_EQUAL(FLAC_JOIN_NONE, decoder.join);
+    free(flac.bytes);
+}
+
 int main(void)
 {
     flac_set_buffers(&decoder, first_bank, second_bank, FLAC_MAX_BLOCK);
@@ -491,6 +553,8 @@ int main(void)
         TEST_CASE(a_header_that_is_not_flac_is_refused),
         TEST_CASE(decoding_can_start_from_audio_bytes_alone),
         TEST_CASE(the_position_moves_from_the_audio_start_to_the_next_frame),
+        TEST_CASE(a_deferred_join_gives_the_same_samples_out_of_place),
+        TEST_CASE(the_decoder_joins_in_place_unless_asked_to_defer),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

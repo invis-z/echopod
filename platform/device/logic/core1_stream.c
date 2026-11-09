@@ -74,12 +74,14 @@ static Core1DecodeResult decode_flac(void *context, Core1Block *block)
     block->first_sample = decoder->frame_first_sample;
     block->samples = decoder->block_samples;
     block->position = flac_position(decoder);
+    block->join = decoder->join;
     return CORE1_DECODED;
 }
 
 Core1Decoder core1_flac_decoder(Core1Flac *flac, FlacDecoder *decoder, Core1FlacBanks banks)
 {
     *flac = (Core1Flac){.decoder = decoder, .banks = banks, .starved = NULL};
+    flac_defer_join(decoder, true);
     return (Core1Decoder){start_flac, decode_flac, flac};
 }
 
@@ -284,6 +286,12 @@ static void copy_channels(Core1Stream *stream, uint32_t slot, uint32_t samples)
     const Core1Block *block = &stream->pending;
     uint32_t stride = block->stride > 0 ? block->stride : 1;
     uint32_t first = stream->emitted * stride;
+    if (stream->channels == FLAC_MAX_CHANNELS && stride == 1 && block->narrow[0] == NULL &&
+        block->narrow[1] == NULL) {
+        flac_join((FlacJoin)block->join, block->channels[0] + first, block->channels[1] + first,
+                  stream_row(stream, slot, 0), stream_row(stream, slot, 1), samples);
+        return;
+    }
     for (uint32_t channel = 0; channel < stream->channels; channel++) {
         const int32_t *from = block->channels[channel];
         const int16_t *narrow = block->narrow[channel];
@@ -324,14 +332,18 @@ static uint32_t upsample(Core1Stream *stream, uint32_t slot, uint32_t count, boo
     uint32_t produced = 0;
     for (uint32_t index = 0; index < count; index++) {
         uint32_t at = (stream->emitted + index) * stride;
-        for (uint32_t channel = 0; channel < stream->channels; channel++) {
-            int32_t sample = 0;
-            if (!silence) {
+        int32_t values[FLAC_MAX_CHANNELS] = {0, 0};
+        if (!silence) {
+            for (uint32_t channel = 0; channel < stream->channels; channel++) {
                 const int16_t *narrow = block->narrow[channel];
-                int32_t value = narrow != NULL ? narrow[at] : block->channels[channel][at];
-                sample = value * (int32_t)(1u << widen);
+                values[channel] = narrow != NULL ? narrow[at] : block->channels[channel][at];
             }
-            upsampler_put(&stream->upsampler, channel, sample);
+            if (block->join != FLAC_JOIN_NONE) {
+                flac_join_pair((FlacJoin)block->join, values[0], values[1], &values[0], &values[1]);
+            }
+        }
+        for (uint32_t channel = 0; channel < stream->channels; channel++) {
+            upsampler_put(&stream->upsampler, channel, values[channel] * (int32_t)(1u << widen));
         }
         int32_t *right = stream->channels > 1 ? stream_row(stream, slot, 1) + produced : NULL;
         produced +=

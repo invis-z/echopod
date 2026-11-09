@@ -11,6 +11,13 @@ enum {
     FLAC_BUFFER_BYTES = 4096
 };
 
+typedef enum FlacJoin {
+    FLAC_JOIN_NONE,
+    FLAC_JOIN_LEFT_SIDE,
+    FLAC_JOIN_SIDE_RIGHT,
+    FLAC_JOIN_MID_SIDE
+} FlacJoin;
+
 typedef enum FlacResult {
     FLAC_OK,
     FLAC_END,
@@ -44,6 +51,7 @@ typedef struct FlacBits {
     uint32_t bits;
     uint16_t crc16;
     uint8_t crc8;
+    bool crc8_done;
     bool failed;
 } FlacBits;
 
@@ -71,6 +79,8 @@ typedef struct FlacDecoder {
     FlacLpcHook lpc_hook;
     int32_t *samples[FLAC_MAX_CHANNELS];
     uint32_t capacity;
+    bool defer_join;
+    uint8_t join;
 } FlacDecoder;
 
 typedef struct FlacBlockBuffer {
@@ -89,3 +99,7 @@ const int32_t *flac_channel(const FlacDecoder *decoder, int channel);
 void flac_set_lpc_hook(FlacDecoder *decoder, FlacLpcHook hook);
 void flac_set_buffers(FlacDecoder *decoder, int32_t *first, int32_t *second, uint32_t capacity);
 void flac_use_block_buffer(FlacDecoder *decoder, FlacBlockBuffer *buffer);
+void flac_defer_join(FlacDecoder *decoder, bool defer);
+void flac_join(FlacJoin join, const int32_t *first, const int32_t *second, int32_t *left,
+               int32_t *right, uint32_t count);
+void flac_join_pair(FlacJoin join, int32_t first, int32_t second, int32_t *left, int32_t *right);

@@ -18,7 +18,7 @@ set(RIPPL_CODEC_SOURCES
 add_library(rippl_codec STATIC ${RIPPL_CODEC_SOURCES})
 if(CMAKE_CROSSCOMPILING)
     set_source_files_properties(mp4.c ogg.c PROPERTIES COMPILE_OPTIONS -Os)
-    target_compile_definitions(rippl_codec PRIVATE RIPPL_RESIDENT_TABLES)
+    target_compile_definitions(rippl_codec PRIVATE RIPPL_RESIDENT_TABLES RIPPL_FLAC_SMALL_CRC)
 endif()
 target_include_directories(rippl_codec PUBLIC include)
 target_link_libraries(rippl_codec

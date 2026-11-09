@@ -358,17 +358,52 @@ static void restore_fixed_wide(int32_t *samples, uint32_t block_size, uint32_t o
 
 static int64_t floor_shift(int64_t sum, uint32_t shift)
 {
-    return sum >= 0 ? sum >> shift : -((-sum - 1) >> shift) - 1;
+    uint64_t bias = UINT64_C(1) << 63;
+    return (int64_t)((((uint64_t)sum ^ bias) >> shift) - (bias >> shift));
+}
+
+static int64_t lpc_sum(const int32_t *reversed, const int32_t *history, uint32_t order)
+{
+    int64_t sum = 0;
+    uint32_t tap = 0;
+    for (; tap + 4 <= order; tap += 4) {
+        sum += (int64_t)reversed[tap] * history[tap];
+        sum += (int64_t)reversed[tap + 1] * history[tap + 1];
+        sum += (int64_t)reversed[tap + 2] * history[tap + 2];
+        sum += (int64_t)reversed[tap + 3] * history[tap + 3];
+    }
+    for (; tap < order; tap++) {
+        sum += (int64_t)reversed[tap] * history[tap];
+    }
+    return sum;
 }
 
 static void restore_lpc(int32_t *samples, uint32_t block_size, const int32_t *coefficients,
                         uint32_t order, uint32_t shift)
 {
-    for (uint32_t index = order; index < block_size; index++) {
-        int64_t sum = 0;
-        for (uint32_t tap = 0; tap < order; tap++) {
-            sum += (int64_t)coefficients[tap] * samples[index - 1 - tap];
+    if (order == 1) {
+        int64_t first = coefficients[0];
+        for (uint32_t index = 1; index < block_size; index++) {
+            int64_t sum = first * samples[index - 1];
+            samples[index] = wrapped(samples[index] + floor_shift(sum, shift));
         }
+        return;
+    }
+    if (order == 2) {
+        int64_t first = coefficients[0];
+        int64_t second = coefficients[1];
+        for (uint32_t index = 2; index < block_size; index++) {
+            int64_t sum = first * samples[index - 1] + second * samples[index - 2];
+            samples[index] = wrapped(samples[index] + floor_shift(sum, shift));
+        }
+        return;
+    }
+    int32_t reversed[MAX_LPC_ORDER];
+    for (uint32_t tap = 0; tap < order; tap++) {
+        reversed[tap] = coefficients[order - 1 - tap];
+    }
+    for (uint32_t index = order; index < block_size; index++) {
+        int64_t sum = lpc_sum(reversed, &samples[index - order], order);
         samples[index] = wrapped(samples[index] + floor_shift(sum, shift));
     }
 }
@@ -593,9 +628,9 @@ static uint32_t channel_width(const FrameHeader *header, int channel)
     return header->bits_per_sample + (side ? 1u : 0u);
 }
 
-static int32_t floor_half(int32_t value)
+static int32_t floor_half(uint32_t value)
 {
-    return value >= 0 ? value / 2 : -((-value - 1) / 2) - 1;
+    return (int32_t)((value ^ 0x80000000u) >> 1) - 0x40000000;
 }
 
 static bool side_joined(const FrameHeader *header)
@@ -605,32 +640,77 @@ static bool side_joined(const FrameHeader *header)
             header->channel_assignment == CHANNEL_MID_SIDE);
 }
 
+static FlacJoin join_of(const FrameHeader *header)
+{
+    if (header->channels != 2 || side_joined(header)) {
+        return FLAC_JOIN_NONE;
+    }
+    switch (header->channel_assignment) {
+    case CHANNEL_LEFT_SIDE:
+        return FLAC_JOIN_LEFT_SIDE;
+    case CHANNEL_SIDE_RIGHT:
+        return FLAC_JOIN_SIDE_RIGHT;
+    case CHANNEL_MID_SIDE:
+        return FLAC_JOIN_MID_SIDE;
+    default:
+        return FLAC_JOIN_NONE;
+    }
+}
+
+void flac_join(FlacJoin join, const int32_t *first, const int32_t *second, int32_t *left,
+               int32_t *right, uint32_t count)
+{
+    switch (join) {
+    case FLAC_JOIN_LEFT_SIDE:
+        for (uint32_t index = 0; index < count; index++) {
+            int32_t value = first[index];
+            right[index] = (int32_t)((uint32_t)value - (uint32_t)second[index]);
+            left[index] = value;
+        }
+        break;
+    case FLAC_JOIN_SIDE_RIGHT:
+        for (uint32_t index = 0; index < count; index++) {
+            int32_t value = second[index];
+            left[index] = (int32_t)((uint32_t)first[index] + (uint32_t)value);
+            right[index] = value;
+        }
+        break;
+    case FLAC_JOIN_MID_SIDE:
+        for (uint32_t index = 0; index < count; index++) {
+            uint32_t side = (uint32_t)second[index];
+            uint32_t mid = (uint32_t)first[index] << 1 | (side & 1u);
+            left[index] = floor_half(mid + side);
+            right[index] = floor_half(mid - side);
+        }
+        break;
+    default:
+        for (uint32_t index = 0; index < count; index++) {
+            int32_t value = second[index];
+            left[index] = first[index];
+            right[index] = value;
+        }
+        break;
+    }
+}
+
+void flac_join_pair(FlacJoin join, int32_t first, int32_t second, int32_t *left, int32_t *right)
+{
+    flac_join(join, &first, &second, left, right, 1);
+}
+
 static void decorrelate(FlacDecoder *decoder, const FrameHeader *header)
 {
-    int32_t *first = decoder->samples[0];
-    int32_t *second = decoder->samples[1];
-    if (side_joined(header)) {
+    FlacJoin join = join_of(header);
+    decoder->join = FLAC_JOIN_NONE;
+    if (join == FLAC_JOIN_NONE) {
         return;
     }
-    for (uint32_t index = 0; index < header->block_size; index++) {
-        switch (header->channel_assignment) {
-        case CHANNEL_LEFT_SIDE:
-            second[index] = wrapped((int64_t)first[index] - second[index]);
-            break;
-        case CHANNEL_SIDE_RIGHT:
-            first[index] = wrapped((int64_t)first[index] + second[index]);
-            break;
-        case CHANNEL_MID_SIDE: {
-            int32_t side = second[index];
-            int32_t mid = (int32_t)((uint32_t)first[index] << 1) | (side & 1);
-            first[index] = floor_half(mid + side);
-            second[index] = floor_half(mid - side);
-            break;
-        }
-        default:
-            break;
-        }
+    if (decoder->defer_join) {
+        decoder->join = (uint8_t)join;
+        return;
     }
+    flac_join(join, decoder->samples[0], decoder->samples[1], decoder->samples[0],
+              decoder->samples[1], header->block_size);
 }
 
 static bool frame_crc_matches(FlacDecoder *decoder)
@@ -782,6 +862,11 @@ void flac_set_buffers(FlacDecoder *decoder, int32_t *first, int32_t *second, uin
     decoder->samples[0] = first;
     decoder->samples[1] = second;
     decoder->capacity = capacity;
+}
+
+void flac_defer_join(FlacDecoder *decoder, bool defer)
+{
+    decoder->defer_join = defer;
 }
 
 void flac_use_block_buffer(FlacDecoder *decoder, FlacBlockBuffer *buffer)
