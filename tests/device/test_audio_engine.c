@@ -542,16 +542,16 @@ static void a_32_khz_track_plays_at_its_own_rate(void)
     CHECK_EQUAL(32000u, audio_engine_rate(&engine));
 }
 
-static void rates_up_to_192_khz_play_and_higher_ones_are_refused(void)
+static void rates_up_to_384_khz_play_and_higher_ones_are_refused(void)
 {
     CHECK(scripted_rate_plays(192000));
     CHECK_EQUAL(192000u, audio_engine_rate(&engine));
     CHECK(scripted_rate_plays(176400));
     CHECK_EQUAL(176400u, audio_engine_rate(&engine));
     CHECK(scripted_rate_plays(96000));
-    CHECK(!scripted_rate_plays(384000));
+    CHECK(!scripted_rate_plays(768000));
     CHECK_EQUAL(AUDIO_REFUSAL_RATE, audio_engine_refusal(&engine).problem);
-    CHECK_EQUAL(384000u, audio_engine_refusal(&engine).sample_rate);
+    CHECK_EQUAL(768000u, audio_engine_refusal(&engine).sample_rate);
 }
 
 static bool scripted_depth_plays(AudioCodec codec, uint32_t rate, uint8_t bits)
@@ -575,6 +575,25 @@ static void compressed_samples_wider_than_24_bits_are_refused_above_96_khz(void)
     CHECK_EQUAL(AUDIO_REFUSAL_DEPTH, refusal.problem);
     CHECK_EQUAL(192000u, refusal.sample_rate);
     CHECK_EQUAL(32u, refusal.bits);
+}
+
+static void wav_plays_at_352_8_and_384_khz(void)
+{
+    CHECK(scripted_depth_plays(AUDIO_CODEC_WAV, 352800, 32));
+    CHECK_EQUAL(352800u, audio_engine_rate(&engine));
+    CHECK(scripted_depth_plays(AUDIO_CODEC_WAV, 384000, 32));
+    CHECK_EQUAL(384000u, audio_engine_rate(&engine));
+    CHECK(scripted_depth_plays(AUDIO_CODEC_WAV, 384000, 24));
+}
+
+static void flac_and_alac_stop_at_192_khz(void)
+{
+    CHECK(scripted_depth_plays(AUDIO_CODEC_FLAC, 192000, 24));
+    CHECK(!scripted_depth_plays(AUDIO_CODEC_FLAC, 352800, 24));
+    CHECK_EQUAL(AUDIO_REFUSAL_RATE, audio_engine_refusal(&engine).problem);
+    CHECK_EQUAL(352800u, audio_engine_refusal(&engine).sample_rate);
+    CHECK_EQUAL(0u, audio_engine_refusal(&engine).bits);
+    CHECK(!scripted_depth_plays(AUDIO_CODEC_ALAC, 384000, 16));
 }
 
 static void a_missing_file_is_refused(void)
@@ -725,9 +744,11 @@ int main(void)
         TEST_CASE(a_low_rate_no_source_raises_is_refused),
         TEST_CASE(a_32_khz_track_plays_at_its_own_rate),
         TEST_CASE(an_unsupported_rate_is_refused),
-        TEST_CASE(rates_up_to_192_khz_play_and_higher_ones_are_refused),
+        TEST_CASE(rates_up_to_384_khz_play_and_higher_ones_are_refused),
         TEST_CASE(a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate),
         TEST_CASE(compressed_samples_wider_than_24_bits_are_refused_above_96_khz),
+        TEST_CASE(wav_plays_at_352_8_and_384_khz),
+        TEST_CASE(flac_and_alac_stop_at_192_khz),
         TEST_CASE(a_missing_file_is_refused),
         TEST_CASE(the_ring_never_runs_ahead_of_the_dma_by_more_than_its_size),
     };
