@@ -41,6 +41,7 @@ The first Rippl release, forked from EchoPod 0.12.0.
 - Language packs other than English and Chinese load from `Languages/<code>.bin` on the internal drive, and Settings → Language lists the built-in two plus the packs it finds. A pack that is missing, too big or damaged is refused and the player starts in English.
 - The 69 strings that were still English are translated in every language, and awkward or clashing Chinese strings are fixed.
 - Track, artist and album names in GBK and JIS X 0213 characters beyond the common CJK set draw too.
+- The big letter shown while scrolling fast comes from a 64 px font instead of the 16 px title font blown up 4 times, so it's sharp instead of blurred.
 
 ### Errors
 

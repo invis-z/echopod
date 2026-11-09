@@ -47,7 +47,7 @@ static Image cover_image(void)
 static Theme scene_theme(void)
 {
     Theme theme = TEST_THEME;
-    theme.fonts = (ThemeFonts){&TINY_FONT, &TINY_FONT, &TINY_FONT, &TINY_FONT};
+    theme.fonts = (ThemeFonts){&TINY_FONT, &TINY_FONT, &TINY_FONT, &TINY_FONT, &TINY_FONT};
     theme.marquee = (MarqueeTiming){.pause_ms = 1200, .speed_px_per_s = 40, .gap_px = 32};
     return theme;
 }

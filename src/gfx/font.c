@@ -8,7 +8,11 @@
 enum {
     LEVELS_PER_BYTE = 2,
     HIGH_NIBBLE_SHIFT = 4,
-    NIBBLE_MASK = 0x0F
+    NIBBLE_MASK = 0x0F,
+    TWO_BIT_LEVELS_PER_BYTE = 4,
+    TWO_BIT_FIRST_SHIFT = 6,
+    TWO_BIT_MASK = 0x03,
+    TWO_BIT_TO_FULL = 5
 };
 
 static const Glyph *search(const Font *font, uint32_t codepoint)
@@ -32,6 +36,11 @@ static const Glyph *search(const Font *font, uint32_t codepoint)
 
 const Glyph *font_find_glyph(const Font *font, uint32_t codepoint)
 {
+    if (font->level_bits == FONT_TWO_BIT_LEVELS) {
+        const Glyph *glyph = search(font, codepoint);
+        uint8_t face = font->pack_faces[0];
+        return glyph != NULL || face == 0 ? glyph : font_pack_find_large(face - 1u, codepoint);
+    }
     const Glyph *glyph = search(font, codepoint);
     uint8_t face = font->pack_faces[codepoint >= FONT_PACK_CJK_START];
     if (glyph == NULL && face != 0) {
@@ -52,7 +61,14 @@ const uint8_t *font_glyph_bitmap(const Font *font, const Glyph *glyph)
 
 uint8_t font_glyph_level(const Font *font, const Glyph *glyph, int x, int y)
 {
-    return font_bitmap_level(font_glyph_bitmap(font, glyph), glyph, x, y);
+    const uint8_t *bitmap = font_glyph_bitmap(font, glyph);
+    if (font->level_bits != FONT_TWO_BIT_LEVELS) {
+        return font_bitmap_level(bitmap, glyph, x, y);
+    }
+    int index = y * glyph->width + x;
+    int shift = TWO_BIT_FIRST_SHIFT - FONT_TWO_BIT_LEVELS * (index % TWO_BIT_LEVELS_PER_BYTE);
+    return (uint8_t)(((bitmap[index / TWO_BIT_LEVELS_PER_BYTE] >> shift) & TWO_BIT_MASK) *
+                     TWO_BIT_TO_FULL);
 }
 
 uint8_t font_bitmap_level(const uint8_t *bitmap, const Glyph *glyph, int x, int y)

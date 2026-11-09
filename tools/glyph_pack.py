@@ -7,8 +7,10 @@ A pack face is one blob:
          CRC of everything after the header (the image CRC, tools/make_image.py)
   0x200  directory: the first codepoint (u16) of every index sector
   ...    index sectors: 42 entries of 12 bytes, sorted by codepoint, then 8 bytes of padding:
-         codepoint (u16), width, height, left (s8), top (s8), advance, 0, bitmap offset (u32)
-  ...    bitmaps: 4-bit coverage, row by row, high nibble first, as in src/fonts
+         codepoint (u16), width, height, left (s8), top (s8), advance, level bits (0 for 4, or 2),
+         bitmap offset (u32)
+  ...    bitmaps: coverage row by row, first pixel in the high bits; 4-bit as in src/fonts, or
+         2-bit for a face of big letters that has "level_bits": 2
 """
 import argparse
 import json
@@ -31,6 +33,8 @@ ENTRIES_PER_SECTOR = SECTOR_BYTES // ENTRY.size
 HEADER = struct.Struct("<4sBBHIIIIII")
 MAX_DIRECTORY = 320
 MAX_BITMAP_BYTES = 144
+MAX_LARGE_BITMAP_BYTES = 768
+TWO_BIT_LEVELS = 2
 MAX_CODEPOINT = 0xFFFF
 PACK_LAYOUT = ImageFont.Layout.BASIC
 
@@ -113,15 +117,23 @@ def padded(data):
     return data + bytes(-len(data) % SECTOR_BYTES)
 
 
-def index_sectors(glyphs, data_offset):
+def entry_level_bits(level_bits):
+    return TWO_BIT_LEVELS if level_bits == TWO_BIT_LEVELS else 0
+
+
+def max_bitmap_bytes(level_bits):
+    return MAX_LARGE_BITMAP_BYTES if level_bits == TWO_BIT_LEVELS else MAX_BITMAP_BYTES
+
+
+def index_sectors(glyphs, data_offset, level_bits=font_build.DEFAULT_LEVEL_BITS):
     sectors = []
     offset = data_offset
     for start in range(0, len(glyphs), ENTRIES_PER_SECTOR):
         sector = bytearray()
         for glyph in glyphs[start:start + ENTRIES_PER_SECTOR]:
             sector += ENTRY.pack(glyph.codepoint, glyph.width, glyph.height, glyph.left,
-                                 glyph.top, glyph.advance, 0, offset)
-            offset += (glyph.width * glyph.height + 1) // 2
+                                 glyph.top, glyph.advance, entry_level_bits(level_bits), offset)
+            offset += font_build.bitmap_bytes(glyph.width, glyph.height, level_bits)
         sectors.append(padded(bytes(sector)))
     return sectors
 
@@ -134,7 +146,7 @@ def check_glyph(glyph):
             raise PackError(f"U+{glyph.codepoint:04X}: {name} {value} is out of range")
 
 
-def pack_glyphs(glyphs):
+def pack_glyphs(glyphs, level_bits=font_build.DEFAULT_LEVEL_BITS):
     """The face blob for glyphs, which must be sorted by codepoint and fit the limits."""
     if not glyphs:
         raise PackError("a face needs at least one glyph")
@@ -148,8 +160,8 @@ def pack_glyphs(glyphs):
     directory_offset = SECTOR_BYTES
     index_offset = directory_offset + len(directory)
     data_offset = index_offset + sectors * SECTOR_BYTES
-    index = b"".join(index_sectors(glyphs, data_offset))
-    data = b"".join(font_build.pack_nibbles(glyph.levels) for glyph in glyphs)
+    index = b"".join(index_sectors(glyphs, data_offset, level_bits))
+    data = b"".join(font_build.pack_levels(glyph.levels, level_bits) for glyph in glyphs)
     body = bytes(SECTOR_BYTES - HEADER.size) + directory + index + data
     size = HEADER.size + len(body)
     header = HEADER.pack(MAGIC, VERSION, ENTRY.size, ENTRIES_PER_SECTOR, len(glyphs),
@@ -163,14 +175,16 @@ def build_face(spec, codepoints, font_directory):
     if not path.exists():
         return None
     font = font_build.load_font(path, spec["size"], PACK_LAYOUT)
+    level_bits = spec.get("level_bits", font_build.DEFAULT_LEVEL_BITS)
     glyphs, dropped = [], []
     for codepoint in covered(path, codepoints):
-        glyph = font_build.render_glyph(font, codepoint)
-        if (glyph.width * glyph.height + 1) // 2 > MAX_BITMAP_BYTES:
+        glyph = font_build.render_glyph(font, codepoint, level_bits)
+        if font_build.bitmap_bytes(glyph.width, glyph.height, level_bits) > \
+                max_bitmap_bytes(level_bits):
             dropped.append(codepoint)
         else:
             glyphs.append(glyph)
-    return Face(spec["name"], pack_glyphs(glyphs), len(glyphs), dropped)
+    return Face(spec["name"], pack_glyphs(glyphs, level_bits), len(glyphs), dropped)
 
 
 def read_face(blob):
@@ -187,13 +201,14 @@ def read_face(blob):
         if within == 0:
             first = struct.unpack_from("<H", blob, directory + 2 * sector)[0]
         offset = index + sector * SECTOR_BYTES + within * ENTRY.size
-        codepoint, width, height, left, top, advance, _, bitmap = ENTRY.unpack_from(blob, offset)
+        codepoint, width, height, left, top, advance, bits, bitmap = ENTRY.unpack_from(blob, offset)
         if within == 0 and first != codepoint:
             raise PackError(f"directory entry {sector} doesn't match its index sector")
         if bitmap < data:
             raise PackError(f"U+{codepoint:04X} points into the index")
         glyphs[codepoint] = (width, height, left, top, advance,
-                             blob[bitmap:bitmap + (width * height + 1) // 2])
+                             blob[bitmap:bitmap + font_build.bitmap_bytes(
+                                 width, height, bits or font_build.DEFAULT_LEVEL_BITS)])
     return glyphs
 
 

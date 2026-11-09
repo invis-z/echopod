@@ -22,7 +22,7 @@ const Theme TEST_THEME = {
             .success = 0x07E0,
             .chevron = 0xC618,
         },
-    .fonts = {.title = &TINY_FONT, .body = &TINY_FONT, .small = &TINY_FONT},
+    .fonts = {.title = &TINY_FONT, .body = &TINY_FONT, .small = &TINY_FONT, .letter = &TINY_FONT},
     .metrics =
         {
             .screen_width = TEST_SCREEN_WIDTH,

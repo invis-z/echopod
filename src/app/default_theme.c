@@ -30,6 +30,7 @@ const Theme DEFAULT_THEME = {
             .title = &FONT_INTER_SEMIBOLD_16,
             .body = &FONT_INTER_REGULAR_16,
             .small = &FONT_INTER_REGULAR_12,
+            .letter = &FONT_INTER_SEMIBOLD_64,
         },
     .metrics =
         {

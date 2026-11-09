@@ -43,6 +43,13 @@
       "size": 12,
       "character_sets": ["gbk", "jis_x_0213"],
       "exclude_faces": ["cjk_16", "inter_regular_16_latin1"]
+    },
+    {
+      "name": "big_letters",
+      "file": "inter/Inter-SemiBold.ttf",
+      "size": 64,
+      "ranges": [[35, 35], [65, 90]],
+      "level_bits": 2
     }
   ],
   "character_sets": {
