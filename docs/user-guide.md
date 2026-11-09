@@ -37,7 +37,7 @@ If "Updating" flashes for under a second and FiiO's firmware comes back, the ins
 ## Your music
 
 - Put music on a microSD card formatted FAT32 or exFAT, in any folder layout.
-- Rippl plays FLAC, ALAC (Apple Lossless `.m4a`), AAC (`.m4a`), Opus (`.opus`), QOA (`.qoa`), MP3 and WAV, from 8 to 192 kHz, and WAV also at 352.8 and 384 kHz. 32-bit FLAC and ALAC play up to 96 kHz. HE-AAC isn't supported yet. It lists the other formats FiiO lists, and says when it can't play one.
+- Rippl plays FLAC, ALAC (Apple Lossless `.m4a`), AAC (`.m4a`), Opus (`.opus`), QOA (`.qoa`), MP3 and WAV, from 8 to 192 kHz, and FLAC, ALAC and WAV also at 352.8 and 384 kHz, FLAC and ALAC with up to 24 bits. 32-bit FLAC and ALAC play up to 96 kHz. HE-AAC isn't supported yet. It lists the other formats FiiO lists, and says when it can't play one.
 - Album covers come from art inside one of each album's first four tracks (Ogg and Opus pictures included), or from a `cover`, `folder`, `front` or `albumart` JPEG or PNG next to the tracks.
 - `.m3u` and `.m3u8` playlists anywhere on the card appear under Music → Playlists.
 - Libraries of many thousands of tracks work; `docs/known-issues.md` lists the sizes tested so far.
