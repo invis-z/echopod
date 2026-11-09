@@ -118,6 +118,7 @@ typedef struct ScriptedSource {
     int releases;
     int closes;
     uint32_t rate;
+    uint32_t play_rate;
     uint8_t bits;
 } ScriptedSource;
 
@@ -131,7 +132,8 @@ static bool scripted_open(void *context, const char *path, uint32_t start_ms, Au
     uint32_t rate = source_state->rate == 0 ? 44100 : source_state->rate;
     uint8_t bits = source_state->bits == 0 ? 16 : source_state->bits;
     *track = (AudioTrackInfo){
-        .stream = {.sample_rate = rate, .channels = 2, .bits_per_sample = bits, .max_block = 16}};
+        .stream = {.sample_rate = rate, .channels = 2, .bits_per_sample = bits, .max_block = 16},
+        .play_rate = source_state->play_rate};
     return true;
 }
 
@@ -513,45 +515,29 @@ static void a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate(void)
     CHECK_EQUAL(7000u, audio_engine_refusal(&engine).sample_rate);
 }
 
-static void low_rates_play_at_a_rate_they_divide(void)
+static void a_low_rate_plays_at_the_rate_its_source_raises_it_to(void)
 {
-    static const uint32_t RATES[][2] = {{8000, 48000},  {11025, 44100}, {12000, 48000},
-                                        {16000, 48000}, {22050, 44100}, {24000, 48000},
-                                        {32000, 96000}};
-    for (size_t index = 0; index < sizeof RATES / sizeof RATES[0]; index++) {
-        CHECK(scripted_rate_plays(RATES[index][0]));
-        CHECK_EQUAL(RATES[index][1], audio_engine_rate(&engine));
-    }
-}
-
-static int32_t sample_24(const Fixture *pcm, uint32_t index)
-{
-    return index < 2 ? 0 : expected_at(pcm, index - 2) * 256;
-}
-
-static void a_22_khz_track_fills_in_every_other_sample(void)
-{
-    start_engine();
-    CHECK(audio_engine_play(&engine, "independent_16", 0, 1));
+    start_scripted_engine(0, 1);
+    scripted.rate = 22050;
+    scripted.play_rate = 44100;
+    CHECK(audio_engine_play(&engine, "scripted", 0, 1));
     CHECK_EQUAL(44100u, audio_engine_rate(&engine));
-    pump_until_full(0);
-    Fixture pcm = load("independent_16", "pcm");
-    bool ok = pcm.size > 0;
-    for (uint32_t frame = 0; ok && frame < 2000; frame++) {
-        for (uint32_t channel = 0; channel < 2; channel++) {
-            uint32_t index = 2 * frame + channel;
-            int32_t before = sample_24(&pcm, index);
-            int32_t now = expected_at(&pcm, index) * 256;
-            int32_t between = before + (now - before) / 2;
-            ok = ok && ring[2 * (2 * frame) + channel] == (uint32_t)between << 8 &&
-                 ring[2 * (2 * frame + 1) + channel] == (uint32_t)now << 8;
-        }
-    }
-    CHECK(ok);
-    free(pcm.bytes);
+    CHECK_EQUAL(22050u, audio_engine_status(&engine).track.stream.sample_rate);
     audio_engine_observe(&engine, 44100);
     CHECK_EQUAL(1000u, audio_engine_status(&engine).position_ms);
-    CHECK_EQUAL(22050u, audio_engine_status(&engine).track.stream.sample_rate);
+}
+
+static void a_low_rate_no_source_raises_is_refused(void)
+{
+    CHECK(!scripted_rate_plays(22050));
+    CHECK_EQUAL(AUDIO_REFUSAL_RATE, audio_engine_refusal(&engine).problem);
+    CHECK_EQUAL(22050u, audio_engine_refusal(&engine).sample_rate);
+}
+
+static void a_32_khz_track_plays_at_its_own_rate(void)
+{
+    CHECK(scripted_rate_plays(32000));
+    CHECK_EQUAL(32000u, audio_engine_rate(&engine));
 }
 
 static void rates_up_to_192_khz_play_and_higher_ones_are_refused(void)
@@ -711,8 +697,9 @@ int main(void)
         TEST_CASE(a_seek_while_a_new_rate_waits_keeps_the_next_track),
         TEST_CASE(closing_the_source_keeps_the_pause_and_the_position),
         TEST_CASE(mono_plays_on_both_channels),
-        TEST_CASE(low_rates_play_at_a_rate_they_divide),
-        TEST_CASE(a_22_khz_track_fills_in_every_other_sample),
+        TEST_CASE(a_low_rate_plays_at_the_rate_its_source_raises_it_to),
+        TEST_CASE(a_low_rate_no_source_raises_is_refused),
+        TEST_CASE(a_32_khz_track_plays_at_its_own_rate),
         TEST_CASE(an_unsupported_rate_is_refused),
         TEST_CASE(rates_up_to_192_khz_play_and_higher_ones_are_refused),
         TEST_CASE(a_queued_track_at_an_unsupported_rate_is_refused_with_its_rate),

@@ -7,8 +7,7 @@
 
 enum {
     AUDIO_ENGINE_PATH_CAPACITY = 1024,
-    AUDIO_ENGINE_SEGMENTS = 4,
-    AUDIO_ENGINE_MAX_REPEAT = 6
+    AUDIO_ENGINE_SEGMENTS = 4
 };
 
 typedef enum AudioEngineState {
@@ -45,6 +44,7 @@ typedef enum AudioCodec {
 
 typedef struct AudioTrackInfo {
     FlacInfo stream;
+    uint32_t play_rate;
     uint32_t audio_bytes;
     AudioCodec codec;
 } AudioTrackInfo;
@@ -106,9 +106,6 @@ typedef struct AudioEngine {
     int segment_count;
     bool decoding;
     uint32_t decode_rate;
-    uint32_t source_rate;
-    uint32_t repeat;
-    int32_t held[2];
     AudioTrackInfo decode_track;
     AudioFrame frame;
     bool holding_frame;

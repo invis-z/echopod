@@ -164,7 +164,7 @@ static bool hi_res(Core1Program program, uint32_t rate)
 static uint32_t stream_divider(Core1Program program, uint32_t rate, uint32_t pll_mhz)
 {
     bool heavy = program == CORE1_PROGRAM_AAC || program == CORE1_PROGRAM_OPUS ||
-                 equalizing(program, rate) || hi_res(program, rate);
+                 equalizing(program, rate) || hi_res(program, rate) || upsampler_factor(rate) > 1;
     return heavy && pll_mhz <= FULL_SPEED_MHZ ? 1 : core1_divider_for(pll_mhz);
 }
 

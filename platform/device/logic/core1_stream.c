@@ -170,13 +170,12 @@ static void widen(int32_t *samples, uint32_t count, uint32_t shift)
     }
 }
 
-static uint32_t equalize_slot(Core1Stream *stream, uint32_t slot, uint32_t samples)
+static uint32_t equalize_slot(Core1Stream *stream, uint32_t slot, uint32_t samples, uint32_t bits)
 {
     if (stream->equalizer == NULL || stream->share->enabled == 0) {
         return 0;
     }
     follow_share(stream);
-    uint32_t bits = stream->region.control->bits_per_sample;
     if (!equalizer_active(stream->equalizer) || bits == 0 || bits > EQUALIZED_BITS) {
         return 0;
     }
@@ -254,10 +253,14 @@ static void adopt(Core1Stream *stream, uint32_t generation)
     stream->holding = false;
     stream->finished = false;
     stream->starved = false;
+    upsampler_start(&stream->upsampler, info.sample_rate,
+                    info.bits_per_sample <= EQUALIZED_BITS ? EQUALIZED_BITS : info.bits_per_sample);
+    stream->upsampled_timed = false;
+    stream->flush_pending = upsampler_active(&stream->upsampler);
     control->slot_offset = stream->slot_offset;
     control->slot_samples = stream->slot_samples;
     if (stream->equalizer != NULL) {
-        equalizer_set_rate(stream->equalizer, info.sample_rate);
+        equalizer_set_rate(stream->equalizer, info.sample_rate * stream->upsampler.factor);
         if (control->equalizer_reset != 0) {
             control->equalizer_reset = 0;
             equalizer_reset(stream->equalizer);
@@ -302,12 +305,87 @@ static void hand_over(Core1Stream *stream, uint32_t outcome)
     stream->slot = (stream->slot + 1) % STREAM_SLOTS;
 }
 
+static uint32_t source_bits(const Core1Stream *stream)
+{
+    return stream->region.control->bits_per_sample;
+}
+
+static uint32_t upsampled_bits(const Core1Stream *stream)
+{
+    uint32_t bits = source_bits(stream);
+    return bits <= EQUALIZED_BITS ? EQUALIZED_BITS : bits;
+}
+
+static uint32_t upsample(Core1Stream *stream, uint32_t slot, uint32_t count, bool silence)
+{
+    const Core1Block *block = &stream->pending;
+    uint32_t stride = block->stride > 0 ? block->stride : 1;
+    uint32_t widen = upsampled_bits(stream) - source_bits(stream);
+    uint32_t produced = 0;
+    for (uint32_t index = 0; index < count; index++) {
+        uint32_t at = (stream->emitted + index) * stride;
+        for (uint32_t channel = 0; channel < stream->channels; channel++) {
+            int32_t sample = 0;
+            if (!silence) {
+                const int16_t *narrow = block->narrow[channel];
+                int32_t value = narrow != NULL ? narrow[at] : block->channels[channel][at];
+                sample = value * (int32_t)(1u << widen);
+            }
+            upsampler_put(&stream->upsampler, channel, sample);
+        }
+        int32_t *right = stream->channels > 1 ? stream_row(stream, slot, 1) + produced : NULL;
+        produced +=
+            upsampler_render(&stream->upsampler, stream_row(stream, slot, 0) + produced, right);
+        upsampler_advance(&stream->upsampler);
+    }
+    return produced;
+}
+
+static void hand_over_upsampled(Core1Stream *stream, uint32_t produced)
+{
+    volatile StreamSlot *slot = &stream->region.control->slots[stream->slot];
+    uint32_t factor = stream->upsampler.factor;
+    uint32_t bits = upsampled_bits(stream);
+    slot->equalized = equalize_slot(stream, stream->slot, produced, bits);
+    slot->bits = bits;
+    slot->first_sample = stream->upsampled_time * factor;
+    slot->samples = produced;
+    stream->upsampled_time += produced / factor;
+    hand_over(stream, AUDIO_FRAME_READY);
+}
+
+static void emit_upsampled(Core1Stream *stream)
+{
+    if (!stream->upsampled_timed) {
+        stream->upsampled_time = stream->pending.first_sample;
+        stream->upsampled_timed = true;
+    }
+    uint32_t count = smaller(stream->pending.samples - stream->emitted,
+                             stream->slot_samples / stream->upsampler.factor);
+    uint32_t produced = upsample(stream, stream->slot, count, false);
+    stream->emitted += count;
+    stream->handing = stream->emitted < stream->pending.samples;
+    hand_over_upsampled(stream, produced);
+}
+
+static void emit_flush(Core1Stream *stream)
+{
+    stream->flush_pending = false;
+    uint32_t produced = upsample(stream, stream->slot, UPSAMPLER_DELAY, true);
+    hand_over_upsampled(stream, produced);
+}
+
 static void emit_piece(Core1Stream *stream)
 {
+    if (upsampler_active(&stream->upsampler)) {
+        emit_upsampled(stream);
+        return;
+    }
     volatile StreamSlot *slot = &stream->region.control->slots[stream->slot];
     uint32_t samples = smaller(stream->pending.samples - stream->emitted, stream->slot_samples);
     copy_channels(stream, stream->slot, samples);
-    slot->equalized = equalize_slot(stream, stream->slot, samples);
+    slot->equalized = equalize_slot(stream, stream->slot, samples, source_bits(stream));
+    slot->bits = slot->equalized != 0 ? EQUALIZED_BITS : 0;
     slot->first_sample = stream->pending.first_sample + stream->emitted;
     slot->samples = samples;
     stream->emitted += samples;
@@ -321,6 +399,7 @@ static void end_stream(Core1Stream *stream, Core1DecodeResult result)
     slot->first_sample = 0;
     slot->samples = 0;
     slot->equalized = 0;
+    slot->bits = 0;
     stream->finished = true;
     hand_over(stream, result == CORE1_FINISHED ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR);
 }
@@ -351,6 +430,8 @@ static bool hand_over_when_free(Core1Stream *stream)
     uint32_t began = tick_now(stream);
     if (stream->handing) {
         emit_piece(stream);
+    } else if (stream->held == CORE1_FINISHED && stream->flush_pending && stream->upsampled_timed) {
+        emit_flush(stream);
     } else {
         stream->holding = false;
         end_stream(stream, stream->held);
@@ -467,9 +548,11 @@ void core1_source_reset_equalizer(Core1Source *source)
     source->reset_equalizer = true;
 }
 
-static void begin_generation(Core1Source *source)
+static void begin_generation(Core1Source *source, AudioTrackInfo *track)
 {
     volatile StreamControl *control = source->region.control;
+    source->factor = upsampler_factor(control->sample_rate);
+    track->play_rate = control->sample_rate * source->factor;
     control->equalizer_reset = source->reset_equalizer ? 1u : 0u;
     source->reset_equalizer = false;
     publish();
@@ -511,7 +594,7 @@ static bool open_stream(void *context, const char *path, uint32_t start_ms, Audi
     control->written = source->written;
     control->codec = STREAM_CODEC_NATIVE;
     use_ring(source, source->ring_capacity);
-    begin_generation(source);
+    begin_generation(source, track);
     return true;
 }
 
@@ -574,6 +657,12 @@ static int32_t *source_row(const Core1Source *source, uint32_t samples, uint32_t
     return slot_row(source->region.samples, offset, stride, source->slot, channel);
 }
 
+static uint32_t scaled(const Core1Source *source, uint32_t samples)
+{
+    uint32_t factor = source->factor > 0 ? source->factor : 1;
+    return samples == UINT32_MAX ? UINT32_MAX : samples * factor;
+}
+
 static AudioFrameResult next_frame(void *context, AudioFrame *frame)
 {
     Core1Source *source = context;
@@ -592,12 +681,15 @@ static AudioFrameResult next_frame(void *context, AudioFrame *frame)
             return slot->result == AUDIO_FRAME_END ? AUDIO_FRAME_END : AUDIO_FRAME_ERROR;
         }
         uint32_t first = slot->first_sample;
-        if (first >= source->play_end) {
+        uint32_t play_end = scaled(source, source->play_end);
+        uint32_t lead_trim = scaled(source, source->lead_trim);
+        uint32_t play_from = scaled(source, source->play_from);
+        if (first >= play_end) {
             return AUDIO_FRAME_END;
         }
-        uint32_t end = smaller(first + slot->samples, source->play_end);
-        uint32_t from = first > source->lead_trim ? first : source->lead_trim;
-        from = from > source->play_from ? from : source->play_from;
+        uint32_t end = smaller(first + slot->samples, play_end);
+        uint32_t from = first > lead_trim ? first : lead_trim;
+        from = from > play_from ? from : play_from;
         if (from >= end) {
             advance_slot(source);
             continue;
@@ -611,9 +703,9 @@ static AudioFrameResult next_frame(void *context, AudioFrame *frame)
         *frame = (AudioFrame){
             .left = left + skip,
             .right = right + skip,
-            .first_sample = from - source->lead_trim,
+            .first_sample = from - lead_trim,
             .samples = end - from,
-            .bits = slot->equalized != 0 ? EQUALIZED_BITS : source->bits_per_sample,
+            .bits = slot->bits != 0 ? (uint8_t)slot->bits : source->bits_per_sample,
             .equalized = slot->equalized != 0,
         };
         return AUDIO_FRAME_READY;
@@ -686,7 +778,7 @@ static bool open_mp3(void *context, const char *path, uint32_t start_ms, AudioTr
     control->written = source->written;
     control->codec = STREAM_CODEC_NATIVE;
     use_ring(source, source->ring_capacity);
-    begin_generation(source);
+    begin_generation(source, track);
     return true;
 }
 
@@ -740,7 +832,7 @@ static bool open_wav(void *context, const char *path, uint32_t start_ms, AudioTr
     control->written = source->written;
     control->codec = STREAM_CODEC_PCM;
     use_ring(source, source->ring_capacity);
-    begin_generation(source);
+    begin_generation(source, track);
     return true;
 }
 
@@ -816,7 +908,7 @@ static bool open_mp4(void *context, const char *path, uint32_t start_ms, AudioTr
     control->written = 0;
     control->codec = stream_codec_of(probed.codec);
     use_ring(source, source->ring_capacity);
-    begin_generation(source);
+    begin_generation(source, track);
     return true;
 }
 
@@ -873,7 +965,7 @@ static bool open_ogg(void *context, const char *path, uint32_t start_ms, AudioTr
     control->written = source->written;
     control->codec = STREAM_CODEC_OPUS;
     use_ring(source, smaller(source->ring_capacity, CORE1_OPUS_RING_BYTES));
-    begin_generation(source);
+    begin_generation(source, track);
     return true;
 }
 
@@ -936,9 +1028,7 @@ static bool open_qoa(void *context, const char *path, uint32_t start_ms, AudioTr
     control->written = source->written;
     control->codec = STREAM_CODEC_QOA;
     use_ring(source, source->ring_capacity);
-    publish();
-    control->generation = next_generation(source);
-    source->streaming = true;
+    begin_generation(source, track);
     return true;
 }
 

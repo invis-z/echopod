@@ -68,6 +68,10 @@ rippl_add_unit_test(NAME test_equalizer
     SOURCES dsp/test_equalizer.c
     LIBRARIES rippl_dsp $<$<PLATFORM_ID:Linux>:m>
 )
+rippl_add_unit_test(NAME test_upsampler
+    SOURCES dsp/test_upsampler.c
+    LIBRARIES rippl_dsp $<$<PLATFORM_ID:Linux>:m>
+)
 rippl_add_unit_test(NAME test_equalizer_file SOURCES sound/test_equalizer_file.c LIBRARIES rippl_sound)
 rippl_add_unit_test(NAME test_equalizer_text SOURCES sound/test_equalizer_text.c LIBRARIES rippl_sound)
 
@@ -576,6 +580,12 @@ if(EXISTS ${RIPPL_TOOLS_PYTHON})
     add_test(NAME builder_fixture_up_to_date
         COMMAND ${RIPPL_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/builder_fixture.py
             --output ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/builder_random
+            --check
+    )
+    add_test(NAME upsampler_table_up_to_date
+        COMMAND ${RIPPL_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/upsampler_table.py
+            --output ${PROJECT_SOURCE_DIR}/src/dsp
+            --style ${PROJECT_SOURCE_DIR}/.clang-format
             --check
     )
     add_test(NAME sort_fold_up_to_date

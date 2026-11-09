@@ -8,6 +8,7 @@
 #include "device/audio_engine.h"
 #include "device/flac_source.h"
 #include "dsp/equalizer.h"
+#include "dsp/upsampler.h"
 
 enum {
     STREAM_SLOTS = 2,
@@ -36,6 +37,7 @@ typedef struct StreamSlot {
     uint32_t first_sample;
     uint32_t samples;
     uint32_t equalized;
+    uint32_t bits;
 } StreamSlot;
 
 typedef struct StreamControl {
@@ -134,6 +136,10 @@ typedef struct Core1Stream {
     uint32_t last_tick;
     uint32_t busy_ticks;
     uint32_t wall_ticks;
+    Upsampler upsampler;
+    uint32_t upsampled_time;
+    bool upsampled_timed;
+    bool flush_pending;
     Equalizer *equalizer;
     volatile Core1EqualizerShare *share;
     uint32_t share_version;
@@ -169,6 +175,7 @@ typedef struct Core1Source {
     uint32_t play_end;
     uint32_t fill_budget;
     void (*wake)(void);
+    uint32_t factor;
     uint8_t bits_per_sample;
     uint8_t channels;
     bool streaming;

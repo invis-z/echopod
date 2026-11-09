@@ -247,6 +247,37 @@ static int32_t expected_at(const Fixture *pcm, uint32_t index)
     return value;
 }
 
+static uint32_t upsampled_frames(const AudioTrackInfo *info, uint32_t frames)
+{
+    uint32_t rate = info->stream.sample_rate;
+    return info->play_rate > rate ? frames * (info->play_rate / rate) : frames;
+}
+
+static int32_t (*upsample_reference(int32_t (*input)[2], uint32_t frames, uint32_t rate,
+                                    uint32_t widen))[2]
+{
+    static Upsampler upsampler;
+    int32_t (*out)[2] =
+        malloc(sizeof(int32_t[2]) * (frames + UPSAMPLER_DELAY) * UPSAMPLER_MAX_FACTOR);
+    upsampler_start(&upsampler, rate, 24);
+    uint32_t produced = 0;
+    for (uint32_t index = 0; out != NULL && index < frames + UPSAMPLER_DELAY; index++) {
+        int32_t rendered[2][UPSAMPLER_MAX_FACTOR];
+        for (uint32_t channel = 0; channel < 2; channel++) {
+            int32_t sample = index < frames ? input[index][channel] * (int32_t)(1u << widen) : 0;
+            upsampler_put(&upsampler, channel, sample);
+        }
+        uint32_t count = upsampler_render(&upsampler, rendered[0], rendered[1]);
+        for (uint32_t step = 0; step < count; step++) {
+            out[produced + step][0] = rendered[0][step];
+            out[produced + step][1] = rendered[1][step];
+        }
+        produced += count;
+        upsampler_advance(&upsampler);
+    }
+    return out;
+}
+
 static bool frame_matches(const Fixture *pcm, const AudioFrame *frame, int channels)
 {
     for (uint32_t sample = 0; sample < frame->samples; sample++) {
@@ -265,25 +296,60 @@ static bool frame_matches(const Fixture *pcm, const AudioFrame *frame, int chann
     return true;
 }
 
+static bool upsampled_frame_matches(int32_t (*reference)[2], const AudioFrame *frame)
+{
+    for (uint32_t sample = 0; sample < frame->samples; sample++) {
+        if (frame->left[sample] != reference[frame->first_sample + sample][0] ||
+            frame->right[sample] != reference[frame->first_sample + sample][1]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static int32_t (*upsample_fixture(const Fixture *pcm, const AudioTrackInfo *info, int channels))[2]
+{
+    uint32_t frames = (uint32_t)(pcm->size / 4) / (uint32_t)channels;
+    int32_t (*frames_in)[2] = malloc(sizeof(int32_t[2]) * frames);
+    for (uint32_t index = 0; frames_in != NULL && index < frames; index++) {
+        uint32_t at = index * (uint32_t)channels;
+        frames_in[index][0] = expected_at(pcm, at);
+        frames_in[index][1] = channels > 1 ? expected_at(pcm, at + 1) : frames_in[index][0];
+    }
+    int32_t (*reference)[2] = frames_in == NULL
+                                  ? NULL
+                                  : upsample_reference(frames_in, frames, info->stream.sample_rate,
+                                                       24u - info->stream.bits_per_sample);
+    free(frames_in);
+    return reference;
+}
+
 static bool plays_exactly(const char *name, int channels)
 {
     Fixture pcm = load(name, "pcm");
     AudioTrackInfo info;
     bool ok = pcm.size > 0 && interface.open(interface.context, name, 0, &info);
+    bool raised = ok && info.play_rate > info.stream.sample_rate;
+    int32_t (*reference)[2] = raised ? upsample_fixture(&pcm, &info, channels) : NULL;
+    uint8_t bits = raised ? 24 : info.stream.bits_per_sample;
+    ok = ok && (!raised || reference != NULL);
     uint32_t next_sample = 0;
     AudioFrame frame;
     AudioFrameResult result = AUDIO_FRAME_READY;
     while (ok && (result = next_frame(&frame)) == AUDIO_FRAME_READY) {
-        ok = frame.first_sample == next_sample && frame_matches(&pcm, &frame, channels) &&
-             frame.bits == info.stream.bits_per_sample;
+        bool same = raised ? upsampled_frame_matches(reference, &frame)
+                           : frame_matches(&pcm, &frame, channels);
+        ok = frame.first_sample == next_sample && same && frame.bits == bits;
         next_sample += frame.samples;
         for (int round = 0; round < held_rounds; round++) {
             run_core1();
         }
         interface.release(interface.context);
     }
-    ok = ok && result == AUDIO_FRAME_END && next_sample == info.stream.total_samples;
+    ok = ok && result == AUDIO_FRAME_END &&
+         next_sample == upsampled_frames(&info, info.stream.total_samples);
     interface.close(interface.context);
+    free(reference);
     free(pcm.bytes);
     return ok;
 }
@@ -778,23 +844,31 @@ static bool mp3_streams_like_the_decoder(const char *name, uint32_t ring_bytes)
     }
     Mp3Stream probe;
     uint32_t decoded = reference_samples(name, control.start_offset, mp3_reference, 120000, &probe);
-    uint32_t lead = probe.lead_trim;
-    uint32_t expected = decoded - lead - probe.tail_trim;
+    uint32_t expected = decoded - probe.lead_trim - probe.tail_trim;
     bool ok = info.codec == AUDIO_CODEC_MP3 && decoded > 0 && info.stream.total_samples == expected;
+    bool raised = info.play_rate > info.stream.sample_rate;
+    int32_t (*reference)[2] =
+        raised ? upsample_reference(mp3_reference, decoded, info.stream.sample_rate, 0)
+               : mp3_reference;
+    uint32_t lead = upsampled_frames(&info, probe.lead_trim);
+    ok = ok && reference != NULL;
     uint32_t next_sample = 0;
     AudioFrame frame;
     AudioFrameResult result = AUDIO_FRAME_READY;
     while (ok && (result = next_frame(&frame)) == AUDIO_FRAME_READY) {
         ok = frame.first_sample == next_sample && frame.bits == 24 && frame.samples > 0;
         for (uint32_t index = 0; ok && index < frame.samples; index++) {
-            ok = frame.left[index] == mp3_reference[lead + next_sample + index][0] &&
-                 frame.right[index] == mp3_reference[lead + next_sample + index][1];
+            ok = frame.left[index] == reference[lead + next_sample + index][0] &&
+                 frame.right[index] == reference[lead + next_sample + index][1];
         }
         next_sample += frame.samples;
         interface.release(interface.context);
     }
-    ok = ok && result == AUDIO_FRAME_END && next_sample == expected;
+    ok = ok && result == AUDIO_FRAME_END && next_sample == upsampled_frames(&info, expected);
     interface.close(interface.context);
+    if (raised) {
+        free(reference);
+    }
     return ok;
 }
 
@@ -813,7 +887,7 @@ static uint32_t stream_left(const char *name, uint32_t *rate)
     if (!interface.open(interface.context, name, 0, &info)) {
         return 0;
     }
-    *rate = info.stream.sample_rate;
+    *rate = info.play_rate != 0 ? info.play_rate : info.stream.sample_rate;
     uint32_t count = 0;
     AudioFrame frame;
     while (next_frame(&frame) == AUDIO_FRAME_READY) {
@@ -859,7 +933,7 @@ static void a_trimmed_mp3_lines_up_with_the_sound_it_was_made_from(void)
 {
     CHECK(lines_up_with_its_source("mp3/cbr_128_44k_stereo_tagged", 66150));
     CHECK(lines_up_with_its_source("mp3/vbr_48k_mono", 96000));
-    CHECK(lines_up_with_its_source("mp3/mpeg2_22k_stereo", 22050));
+    CHECK(lines_up_with_its_source("mp3/mpeg2_22k_stereo", 44100));
 }
 
 static void a_trimmed_mp3_starts_at_its_first_real_sample(void)
@@ -1268,6 +1342,25 @@ static bool qoa_matches(const Fixture *pcm, const AudioFrame *frame, int channel
     return true;
 }
 
+static int32_t (*upsample_qoa(const Fixture *pcm, uint32_t rate, int channels))[2]
+{
+    uint32_t frames = (uint32_t)(pcm->size / 2) / (uint32_t)channels;
+    int32_t (*frames_in)[2] = malloc(sizeof(int32_t[2]) * frames);
+    for (uint32_t index = 0; frames_in != NULL && index < frames; index++) {
+        int16_t left = 0;
+        int16_t right = 0;
+        uint32_t at = index * (uint32_t)channels;
+        memcpy(&left, pcm->bytes + 2 * at, sizeof left);
+        memcpy(&right, pcm->bytes + 2 * (at + (uint32_t)(channels - 1)), sizeof right);
+        frames_in[index][0] = left;
+        frames_in[index][1] = right;
+    }
+    int32_t (*reference)[2] =
+        frames_in == NULL ? NULL : upsample_reference(frames_in, frames, rate, 24u - 16u);
+    free(frames_in);
+    return reference;
+}
+
 static bool qoa_plays_exactly(const char *name, int channels, uint32_t ring_bytes,
                               uint32_t start_ms, uint32_t *first)
 {
@@ -1276,7 +1369,11 @@ static bool qoa_plays_exactly(const char *name, int channels, uint32_t ring_byte
     AudioTrackInfo info = {0};
     bool ok = pcm.size > 0 && interface.open(interface.context, name, start_ms, &info) &&
               info.codec == AUDIO_CODEC_QOA && control.codec == STREAM_CODEC_QOA;
-    uint32_t target = (uint32_t)((uint64_t)start_ms * info.stream.sample_rate / 1000);
+    bool raised = ok && info.play_rate > info.stream.sample_rate;
+    int32_t (*reference)[2] = raised ? upsample_qoa(&pcm, info.stream.sample_rate, channels) : NULL;
+    ok = ok && (!raised || reference != NULL);
+    uint32_t target =
+        upsampled_frames(&info, (uint32_t)((uint64_t)start_ms * info.stream.sample_rate / 1000));
     uint32_t next_sample = UINT32_MAX;
     AudioFrame frame;
     AudioFrameResult result = AUDIO_FRAME_READY;
@@ -1286,14 +1383,17 @@ static bool qoa_plays_exactly(const char *name, int channels, uint32_t ring_byte
             ok = frame.first_sample <= target && target < frame.first_sample + frame.samples;
             next_sample = frame.first_sample;
         }
-        ok = ok && frame.first_sample == next_sample && frame.bits == 16 &&
-             qoa_matches(&pcm, &frame, channels);
+        bool same = raised ? upsampled_frame_matches(reference, &frame)
+                           : qoa_matches(&pcm, &frame, channels);
+        ok = ok && frame.first_sample == next_sample && frame.bits == (raised ? 24 : 16) && same;
         next_sample += frame.samples;
         interface.release(interface.context);
     }
-    ok = ok && result == AUDIO_FRAME_END && next_sample == info.stream.total_samples &&
+    ok = ok && result == AUDIO_FRAME_END &&
+         next_sample == upsampled_frames(&info, info.stream.total_samples) &&
          info.stream.total_samples == pcm.size / 2 / (uint32_t)channels;
     interface.close(interface.context);
+    free(reference);
     free(pcm.bytes);
     return ok;
 }

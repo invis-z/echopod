@@ -14,6 +14,7 @@
 #include "device/dma_loop.h"
 #include "device/flac_source.h"
 #include "device/mp3_probe.h"
+#include "device/wav_format.h"
 #include "dmac.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
@@ -243,7 +244,13 @@ static TrackProbe probe_input(FlacInput input)
             return probe_header(after, true);
         }
     }
-    if (input.size < LIGHT_SNIFF_BYTES) {
+    if (probe.kind == SOURCE_MP3) {
+        Mp3Stream mp3;
+        probe.rate = mp3_probe(input, &mp3) ? mp3.sample_rate : 0;
+    } else if (probe.kind == SOURCE_WAV && probe.rate == 0) {
+        WavFormat format;
+        probe.rate = wav_parse(input, &format) ? format.sample_rate : 0;
+    } else if (input.size < LIGHT_SNIFF_BYTES) {
         probe.rate = 0;
     }
     return probe;
@@ -532,6 +539,9 @@ static void ensure_audio_clock(void)
 
 static bool light_probe(TrackProbe probe)
 {
+    if (upsampler_factor(probe.rate) > 1) {
+        return false;
+    }
     if (probe.kind == SOURCE_MP3) {
         return true;
     }

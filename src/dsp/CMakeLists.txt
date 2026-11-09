@@ -1,4 +1,4 @@
-set(RIPPL_DSP_SOURCES equalizer.c equalizer_design.c)
+set(RIPPL_DSP_SOURCES equalizer.c equalizer_design.c upsampler.c upsampler_table.c)
 add_library(rippl_dsp STATIC ${RIPPL_DSP_SOURCES})
 target_include_directories(rippl_dsp PUBLIC include)
 target_link_libraries(rippl_dsp PRIVATE rippl_options)
