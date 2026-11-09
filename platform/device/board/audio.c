@@ -744,6 +744,35 @@ void hal_audio_set_balance(uint8_t balance)
     dac_path_set_balance(balance);
 }
 
+static DacDre dac_dre_of(HalAudioDre dre)
+{
+    switch (dre) {
+    case HAL_AUDIO_DRE_ON:
+        return DAC_DRE_ON;
+    case HAL_AUDIO_DRE_ON_FIX:
+        return DAC_DRE_ON_FIX;
+    case HAL_AUDIO_DRE_OFF:
+        break;
+    }
+    return DAC_DRE_OFF;
+}
+
+void hal_audio_set_dre(HalAudioDre dre)
+{
+    if (!dac_path_set_dre(dac_dre_of(dre)) || !path_up || tone_active || stream_service != NULL) {
+        return;
+    }
+    if (!engine_ready || !transferring) {
+        stop_path();
+        return;
+    }
+    HalAudioStatus status = hal_audio_status();
+    stop_path();
+    if (status.state != HAL_AUDIO_STOPPED) {
+        seek_to(status.position_ms, status.state == HAL_AUDIO_PAUSED, true);
+    }
+}
+
 void hal_audio_set_output(HalAudioOutput output)
 {
     output_setting = output;

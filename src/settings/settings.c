@@ -58,7 +58,8 @@ static const uint8_t OPTION_COUNTS[SETTINGS_OPTION_COUNT] = {
     [OPTION_LYRICS] = 2,
     [OPTION_FOLDER_VIEW] = 2,
     [OPTION_STATUS_BAR] = 2,
-    [OPTION_POWER_ON] = 2};
+    [OPTION_POWER_ON] = 2,
+    [OPTION_DRE] = DRE_MODE_COUNT};
 
 _Static_assert(CHECKSUM_FIELD + 4 == SETTINGS_FILE_SIZE, "the checksum ends the file");
 

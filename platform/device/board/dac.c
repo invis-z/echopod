@@ -106,6 +106,7 @@ static bool gain_high;
 static uint8_t filter_choice;
 static uint8_t balance;
 static bool balance_known;
+static DacDre dre_setting;
 static bool dac_up;
 static bool muted;
 static uint8_t applied_volume;
@@ -377,6 +378,7 @@ static HalToneResult start_audio_path(const AudioRate *rate, uint32_t divider, u
     if (filter_choice != 0) {
         dac_set_filter(&BUS, filter_choice);
     }
+    dac_set_dre(&BUS, dre_setting);
     dac_up = true;
     muted = true;
     applied_volume = DAC_VOLUME_MUTED;
@@ -522,6 +524,13 @@ void dac_path_set_balance(uint8_t balance_step)
     if (dac_up && !muted) {
         dac_set_balanced_volume(&BUS, applied_volume, current_balance());
     }
+}
+
+bool dac_path_set_dre(DacDre dre)
+{
+    bool changed = dre != dre_setting;
+    dre_setting = dre;
+    return changed;
 }
 
 bool dac_path_take_underrun(void)

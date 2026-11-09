@@ -96,6 +96,7 @@ bool fake_hal_start_hold_required(void);
 int fake_hal_audio_gain(void);
 int fake_hal_audio_filter(void);
 int fake_hal_audio_balance(void);
+int fake_hal_audio_dre(void);
 int fake_hal_audio_output(void);
 bool fake_hal_slow_clock_allowed(void);
 EqualizerCurve fake_hal_equalizer(void);
