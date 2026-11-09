@@ -16,6 +16,7 @@ The first Rippl release, forked from EchoPod 0.12.0.
 
 - The library lives in segment files in `/.rippl/library`, which grow with the music instead of a fixed 4 MB `library.db`, 24 MB `build.tmp` and 80 MB `covers.bin`. Tracks, albums, folders and playlists are counted in 32 bits, so a library is no longer limited to 65,535 tracks; the builder is tested with 250,000.
 - A rescan reads only files that are new or changed. Resume and Up Next keep their songs across rescans, and covers are kept for albums that didn't change, in 4 MiB segments with no album limit.
+- Tracks whose path on the card is up to 1024 bytes play. Before, a path over 256 bytes, which deep folders with long Chinese or Japanese names reach quickly since each character takes 3 bytes, was in the library but wouldn't play.
 - **Tide** replaces rippl-sync. `tide sync` writes the same segment files as the player, so a synced card needs no rescan; `tide bookmarks` lists audiobook and podcast bookmarks; `tide languages` installs language packs.
 - Folders list their tracks by disc, track number and file name again, as before EchoPod 0.12.0, instead of by file name alone.
 
@@ -43,7 +44,7 @@ The first Rippl release, forked from EchoPod 0.12.0.
 
 ### Errors
 
-- `/.rippl/errors.log` lists the files the player couldn't open or use (tracks, presets, language packs, its own files and those of the library and the scan), with the time and the reason. The player makes the file at the first error and only adds to it, so delete it to empty it.
+- `/.rippl/errors.log` lists the files the player couldn't open or use (tracks, presets, language packs, its own files and those of the library and the scan), with the time and the reason, including a track whose path is too long to play. The player makes the file at the first error and only adds to it, so delete it to empty it.
 
 ### Updates
 

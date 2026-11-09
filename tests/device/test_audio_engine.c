@@ -644,6 +644,17 @@ static void the_current_path_is_the_track_being_played(void)
     CHECK(strcmp("lpc_16_44k_stereo", audio_engine_current_path(&engine)) == 0);
 }
 
+static void a_long_card_path_is_kept_whole(void)
+{
+    start_scripted_engine(0, 1);
+    char path[1000];
+    memset(path, 'a', sizeof path - 1);
+    path[0] = '/';
+    path[sizeof path - 1] = '\0';
+    CHECK(audio_engine_play(&engine, path, 0, 1));
+    CHECK(strcmp(path, audio_engine_current_path(&engine)) == 0);
+}
+
 static void a_source_that_is_not_ready_leaves_the_ring_alone(void)
 {
     start_scripted_engine(2, 1);
@@ -674,6 +685,7 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_current_path_is_the_track_being_played),
+        TEST_CASE(a_long_card_path_is_kept_whole),
         TEST_CASE(a_source_that_is_not_ready_leaves_the_ring_alone),
         TEST_CASE(a_frame_is_released_once_its_samples_are_in_the_ring),
         TEST_CASE(observing_the_dma_position_never_decodes),
