@@ -11,6 +11,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 ALPHA_LEVELS = 15
 FULL_ALPHA = 255
+DEFAULT_LEVEL_BITS = 4
+BYTE_BITS = 8
 BYTES_PER_LINE = 16
 MAX_BITMAP_BYTES = 0xFFFF
 
@@ -33,15 +35,33 @@ class FontData:
     descent: int
     glyphs: list
     pack_faces: tuple = (0, 0)
+    level_bits: int = DEFAULT_LEVEL_BITS
 
 
-def quantize_alpha(value):
-    return (value * ALPHA_LEVELS + FULL_ALPHA // 2) // FULL_ALPHA
+def quantize_alpha(value, level_bits=DEFAULT_LEVEL_BITS):
+    top = (1 << level_bits) - 1
+    return (value * top + FULL_ALPHA // 2) // FULL_ALPHA
+
+
+def bitmap_bytes(width, height, level_bits=DEFAULT_LEVEL_BITS):
+    per_byte = BYTE_BITS // level_bits
+    return (width * height + per_byte - 1) // per_byte
+
+
+def pack_levels(levels, level_bits=DEFAULT_LEVEL_BITS):
+    per_byte = BYTE_BITS // level_bits
+    padded = list(levels) + [0] * (-len(levels) % per_byte)
+    packed = bytearray()
+    for start in range(0, len(padded), per_byte):
+        value = 0
+        for level in padded[start:start + per_byte]:
+            value = (value << level_bits) | level
+        packed.append(value)
+    return bytes(packed)
 
 
 def pack_nibbles(levels):
-    padded = list(levels) + [0] * (len(levels) % 2)
-    return bytes((padded[index] << 4) | padded[index + 1] for index in range(0, len(padded), 2))
+    return pack_levels(levels)
 
 
 def load_font(path, size, layout_engine=None):
@@ -58,7 +78,7 @@ def empty_glyph(codepoint, advance):
     return GlyphImage(codepoint, 0, 0, 0, 0, advance, [])
 
 
-def render_glyph(font, codepoint):
+def render_glyph(font, codepoint, level_bits=DEFAULT_LEVEL_BITS):
     character = chr(codepoint)
     advance = round(font.getlength(character))
     left, upper, right, lower = font.getbbox(character, anchor="ls")
@@ -66,7 +86,7 @@ def render_glyph(font, codepoint):
         return empty_glyph(codepoint, advance)
     image = Image.new("L", (right - left, lower - upper), 0)
     ImageDraw.Draw(image).text((-left, -upper), character, font=font, fill=FULL_ALPHA, anchor="ls")
-    quantized = image.point(quantize_alpha)
+    quantized = image.point(lambda value: quantize_alpha(value, level_bits))
     ink = quantized.getbbox()
     if ink is None:
         return empty_glyph(codepoint, advance)
@@ -87,10 +107,12 @@ def build_font(spec, ranges, assets_directory):
     path = assets_directory / spec["file"]
     font = load_font(path, spec["size"])
     ascent, descent = font.getmetrics()
+    ranges = spec.get("ranges", ranges)
     glyphs = [render_glyph(font, codepoint) for codepoint in covered_codepoints(path, ranges)]
     numbers = pack_face_numbers(assets_directory)
     faces = tuple(numbers[name] if name else 0 for name in spec.get("pack_faces", [None, None]))
-    return FontData(spec["name"], ascent, descent, glyphs, faces)
+    return FontData(spec["name"], ascent, descent, glyphs, faces,
+                    spec.get("level_bits", DEFAULT_LEVEL_BITS))
 
 
 def constant_name(name):
@@ -115,28 +137,42 @@ def glyph_table(glyphs):
     return lines, bytes(bitmap)
 
 
-def font_source(font):
+def font_tables(font):
     prefix = font.name.upper()
+    if not font.glyphs:
+        return [], []
     glyph_lines, bitmap = glyph_table(font.glyphs)
-    bitmap_lines = list(byte_lines(bitmap)) or ["    0x00,"]
-    return "\n".join([
+    tables = [
         f"RIPPL_RESIDENT static const uint8_t {prefix}_BITMAP[] = {{",
-        *bitmap_lines,
+        *(list(byte_lines(bitmap)) or ["    0x00,"]),
         "};",
         "",
         f"RIPPL_RESIDENT static const Glyph {prefix}_GLYPHS[] = {{",
         *glyph_lines,
         "};",
         "",
-        f"const Font {constant_name(font.name)} = {{",
+    ]
+    fields = [
         f"    .glyphs = {prefix}_GLYPHS,",
         f"    .bitmap = {prefix}_BITMAP,",
         f"    .glyph_count = {len(font.glyphs)},",
         f"    .bitmap_size = {len(bitmap)},",
+    ]
+    return tables, fields
+
+
+def font_source(font):
+    tables, fields = font_tables(font)
+    return "\n".join([
+        *tables,
+        f"const Font {constant_name(font.name)} = {{",
+        *fields,
         f"    .ascent = {font.ascent},",
         f"    .descent = {font.descent},",
         *([f"    .pack_faces = {{{', '.join(str(face) for face in font.pack_faces)}}},"]
           if any(font.pack_faces) else []),
+        *([f"    .level_bits = {font.level_bits},"]
+          if font.level_bits != DEFAULT_LEVEL_BITS else []),
         "};",
         "",
     ])

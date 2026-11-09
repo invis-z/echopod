@@ -339,10 +339,9 @@ static void draw_section(const ListView *view, Canvas *canvas, Rect area, uint32
     Rect inner = {box.x + 1, box.y + 1, side - 2, side - 2};
     canvas_fill_rect(canvas, box, theme->colors.divider);
     canvas_fill_rect(canvas, inner, theme->colors.header_background);
-    TextStyle style = {.font = theme->fonts.title, .color = theme->colors.header_text};
-    int scale = max_of(1, side / (font_line_height(style.font) + 4));
+    TextStyle style = {.font = theme->fonts.letter, .color = theme->colors.header_text};
     const char *label = list_section_label(view->section);
-    text_draw_glyph_scaled(canvas, style, inner, (uint32_t)(unsigned char)label[0], scale);
+    text_draw_glyph_centered(canvas, style, inner, (uint32_t)(unsigned char)label[0]);
 }
 
 void list_view_draw(const ListView *view, Canvas *canvas, Rect area, uint32_t now_ms)

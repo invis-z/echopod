@@ -63,6 +63,14 @@
       "file": "inter/Inter-SemiBold.ttf",
       "size": 16,
       "pack_faces": ["inter_semibold_16_latin1", "cjk_16", "cjk_ext_16"]
+    },
+    {
+      "name": "inter_semibold_64",
+      "file": "inter/Inter-SemiBold.ttf",
+      "size": 64,
+      "ranges": [],
+      "pack_faces": ["big_letters", "big_letters"],
+      "level_bits": 2
     }
   ]
 }

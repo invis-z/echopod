@@ -20,9 +20,11 @@ typedef struct Font {
     uint8_t ascent;
     uint8_t descent;
     uint8_t pack_faces[3];
+    uint8_t level_bits;
 } Font;
 
 enum {
+    FONT_TWO_BIT_LEVELS = 2,
     FONT_FALLBACK_CODEPOINT = '?',
     FONT_PACK_CJK_START = 0x2E80
 };

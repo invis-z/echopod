@@ -7,13 +7,14 @@
 #include "gfx/font.h"
 
 enum {
-    FONT_PACK_FACES = 7,
+    FONT_PACK_FACES = 8,
     FONT_PACK_HEADER_BYTES = 32,
     FONT_PACK_ENTRY_BYTES = 12,
     FONT_PACK_ENTRIES_PER_SECTOR = 42,
     FONT_PACK_SECTOR_BYTES = 512,
     FONT_PACK_MAX_DIRECTORY = 320,
     FONT_PACK_MAX_BITMAP = 144,
+    FONT_PACK_MAX_LARGE_BITMAP = 768,
     FONT_PACK_WAYS = 4,
     FONT_PACK_VERSION = 1
 };
@@ -27,4 +28,5 @@ uint32_t font_pack_attach(FontPackReader reader, void *memory, size_t bytes);
 void font_pack_detach(void);
 void font_pack_forget(void);
 const Glyph *font_pack_find(uint32_t face, uint32_t codepoint);
+const Glyph *font_pack_find_large(uint32_t face, uint32_t codepoint);
 const uint8_t *font_pack_bitmap(const Glyph *glyph);
