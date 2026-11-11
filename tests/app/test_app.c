@@ -48,6 +48,7 @@ enum {
     SETTINGS_SLEEP_INDEX = 4,
     SETTINGS_FIRST_GROUP_INDEX = 5,
     SOUND_GAIN_ROW = 0,
+    SOUND_DRE_ROW = 4,
     DISPLAY_THEME_ROW = 0,
     DISPLAY_ACCENT_ROW = 1,
     DISPLAY_HIGHLIGHT_ROW = 2,
@@ -583,6 +584,17 @@ static void the_equalizer_opens_from_settings_and_is_applied(void)
     CHECK_EQUAL(2, fake_hal_equalizer().band_count);
     tap(KEY_BACK);
     CHECK(title_is("Settings"));
+}
+
+static void dre_is_applied(void)
+{
+    start_app_with_library();
+    CHECK_EQUAL(HAL_AUDIO_DRE_OFF, fake_hal_audio_dre());
+    open_setting(SETTINGS_SOUND, SOUND_DRE_ROW);
+    CHECK(title_is("DRE"));
+    move_down(2);
+    tap(KEY_PLAY);
+    CHECK_EQUAL(HAL_AUDIO_DRE_ON_FIX, fake_hal_audio_dre());
 }
 
 static void gain_is_applied(void)
@@ -3379,6 +3391,7 @@ int main(void)
         TEST_CASE(brightness_is_applied_and_saved),
         TEST_CASE(the_equalizer_opens_from_settings_and_is_applied),
         TEST_CASE(gain_is_applied),
+        TEST_CASE(dre_is_applied),
         TEST_CASE(saved_settings_are_restored_at_start),
         TEST_CASE(the_orientation_setting_is_saved),
         TEST_CASE(a_swapping_portrait_turns_the_rocker_around_in_lists),

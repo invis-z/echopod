@@ -58,6 +58,7 @@ static void defaults_are_comfortable(void)
     CHECK_EQUAL(USB_MODE_STORAGE, settings.usb_mode);
     CHECK_EQUAL(60, settings.dac_volume);
     CHECK_EQUAL(ORIENTATION_LANDSCAPE, settings.orientation);
+    CHECK_EQUAL(DRE_OFF, settings.options[OPTION_DRE]);
 }
 
 static void auto_off_options_are_stocks(void)
@@ -139,7 +140,10 @@ static void any_other_version_is_rejected(void)
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 8;
+    bytes[VERSION_FIELD] = 2;
+    rewrite_checksum(bytes);
+    CHECK(!settings_decode(bytes, sizeof bytes, &settings));
+    bytes[VERSION_FIELD] = 0;
     rewrite_checksum(bytes);
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
@@ -318,12 +322,12 @@ static void the_animation_speed_scales_animation_times(void)
     CHECK_EQUAL(70u, settings_animation_ms(NULL, 70));
 }
 
-static void a_file_is_42_bytes_with_every_byte_in_use(void)
+static void a_file_is_43_bytes_with_every_byte_in_use(void)
 {
     Settings settings = settings_with_every_option_at_its_top();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(42, SETTINGS_FILE_SIZE);
+    CHECK_EQUAL(43, SETTINGS_FILE_SIZE);
     CHECK_EQUAL(1, bytes[VERSION_FIELD]);
     CHECK_EQUAL(3, bytes[BRIGHTNESS_FIELD]);
     CHECK_EQUAL(ANIMATION_FASTER, bytes[OPTIONS_FIELD + OPTION_ANIMATION_SPEED]);
@@ -386,6 +390,18 @@ static void the_checksum_covers_the_now_playing_face_byte(void)
     CHECK(settings_decode(bytes, sizeof bytes, &decoded));
     CHECK_EQUAL(NP_FACE_LCD, decoded.options[OPTION_NOW_PLAYING_FACE]);
 }
+
+static void an_unknown_dre_setting_is_rejected(void)
+{
+    Settings settings = custom_settings();
+    uint8_t bytes[SETTINGS_FILE_SIZE];
+    settings_encode(&settings, bytes);
+    bytes[OPTIONS_FIELD + OPTION_DRE] = DRE_MODE_COUNT;
+    rewrite_checksum(bytes);
+    Settings decoded;
+    CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
+}
+
 static void a_new_option_out_of_range_is_rejected(void)
 {
     Settings settings = custom_settings();
@@ -424,7 +440,7 @@ int main(void)
         TEST_CASE(the_new_options_are_saved_and_read_back),
         TEST_CASE(the_new_options_default_to_their_first_choice),
         TEST_CASE(the_animation_speed_scales_animation_times),
-        TEST_CASE(a_file_is_42_bytes_with_every_byte_in_use),
+        TEST_CASE(a_file_is_43_bytes_with_every_byte_in_use),
         TEST_CASE(a_new_option_out_of_range_is_rejected),
         TEST_CASE(an_option_out_of_range_is_rejected),
         TEST_CASE(the_now_playing_face_is_saved_in_its_option_byte),
@@ -432,6 +448,7 @@ int main(void)
         TEST_CASE(the_checksum_covers_the_now_playing_face_byte),
         TEST_CASE(a_settings_file_with_the_last_theme_round_trips),
         TEST_CASE(a_theme_past_the_last_one_rejects_the_file),
+        TEST_CASE(an_unknown_dre_setting_is_rejected),
         TEST_CASE(defaults_are_comfortable),
         TEST_CASE(timeout_options_end_with_never),
         TEST_CASE(sleep_options_start_with_off),

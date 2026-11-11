@@ -17,7 +17,7 @@ static const char *const TOP[SETTINGS_TOP_COUNT] = {
     "Shuffle", "Repeat",  "Bluetooth", "Equalizer", "Sleep timer",
     "Sound",   "Display", "Library",   "Buttons",   "System"};
 
-static const char *const SOUND[] = {"Gain", "Output", "Filter", "Balance"};
+static const char *const SOUND[] = {"Gain", "Output", "Filter", "Balance", "DRE"};
 static const char *const DISPLAY[] = {
     "Theme",           "Accent color",        "Highlight",   "Now Playing",
     "Brightness",      "Screen timeout",      "Orientation", "Animations",

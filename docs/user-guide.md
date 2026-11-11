@@ -177,7 +177,7 @@ At the top of an artist's, album artist's or genre's album list, **Play all** pl
 
 Choose Settings on Home, or hold ≡ anywhere except on Now Playing. The top of the list holds the settings you change most: **Shuffle**, **Repeat**, **Bluetooth** (see Bluetooth headphones), **Equalizer** (see Equalizer) and **Sleep timer**. The rest are in five groups: ▶ opens a group, and Back goes back to Settings. Each row shows its current value, and a change applies as soon as you pick it.
 
-- **Sound:** **Gain** (Low or High), **Output** (Auto, 3.5 mm or 4.4 mm), **Filter**, **Balance**.
+- **Sound:** **Gain** (Low or High), **Output** (Auto, 3.5 mm or 4.4 mm), **Filter**, **Balance**, **DRE** (the DACs' dynamic range enhancement: Off, On, or On, lower threshold; changing it restarts the DACs, so playback skips briefly).
 - **Display:** **Theme** picks the look of menus, lists, headers and Now Playing:
   - **Dark:** the default, light text on near-black, with a blue bar.
   - **Light:** dark text on a light background.

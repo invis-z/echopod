@@ -8,6 +8,8 @@
 const char SETTINGS_STORE_PATH[] = "/.rippl/settings.bin";
 
 static const HalAudioGain HAL_GAINS[GAIN_LEVEL_COUNT] = {HAL_AUDIO_GAIN_LOW, HAL_AUDIO_GAIN_HIGH};
+static const HalAudioDre HAL_DRES[DRE_MODE_COUNT] = {HAL_AUDIO_DRE_OFF, HAL_AUDIO_DRE_ON,
+                                                     HAL_AUDIO_DRE_ON_FIX};
 static const HalAudioOutput HAL_OUTPUTS[OUTPUT_JACK_COUNT] = {
     HAL_AUDIO_OUTPUT_AUTO, HAL_AUDIO_OUTPUT_SINGLE_ENDED, HAL_AUDIO_OUTPUT_BALANCED};
 static const HalUsbMode HAL_USB_MODES[USB_MODE_COUNT] = {HAL_USB_MODE_STORAGE, HAL_USB_MODE_DAC};
@@ -90,6 +92,7 @@ void settings_store_apply_hardware(const Settings *settings)
     hal_audio_set_gain(HAL_GAINS[settings->gain]);
     hal_audio_set_filter(settings->filter);
     hal_audio_set_balance(settings->balance);
+    hal_audio_set_dre(HAL_DRES[settings->options[OPTION_DRE]]);
     hal_audio_set_output(HAL_OUTPUTS[settings->output]);
     hal_system_set_usb_mode(HAL_USB_MODES[settings->usb_mode]);
     hal_system_set_dac_volume(settings->dac_volume);
