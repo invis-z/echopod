@@ -212,35 +212,13 @@ static void the_backdrop_runs_from_walnut_top_to_walnut_bottom(void)
     }
 }
 
-static void a_cover_fills_the_record_as_a_picture_disc(void)
+static void a_cover_is_a_round_label_with_a_vinyl_mask(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
-        scene.frame.tick = GLINT_STEPS / 4;
         CHECK_EQUAL(COVER_RED, probe(&scene, 10, 10));
-        CHECK_EQUAL(COVER_RED, probe(&scene, -42, -42));
-        CHECK_EQUAL(COVER_RED, probe(&scene, -62, 0));
-        CHECK_EQUAL(COVER_RED, probe(&scene, 0, -62));
-        CHECK_EQUAL(VINYL, probe(&scene, 4, 0));
-        CHECK_EQUAL(ALU, probe(&scene, 0, 0));
-        CHECK_EQUAL(ALU, probe(&scene, 0, -65));
-        CHECK(probe(&scene, -50, -50) != COVER_RED);
-        CHECK(probe(&scene, -60, 40) != COVER_RED);
-    }
-}
-
-static void a_picture_disc_has_no_grooves_but_the_glint_still_turns(void)
-{
-    for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
-        NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
-        scene.frame.tick = GLINT_STEPS / 4;
-        CHECK_EQUAL(COVER_RED, probe(&scene, -32, -32));
-        CHECK_EQUAL(COVER_RED, probe(&scene, -37, -37));
-        CHECK_EQUAL(COVER_RED, probe(&scene, -42, -42));
-        scene.frame.tick = 0;
-        CHECK_EQUAL(ALU, probe(&scene, 0, -50));
-        scene.frame.tick = GLINT_STEPS / 2;
-        CHECK_EQUAL(COVER_RED, probe(&scene, 0, -50));
+        CHECK_EQUAL(VINYL, probe(&scene, 27, 27));
+        CHECK_EQUAL(VINYL, probe(&scene, -27, -27));
     }
 }
 
@@ -254,10 +232,10 @@ static void without_a_cover_the_label_is_red_with_a_cream_ring(void)
     }
 }
 
-static void without_a_cover_the_rim_and_three_grooves_ring_the_record(void)
+static void the_rim_and_three_grooves_ring_the_record(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
-        NpTestScene scene = scene_of(layout, NP_TEST_NO_COVER);
+        NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
         CHECK_EQUAL(ALU, probe(&scene, 0, -65));
         CHECK(probe(&scene, 32, 32) != VINYL);
         CHECK(probe(&scene, 37, 37) != VINYL);
@@ -269,7 +247,7 @@ static void without_a_cover_the_rim_and_three_grooves_ring_the_record(void)
 static void the_glint_makes_one_turn_in_eighteen_ticks(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
-        NpTestScene scene = scene_of(layout, NP_TEST_NO_COVER);
+        NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
         scene.frame.tick = 0;
         CHECK_EQUAL(ALU, probe(&scene, 0, -50));
         np_test_draw(&scene, other);
@@ -285,7 +263,7 @@ static void the_glint_makes_one_turn_in_eighteen_ticks(void)
 static void the_glint_turns_clockwise_from_the_top(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
-        NpTestScene scene = scene_of(layout, NP_TEST_NO_COVER);
+        NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
         scene.frame.tick = 5;
         CHECK_EQUAL(VINYL, probe(&scene, -49, 9));
         scene.frame.tick = GLINT_STEPS - 5;
@@ -534,10 +512,9 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_backdrop_runs_from_walnut_top_to_walnut_bottom),
-        TEST_CASE(a_cover_fills_the_record_as_a_picture_disc),
-        TEST_CASE(a_picture_disc_has_no_grooves_but_the_glint_still_turns),
+        TEST_CASE(a_cover_is_a_round_label_with_a_vinyl_mask),
         TEST_CASE(without_a_cover_the_label_is_red_with_a_cream_ring),
-        TEST_CASE(without_a_cover_the_rim_and_three_grooves_ring_the_record),
+        TEST_CASE(the_rim_and_three_grooves_ring_the_record),
         TEST_CASE(the_glint_makes_one_turn_in_eighteen_ticks),
         TEST_CASE(the_glint_turns_clockwise_from_the_top),
         TEST_CASE(one_tick_repaints_only_the_glint_band),
