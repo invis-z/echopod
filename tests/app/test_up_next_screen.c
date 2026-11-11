@@ -87,6 +87,7 @@ static const Mp4BookChapter CHAPTERS[] = {{0, "Part 1"}, {200000, "Part 2"}, {40
 static void play_chaptered_book(void)
 {
     fake_hal_reset();
+    spoken_library_close(&spoken);
     Library *library = spoken_library_open(&spoken);
     player_init(&player, library);
     uint32_t size = mp4_book_build(book_file, sizeof book_file, CHAPTERS, 3);
