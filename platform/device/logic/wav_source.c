@@ -163,7 +163,7 @@ static bool read_block(WavSource *source, uint32_t first, uint32_t frames)
     WavBuffers *buffers = source->buffers;
     WavFormat format = source->format;
     uint32_t sample_bytes = format.bits / BITS_PER_BYTE;
-    uint32_t per_read = WAV_SOURCE_RAW_BYTES / format.frame_bytes;
+    uint32_t per_read = (uint32_t)WAV_SOURCE_RAW_BYTES / format.frame_bytes;
     for (uint32_t done = 0; done < frames;) {
         uint32_t count = frames - done < per_read ? frames - done : per_read;
         uint32_t offset = format.data_offset + (first + done) * format.frame_bytes;

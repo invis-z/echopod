@@ -76,7 +76,7 @@ static FatReserveResult find_free_run(FatVolume *volume, FatFile *bitmap, uint32
         }
         uint32_t within = bit % BITS_PER_SECTOR;
         uint8_t byte = fat_cached_sector(volume)[within / BITS_PER_BYTE];
-        run = (byte >> (within % BITS_PER_BYTE) & 1u) == 0 ? run + 1 : 0;
+        run = ((uint32_t)byte >> (within % BITS_PER_BYTE) & 1u) == 0 ? run + 1 : 0;
         if (run == needed) {
             *first = bit + 1 - needed + FIRST_CLUSTER;
             return FAT_RESERVE_CREATED;
@@ -274,7 +274,8 @@ static bool bitmap_free(FatVolume *volume, void *context, uint32_t cluster, bool
     }
     uint32_t within = bit % BITS_PER_SECTOR;
     *free =
-        (fat_cached_sector(volume)[within / BITS_PER_BYTE] >> (within % BITS_PER_BYTE) & 1u) == 0;
+        ((uint32_t)fat_cached_sector(volume)[within / BITS_PER_BYTE] >> (within % BITS_PER_BYTE) &
+         1u) == 0;
     return true;
 }
 

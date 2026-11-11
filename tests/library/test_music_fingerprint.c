@@ -275,8 +275,8 @@ static void a_card_deeper_than_the_limit_is_incomplete_and_closed(void)
     strcpy(parents[0], "/");
     for (int level = 0; level <= FINGERPRINT_MAX_DEPTH; level++) {
         add(parents[level], "d", true, 0, 1);
-        snprintf(parents[level + 1], FINGERPRINT_PATH_CAPACITY, "%s%sd", parents[level],
-                 level == 0 ? "" : "/");
+        strcpy(parents[level + 1], parents[level]);
+        strcat(parents[level + 1], level == 0 ? "d" : "/d");
     }
     CHECK(!fingerprint().complete);
     CHECK_EQUAL(0, tree.open_dirs);

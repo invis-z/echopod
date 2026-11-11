@@ -786,7 +786,8 @@ static void a_buffered_write_in_odd_sized_packets_lands_intact(void)
     read_10_block(block, 0x2A, 30, 6);
     send_command(msc, sizeof bytes, false, 0, block, 10);
     for (uint32_t offset = 0; offset < sizeof bytes; offset += 37) {
-        uint32_t chunk = sizeof bytes - offset < 37 ? sizeof bytes - offset : 37;
+        uint32_t left = (uint32_t)sizeof bytes - offset;
+        uint32_t chunk = left < 37 ? left : 37;
         msc_receive(msc, bytes + offset, chunk);
     }
     check_csw(collect(msc), 0, 0);

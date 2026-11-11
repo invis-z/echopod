@@ -853,8 +853,9 @@ static bool emit_folder_links(BuilderState *state, Prepared *prepared, const uin
         if (!builder_read_row(&prepared->rows, state, track, &row)) {
             return false;
         }
-        uint32_t mixed =
-            (mixed_albums[row.folder / MIXED_ALBUM_BITS] >> (row.folder % MIXED_ALBUM_BITS)) & 1u;
+        uint32_t mixed = ((uint32_t)mixed_albums[row.folder / MIXED_ALBUM_BITS] >>
+                          (row.folder % MIXED_ALBUM_BITS)) &
+                         1u;
         if (!put_link_tuple(&tail, phase->new_index[row.folder], KIND_TRACK, mixed ? 0 : row.disc,
                             mixed ? 0 : row.number, files[track], position)) {
             return false;

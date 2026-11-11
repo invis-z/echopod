@@ -16,7 +16,8 @@ static SimPower power;
 
 void sim_power_configure(uint8_t battery_percent, bool charging)
 {
-    uint32_t millivolts = EMPTY_MILLIVOLTS + battery_percent * MILLIVOLTS_PER_PERCENT_TENFOLD / 10;
+    uint32_t millivolts =
+        EMPTY_MILLIVOLTS + (uint32_t)battery_percent * MILLIVOLTS_PER_PERCENT_TENFOLD / 10;
     power = (SimPower){
         .battery = {.known = true,
                     .percent = battery_percent,

@@ -28,5 +28,8 @@ bool key_ladder_decode(uint16_t reading, Key *key)
 uint8_t key_ladder_mask(uint16_t reading)
 {
     Key key = KEY_POWER;
-    return key_ladder_decode(reading, &key) ? (uint8_t)(1u << key) : 0;
+    if (!key_ladder_decode(reading, &key)) {
+        return 0;
+    }
+    return (uint8_t)(1u << key);
 }

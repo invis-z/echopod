@@ -212,7 +212,9 @@ static uint32_t config_read(ConfigBits *bits, uint32_t count)
         uint32_t position = bits->position++;
         uint32_t bit = 0;
         if (position / BYTE_BITS < bits->length) {
-            bit = bits->bytes[position / BYTE_BITS] >> (BYTE_BITS - 1 - position % BYTE_BITS) & 1u;
+            bit = (uint32_t)bits->bytes[position / BYTE_BITS] >>
+                      (BYTE_BITS - 1 - position % BYTE_BITS) &
+                  1u;
         }
         value = value << 1 | bit;
     }

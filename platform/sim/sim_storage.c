@@ -1,3 +1,5 @@
+#define _DEFAULT_SOURCE 1
+
 #include "sim_storage.h"
 
 #include <dirent.h>

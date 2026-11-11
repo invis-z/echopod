@@ -98,11 +98,12 @@ static void check_write_at_end(Card *card, const char *path)
     for (uint32_t index = 0; index < sizeof written; index++) {
         written[index] = (uint8_t)(0x5A ^ index);
     }
-    CHECK(fat_write(&card->volume, &file, file.size - sizeof written, written, sizeof written));
+    CHECK(fat_write(&card->volume, &file, file.size - (uint32_t)sizeof written, written,
+                    sizeof written));
     remount(card);
     CHECK(fat_open(&card->volume, path, &file));
     uint8_t bytes[sizeof written];
-    CHECK(fat_read(&card->volume, &file, file.size - sizeof bytes, bytes, sizeof bytes));
+    CHECK(fat_read(&card->volume, &file, file.size - (uint32_t)sizeof bytes, bytes, sizeof bytes));
     CHECK(memcmp(bytes, written, sizeof bytes) == 0);
 }
 

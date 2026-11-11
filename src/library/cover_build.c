@@ -105,7 +105,7 @@ static uint32_t bit_bytes(uint32_t bits)
 
 static bool bit_set(const uint8_t *bits, uint32_t index)
 {
-    return (bits[index / BITS_PER_BYTE] >> (index % BITS_PER_BYTE) & 1u) != 0;
+    return ((uint32_t)bits[index / BITS_PER_BYTE] >> (index % BITS_PER_BYTE) & 1u) != 0;
 }
 
 static void set_bit(uint8_t *bits, uint32_t index)
@@ -135,8 +135,9 @@ static CoverState *prepare(const CoverJob *job, uint32_t albums, CoverLayout lay
     uint8_t *end = cursor + job->size;
     uint32_t capacity = index_capacity(layout, albums, previous);
     CoverState *state = (CoverState *)take(&cursor, end, sizeof(CoverState));
-    CoverEntry *index = (CoverEntry *)take(&cursor, end, capacity * sizeof(CoverEntry) + 1);
-    uint16_t *slots = (uint16_t *)take(&cursor, end, capacity * sizeof(uint16_t) + 1);
+    CoverEntry *index =
+        (CoverEntry *)take(&cursor, end, capacity * (uint32_t)sizeof(CoverEntry) + 1);
+    uint16_t *slots = (uint16_t *)take(&cursor, end, capacity * (uint32_t)sizeof(uint16_t) + 1);
     uint8_t *claimed = take(&cursor, end, bit_bytes(capacity) + 1);
     uint8_t *used_slots = take(&cursor, end, bit_bytes(layout.slots) + 1);
     if (state == NULL || index == NULL || slots == NULL || claimed == NULL || used_slots == NULL) {

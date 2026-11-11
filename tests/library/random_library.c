@@ -136,7 +136,7 @@ static void make_track(RandomLibrary *library, Random *random, uint32_t index, u
     char title_text[TEXT_CAPACITY];
     char folder_artist[TEXT_CAPACITY];
     char folder_album[TEXT_CAPACITY];
-    char path[TEXT_CAPACITY * 3];
+    char path[TEXT_CAPACITY * 4];
     artist_name(random, artist, artist_text, sizeof artist_text);
     bool compilation = below(random, 12) == 0;
     bool guessed = below(random, 3) == 0;
