@@ -1395,7 +1395,7 @@ static void a_refused_track_says_why_it_was_skipped(void)
     error_log_forget();
     play_first_album_track();
     CHECK(playing_path_is(SHOOT_TO_THRILL_PATH));
-    CHECK(toast_is("192 kHz isn't supported yet"));
+    CHECK(toast_is("192 kHz isn't supported"));
     uint32_t size = 0;
     const char *log = (const char *)fake_hal_file_bytes(ERROR_LOG_PATH, &size);
     CHECK(log != NULL && strstr(log, "can't play this sample rate: /") != NULL);

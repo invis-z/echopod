@@ -260,16 +260,16 @@ static void refusals_explain_themselves(void)
     char text[48];
     player_refusal_text((HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_RATE, .sample_rate = 192000},
                         text, sizeof text);
-    CHECK(path_is(text, "192 kHz isn't supported yet"));
+    CHECK(path_is(text, "192 kHz isn't supported"));
     player_refusal_text((HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_RATE, .sample_rate = 384000},
                         text, sizeof text);
-    CHECK(path_is(text, "384 kHz isn't supported yet"));
+    CHECK(path_is(text, "384 kHz isn't supported"));
     player_refusal_text(
         (HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_DEPTH, .sample_rate = 96000, .bits = 32},
         text, sizeof text);
-    CHECK(path_is(text, "96 kHz 32-bit isn't supported yet"));
+    CHECK(path_is(text, "96 kHz 32-bit isn't supported"));
     player_refusal_text((HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_FORMAT}, text, sizeof text);
-    CHECK(path_is(text, "This file type isn't supported yet"));
+    CHECK(path_is(text, "This file type isn't supported"));
     player_refusal_text((HalAudioRefusal){.problem = HAL_AUDIO_PROBLEM_UNREADABLE}, text,
                         sizeof text);
     CHECK(path_is(text, "Couldn't read the track"));
