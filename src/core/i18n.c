@@ -15,7 +15,7 @@ static const uint8_t MAGIC[MAGIC_SIZE] = {'E', 'L', 'N', 'G'};
 
 #ifdef ECHO_BUILTIN_ENGLISH
 typedef struct EnglishBlob {
-#define STRING(id, text) char id[sizeof text];
+#define STRING(id, text) char id[sizeof(text)];
 #include "core/strings_all.def"
 #undef STRING
 } EnglishBlob;

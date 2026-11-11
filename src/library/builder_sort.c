@@ -178,7 +178,7 @@ static bool merge_group(const SortJob *job, const Region *group, uint32_t count,
     }
     uint32_t share = arena_left(arena) / (count > 0 ? count : 1);
     share &= ~7u;
-    if (arena->failed || share < MINIMUM_RUN_BUFFER) {
+    if (heads == NULL || out_buffer == NULL || arena->failed || share < MINIMUM_RUN_BUFFER) {
         arena->failed = true;
         return false;
     }

@@ -2,12 +2,12 @@
 #include "faces.h"
 
 #define CHROME(top, bottom, line, text, off, backdrop)                                             \
-    {.background = backdrop,                                                                       \
-     .header_top = top,                                                                            \
-     .header_background = bottom,                                                                  \
-     .divider = line,                                                                              \
-     .header_text = text,                                                                          \
-     .text_tertiary = off,                                                                         \
+    {.background = (backdrop),                                                                     \
+     .header_top = (top),                                                                          \
+     .header_background = (bottom),                                                                \
+     .divider = (line),                                                                            \
+     .header_text = (text),                                                                        \
+     .text_tertiary = (off),                                                                       \
      .success = COLOR_RGB(120, 200, 96),                                                           \
      .danger = COLOR_RGB(248, 96, 72)}
 

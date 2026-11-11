@@ -506,7 +506,7 @@ static AlacResult decode_element(AlacDecoder *decoder, uint32_t first, uint32_t 
     uint32_t shift = bytes_shifted * BYTE_BITS;
     uint32_t chan_bits = config->bit_depth - shift + count - 1;
     uint32_t mix_bits = reader_read(reader, BYTE_BITS);
-    int32_t mix_res = (int8_t)reader_read(reader, BYTE_BITS);
+    int32_t mix_res = (int32_t)(reader_read(reader, BYTE_BITS) ^ 0x80u) - 0x80;
     Prediction predictions[FLAC_MAX_CHANNELS];
     for (uint32_t channel = 0; channel < count; channel++) {
         read_prediction(reader, &predictions[channel]);

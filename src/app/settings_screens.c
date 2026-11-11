@@ -336,7 +336,8 @@ static void choose_slot(void *context, int index)
 }
 
 #define OPTION_CHOICE(title, options, option)                                                      \
-    {title, options, NULL, (int)(sizeof options / sizeof options[0]), NULL, NULL, NULL, option + 1}
+    {(title), (options), NULL, (int)(sizeof(options) / sizeof((options)[0])),                      \
+     NULL,    NULL,      NULL, (option) + 1}
 
 ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     {STR_SETTINGS_SHUFFLE, SHUFFLE_OPTIONS, NULL, SHUFFLE_MODE_COUNT, current_shuffle,

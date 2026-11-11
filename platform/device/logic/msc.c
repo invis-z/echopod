@@ -80,10 +80,10 @@ static void put_le32(uint8_t *bytes, uint32_t value)
 void msc_init(Msc *msc, const MscLun *luns, uint8_t count)
 {
     *msc = (Msc){.lun_count = count, .stats = {.last_failed_lba = UINT32_MAX}, .write_sectors = 1};
-    for (uint8_t index = 0; index < MSC_MAX_LUNS; index++) {
+    for (uint32_t index = 0; index < MSC_MAX_LUNS; index++) {
         msc->stats.last_written_lba[index] = UINT32_MAX;
     }
-    for (uint8_t index = 0; index < count && index < MSC_MAX_LUNS; index++) {
+    for (uint32_t index = 0; index < count && index < MSC_MAX_LUNS; index++) {
         msc->luns[index] = luns[index];
         if (luns[index].present) {
             msc->present_at_start = (uint8_t)(msc->present_at_start | (1u << index));

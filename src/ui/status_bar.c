@@ -105,12 +105,12 @@ static char widest_digit(const Font *font)
 {
     char widest = '0';
     int widest_width = 0;
-    for (char digit = '0'; digit <= '9'; digit++) {
-        char text[2] = {digit, '\0'};
+    for (int digit = '0'; digit <= '9'; digit++) {
+        char text[2] = {(char)digit, '\0'};
         int width = text_width(font, text);
         if (width > widest_width) {
             widest_width = width;
-            widest = digit;
+            widest = (char)digit;
         }
     }
     return widest;

@@ -348,7 +348,7 @@ static void add_event(BtModule *module, char first, char second, uint32_t now_ms
 
 static void note_event(BtModule *module, const uint8_t *bytes, uint32_t size, uint32_t now_ms)
 {
-    bool same_status = bytes[1] == 'Q' && size > 2 && bytes[2] == module->status.link_status;
+    bool same_status = bytes[1] == 'Q' && size > 2 && (char)bytes[2] == module->status.link_status;
     if (bytes[1] == 'S' || same_status) {
         return;
     }

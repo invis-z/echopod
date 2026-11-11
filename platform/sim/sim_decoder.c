@@ -139,8 +139,7 @@ static bool open_qoa(SimDecoder *decoder, const char *path)
         return false;
     }
     long size = ftell(decoder->qoa_file);
-    rewind(decoder->qoa_file);
-    if (size <= 0) {
+    if (size <= 0 || fseek(decoder->qoa_file, 0, SEEK_SET) != 0) {
         fclose(decoder->qoa_file);
         decoder->qoa_file = NULL;
         return false;
@@ -239,7 +238,6 @@ static uint64_t read_native(SimDecoder *decoder, uint64_t count)
     case SIM_CODEC_OPUS:
         return sim_opus_read(&decoder->opus, native_samples, count, decoder->channels);
     case SIM_CODEC_QOA:
-        return 0;
     case SIM_CODEC_NONE:
         return 0;
     }

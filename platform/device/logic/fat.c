@@ -150,11 +150,10 @@ static bool find_fat_entry(FatVolume *volume, FatFile *directory, const char *na
         if (entry == NULL || entry[0] == ENTRY_END) {
             return false;
         }
-        if (entry[0] == ENTRY_DELETED) {
-            long_name.valid = false;
-        } else if (entry[ATTRIBUTES] == ATTRIBUTE_LONG_NAME) {
+        bool deleted = entry[0] == ENTRY_DELETED;
+        if (!deleted && entry[ATTRIBUTES] == ATTRIBUTE_LONG_NAME) {
             collect_long_name(volume, &long_name, entry);
-        } else if ((entry[ATTRIBUTES] & ATTRIBUTE_VOLUME_ID) == 0 &&
+        } else if (!deleted && (entry[ATTRIBUTES] & ATTRIBUTE_VOLUME_ID) == 0 &&
                    entry_matches(volume, &long_name, entry, name, length)) {
             *found = entry_file(volume, entry);
             volume->found_entry = index;
@@ -336,11 +335,11 @@ static bool next_fat_entry(FatVolume *volume, FatDirCursor *cursor, FatDirEntry 
             return false;
         }
         cursor->index++;
-        if (entry[0] == ENTRY_DELETED) {
-            long_name.valid = false;
-        } else if (entry[ATTRIBUTES] == ATTRIBUTE_LONG_NAME) {
+        bool deleted = entry[0] == ENTRY_DELETED;
+        if (!deleted && entry[ATTRIBUTES] == ATTRIBUTE_LONG_NAME) {
             collect_long_name(volume, &long_name, entry);
-        } else if ((entry[ATTRIBUTES] & ATTRIBUTE_VOLUME_ID) != 0 || is_dot_entry(entry)) {
+        } else if (deleted || (entry[ATTRIBUTES] & ATTRIBUTE_VOLUME_ID) != 0 ||
+                   is_dot_entry(entry)) {
             long_name.valid = false;
         } else {
             fill_entry(volume, &long_name, entry, found);
