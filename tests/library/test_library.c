@@ -54,6 +54,33 @@ static void the_fixture_opens_with_its_counts(void)
     CHECK_EQUAL(2, library_count(library, LIBRARY_PLAYLISTS));
 }
 
+static Library *with_record_byte(LibrarySection section, uint32_t index, uint32_t field,
+                                 uint8_t value)
+{
+    Library *library = fixture_library_open(&fixture);
+    LibrarySectionInfo info = library->sections[section];
+    fixture.bytes[info.offset + index * info.record_size + field] = value;
+    return library;
+}
+
+static void records_reaching_past_their_section_are_refused(void)
+{
+    LibraryAlbum album;
+    LibraryGroup group;
+    LibraryFolder folder;
+    CHECK(library_read_album(fixture_library_open(&fixture), 0, &album));
+    CHECK(!library_read_album(with_record_byte(LIBRARY_ALBUMS, 0, 13, 0xFF), 0, &album));
+    CHECK(!library_read_album(with_record_byte(LIBRARY_ALBUMS, 0, 11, 0xFF), 0, &album));
+    CHECK(library_read_group(fixture_library_open(&fixture), LIBRARY_ARTISTS, 0, &group));
+    CHECK(!library_read_group(with_record_byte(LIBRARY_ARTISTS, 0, 9, 0xFF), LIBRARY_ARTISTS, 0,
+                              &group));
+    CHECK(!library_read_group(with_record_byte(LIBRARY_GENRES, 0, 7, 0xFF), LIBRARY_GENRES, 0,
+                              &group));
+    CHECK(library_read_folder(fixture_library_open(&fixture), 0, &folder));
+    CHECK(!library_read_folder(with_record_byte(LIBRARY_FOLDERS, 0, 13, 0xFF), 0, &folder));
+    CHECK(!library_read_folder(with_record_byte(LIBRARY_FOLDERS, 0, 7, 0xFF), 0, &folder));
+}
+
 static void a_wrong_magic_is_rejected(void)
 {
     CHECK_EQUAL(LIBRARY_BAD_MAGIC, open_modified(0, 'X', fixture_size()));
@@ -234,6 +261,7 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_fixture_opens_with_its_counts),
+        TEST_CASE(records_reaching_past_their_section_are_refused),
         TEST_CASE(a_wrong_magic_is_rejected),
         TEST_CASE(a_newer_version_is_rejected),
         TEST_CASE(a_truncated_file_is_rejected),

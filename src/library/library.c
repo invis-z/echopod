@@ -139,6 +139,13 @@ uint32_t library_music_count(const Library *library, LibrarySection section)
     return counted && info.music < info.count ? info.music : info.count;
 }
 
+static bool range_fits(const Library *library, LibrarySection section, uint32_t first,
+                       uint64_t count)
+{
+    uint32_t available = library->sections[section].count;
+    return first <= available && count <= available - first;
+}
+
 bool library_read_track(const Library *library, uint32_t index, LibraryTrack *track)
 {
     uint8_t record[TRACK_SIZE];
@@ -175,7 +182,7 @@ bool library_read_album(const Library *library, uint32_t index, LibraryAlbum *al
         .track_count = u16_at(record, 12),
         .cover = u16_at(record, 14),
     };
-    return true;
+    return range_fits(library, LIBRARY_TRACKS, album->first_track, album->track_count);
 }
 
 bool library_read_group(const Library *library, LibrarySection section, uint32_t index,
@@ -190,7 +197,7 @@ bool library_read_group(const Library *library, LibrarySection section, uint32_t
         .first_link = u32_at(record, 4),
         .link_count = u16_at(record, 8),
     };
-    return true;
+    return range_fits(library, LIBRARY_LINKS, group->first_link, group->link_count);
 }
 
 bool library_read_folder(const Library *library, uint32_t index, LibraryFolder *folder)
@@ -206,7 +213,8 @@ bool library_read_folder(const Library *library, uint32_t index, LibraryFolder *
         .first_link = u32_at(record, 8),
         .track_count = u16_at(record, 12),
     };
-    return true;
+    return range_fits(library, LIBRARY_LINKS, folder->first_link,
+                      (uint64_t)folder->subfolder_count + folder->track_count);
 }
 
 bool library_read_index(const Library *library, LibrarySection section, uint32_t position,
