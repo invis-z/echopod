@@ -419,11 +419,23 @@ static void the_position_moves_from_the_audio_start_to_the_next_frame(void)
     free(flac.bytes);
 }
 
+static void a_corrupt_fixed_subframe_wraps_instead_of_overflowing(void)
+{
+    Buffer flac = load("corrupt_fixed_overflow", "flac");
+    CHECK(flac.size > 0);
+    CHECK_EQUAL(FLAC_OK, flac_open(&decoder, input_of(&flac)));
+    CHECK_EQUAL(FLAC_OK, flac_decode_frame(&decoder));
+    CHECK_EQUAL(1024u, decoder.block_samples);
+    CHECK_EQUAL(FLAC_ERROR, flac_decode_frame(&decoder));
+    free(flac.bytes);
+}
+
 int main(void)
 {
     flac_set_buffers(&decoder, first_bank, second_bank, FLAC_MAX_BLOCK);
     static const TestCase cases[] = {
         TEST_CASE(sixteen_bit_lpc_stereo_decodes_exactly),
+        TEST_CASE(a_corrupt_fixed_subframe_wraps_instead_of_overflowing),
         TEST_CASE(an_lpc_hook_that_restores_gives_the_same_samples),
         TEST_CASE(a_hook_that_declines_leaves_the_restore_to_software),
         TEST_CASE(fixed_predictors_never_reach_the_hook),

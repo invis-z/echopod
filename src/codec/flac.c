@@ -294,24 +294,30 @@ static bool read_residual(FlacDecoder *decoder, int32_t *residual, uint32_t bloc
 
 static void restore_fixed(int32_t *samples, uint32_t block_size, uint32_t order)
 {
+    if (order == 0) {
+        return;
+    }
     for (uint32_t index = order; index < block_size; index++) {
-        int32_t *s = &samples[index];
+        const int32_t *s = &samples[index];
+        uint32_t a = (uint32_t)s[-1];
+        uint32_t sum = (uint32_t)s[0];
         switch (order) {
         case 1:
-            s[0] += s[-1];
+            sum += a;
             break;
         case 2:
-            s[0] += 2 * s[-1] - s[-2];
+            sum += 2u * a - (uint32_t)s[-2];
             break;
         case 3:
-            s[0] += 3 * s[-1] - 3 * s[-2] + s[-3];
+            sum += 3u * a - 3u * (uint32_t)s[-2] + (uint32_t)s[-3];
             break;
         case 4:
-            s[0] += 4 * s[-1] - 6 * s[-2] + 4 * s[-3] - s[-4];
+            sum += 4u * a - 6u * (uint32_t)s[-2] + 4u * (uint32_t)s[-3] - (uint32_t)s[-4];
             break;
         default:
             break;
         }
+        samples[index] = (int32_t)sum;
     }
 }
 
