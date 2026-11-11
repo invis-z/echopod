@@ -2,8 +2,6 @@
 
 #include "reference_internal.h"
 
-#include "library/sort_key.h"
-
 typedef enum TrackField {
     FIELD_TITLE,
     FIELD_ARTIST,
@@ -17,7 +15,6 @@ typedef struct SortContext {
     const ReferenceBuilder *builder;
     const LibraryModel *model;
     TrackField field;
-    bool same_album;
 } SortContext;
 
 static uint32_t field_of(const TrackRecord *track, TrackField field)
@@ -427,20 +424,9 @@ static bool number_folders(const ReferenceBuilder *builder, Work *work, FolderTr
 static int by_folder_track(const void *context, uint16_t left, uint16_t right)
 {
     const SortContext *sort = context;
-    const TrackRecord *a = reference_track(sort->builder, sort->model->final_tracks[left]);
-    const TrackRecord *b = reference_track(sort->builder, sort->model->final_tracks[right]);
-    if (sort->same_album) {
-        int disc = compare_numbers(a->disc, b->disc);
-        if (disc != 0) {
-            return disc;
-        }
-        int number = compare_numbers(a->number, b->number);
-        if (number != 0) {
-            return number;
-        }
-    }
-    return natural_key_compare(reference_text(sort->builder, a->file_name),
-                               reference_text(sort->builder, b->file_name));
+    uint16_t a = sort->model->final_tracks[left];
+    uint16_t b = sort->model->final_tracks[right];
+    return by_track_order(context, a, b);
 }
 
 static bool collect_folder_tracks(const ReferenceBuilder *builder, Work *work, LibraryModel *model,
@@ -474,14 +460,8 @@ static bool collect_folder_tracks(const ReferenceBuilder *builder, Work *work, L
     }
     SortContext sort = {.builder = builder, .model = model, .field = FIELD_FILE_NAME};
     for (uint32_t node = 0; node < nodes; node++) {
-        uint32_t start = tree->track_start_of_node[node];
-        uint32_t tracks = tree->track_count_of_node[node];
-        sort.same_album = true;
-        for (uint32_t index = 1; index < tracks && sort.same_album; index++) {
-            sort.same_album = model->track_album[tree->tracks[start + index]] ==
-                              model->track_album[tree->tracks[start]];
-        }
-        reference_stable_sort(tree->tracks + start, scratch, tracks, by_folder_track, &sort);
+        reference_stable_sort(tree->tracks + tree->track_start_of_node[node], scratch,
+                              tree->track_count_of_node[node], by_folder_track, &sort);
     }
     return true;
 }
