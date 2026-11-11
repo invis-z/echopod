@@ -27,8 +27,8 @@ static const char *const LIBRARY[] = {
     "Cover Flow order", "Artist albums",  "Folders & playlists", "Lyrics"};
 static const char *const BUTTONS[] = {"Volume buttons", "Swap volume buttons", "Menu button",
                                       "Power on"};
-static const char *const SYSTEM[] = {"Language", "Date & time", "Auto off", "USB mode",
-                                     "Ask when connected"};
+static const char *const SYSTEM[] = {"Language", "Date & time", "Daylight saving",
+                                     "Auto off", "USB mode",    "Ask when connected"};
 
 typedef struct GroupRows {
     const char *title;

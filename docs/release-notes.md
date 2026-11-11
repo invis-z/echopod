@@ -30,6 +30,10 @@ The first Rippl release, forked from EchoPod 0.12.0.
 
 - In both portraits the volume buttons turn the volume the other way, while holding them still skips and seeks as in landscape. **Swap volume buttons** now reverses only the volume, not lists, skips or seeking.
 
+### Clock
+
+- **Daylight saving:** Settings → System → Daylight saving moves the clock an hour in summer by itself, for Europe, US & Canada, Australia or New Zealand, or by the rule Tide reads from the computer's time zone (From computer). The time zone setting is now the standard-time zone and the clock chip keeps standard time; changing the setting keeps the time shown. Tide's `clock.bin` now carries the computer's standard offset and its rule.
+
 ### Languages and text
 
 - Language packs other than English and Chinese load from `Languages/<code>.bin` on the internal drive, and Settings → Language lists the built-in two plus the packs it finds. A pack that is missing, too big or damaged is refused and the player starts in English.
@@ -43,7 +47,7 @@ The first Rippl release, forked from EchoPod 0.12.0.
 ### Memory
 
 - The language pack moves to 16 KB of RAM that is free once the player has started, so a pack can be 16 KB instead of 12, and the glyph cache grows from 34 to 46 KB.
-- About 10 KB of code (the Bluetooth protocol and the Bluetooth, Equalizer, Music folders and Date & time screens) loads after start into a second code area, leaving about 15 KB free in the main one. If it fails to load, those screens say to reinstall the update and Bluetooth stays off.
+- About 10 KB of code (the Bluetooth protocol and the Bluetooth, Equalizer, Music folders and Date & time screens) loads after start into a second code area, leaving about 21 KB free in the main one. If it fails to load, those screens say to reinstall the update and Bluetooth stays off.
 
 ### Removed
 

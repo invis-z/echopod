@@ -204,20 +204,24 @@ A folder key is the FNV-1a hash of the folder's library path: its name as the fi
 
 ## Clock record
 
-`/.rippl/clock.bin` (20 bytes, little-endian) is written by Tide as the last step of a sync, so the player can set its clock chip from the computer's when the USB session ends. The player never writes it.
+`/.rippl/clock.bin` (32 bytes, little-endian) is written by Tide as the last step of a sync, so the player can set its clock chip from the computer's when the USB session ends. The player never writes it.
 
 | Offset | Size | Field |
 |---|---|---|
 | 0 | 4 | `ECLK` |
 | 4 | 1 | version, 1 |
-| 5 | 1 | flags, 0 |
+| 5 | 1 | flags: bit 0, a daylight saving rule follows; the other bits 0 |
 | 6 | 2 | reserved, 0 |
 | 8 | 4 | the computer's time as Unix seconds (UTC) |
-| 12 | 2 | the computer's UTC offset in minutes, signed (`time.localtime().tm_gmtoff`) |
-| 14 | 2 | reserved, 0 |
-| 16 | 4 | FNV-1a of bytes 0–15 |
+| 12 | 2 | the computer's standard UTC offset in minutes, signed |
+| 14 | 2 | the minutes daylight saving adds, 1–180 (0 without a rule) |
+| 16 | 6 | when daylight saving starts: month (1–12), week (1–4, or 5 for the last), weekday (0 Sunday – 6 Saturday), a reserved 0, then the minutes after midnight of that day in standard time, signed (−10,080 to 10,080, so a change can be written as the 4th Thursday at 26:00) |
+| 22 | 6 | when it ends, the same way, also in standard time |
+| 28 | 4 | FNV-1a of bytes 0–27 |
 
-The player accepts a record whose magic, version and checksum agree and whose time falls in 2024–2099, and only when its time differs from the record it saw when it started: it sets the chip to the time plus the offset (the chip keeps local time), stores the offset as its time zone setting (rounded to 15 minutes), and ignores the same record from then on.
+Without a rule, bytes 14–27 are 0. Tide reads the computer's UTC offset with `time.localtime` over the next eight years (or two, if the rule changes within eight), finds each change to the second, and writes a rule only when one yearly rule in this form gives every change it found and the offset it sampled every six hours; otherwise it writes the current offset and no rule. The rule's dates and times are the computer's local ones, like a POSIX `TZ` rule's `Mm.w.d/time`, with the end moved from summer time into standard time.
+
+The player accepts a record whose magic, version and checksum agree, whose time falls in 2024–2099, whose offset is −12:00 to +14:00, and whose rule, if any, has every field in range and starts and ends at different times; and only when its time differs from the record it saw when it started. It sets the chip to the time plus the standard offset (the chip keeps standard local time), stores the offset as its time zone setting (rounded to 15 minutes), sets Daylight saving to From computer (Off without a rule), and ignores the same record from then on. It reads the rule again from the file at every start.
 
 ## Covers
 

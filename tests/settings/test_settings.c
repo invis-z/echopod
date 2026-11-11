@@ -322,18 +322,17 @@ static void the_animation_speed_scales_animation_times(void)
     CHECK_EQUAL(70u, settings_animation_ms(NULL, 70));
 }
 
-static void a_file_is_43_bytes_with_every_byte_in_use(void)
+static void a_file_is_44_bytes_with_every_byte_in_use(void)
 {
     Settings settings = settings_with_every_option_at_its_top();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(43, SETTINGS_FILE_SIZE);
+    CHECK_EQUAL(44, SETTINGS_FILE_SIZE);
     CHECK_EQUAL(1, bytes[VERSION_FIELD]);
     CHECK_EQUAL(3, bytes[BRIGHTNESS_FIELD]);
     CHECK_EQUAL(ANIMATION_FASTER, bytes[OPTIONS_FIELD + OPTION_ANIMATION_SPEED]);
     CHECK_EQUAL(SETTINGS_FILE_SIZE - 4, CHECKSUM_FIELD);
-    CHECK_EQUAL(settings_option_count((SettingOption)(SETTINGS_OPTION_COUNT - 1)) - 1,
-                bytes[CHECKSUM_FIELD - 1]);
+    CHECK_EQUAL(DAYLIGHT_CHOICE_COUNT - 1, bytes[CHECKSUM_FIELD - 1]);
     uint32_t checksum = hash_update(HASH_START, bytes, CHECKSUM_FIELD);
     CHECK_EQUAL(checksum, (uint32_t)bytes[CHECKSUM_FIELD] |
                               (uint32_t)bytes[CHECKSUM_FIELD + 1] << 8 |
@@ -440,7 +439,7 @@ int main(void)
         TEST_CASE(the_new_options_are_saved_and_read_back),
         TEST_CASE(the_new_options_default_to_their_first_choice),
         TEST_CASE(the_animation_speed_scales_animation_times),
-        TEST_CASE(a_file_is_43_bytes_with_every_byte_in_use),
+        TEST_CASE(a_file_is_44_bytes_with_every_byte_in_use),
         TEST_CASE(a_new_option_out_of_range_is_rejected),
         TEST_CASE(an_option_out_of_range_is_rejected),
         TEST_CASE(the_now_playing_face_is_saved_in_its_option_byte),
