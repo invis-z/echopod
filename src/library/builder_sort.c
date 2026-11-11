@@ -1,6 +1,7 @@
 #include <stddef.h>
 
 #include "builder_internal.h"
+#include "core/borrowed.h"
 
 enum {
     STREAM_BUFFER = 4096,
@@ -22,9 +23,9 @@ typedef struct Runs {
     uint32_t count;
 } Runs;
 
-static uint32_t *chunk_offsets(const Chunk *chunk)
+static BorrowedWord *chunk_offsets(const Chunk *chunk)
 {
-    return (uint32_t *)(void *)(chunk->memory + chunk->size - chunk->count * 4);
+    return (BorrowedWord *)(chunk->memory + chunk->size - chunk->count * 4);
 }
 
 static bool fits(const Chunk *chunk, uint32_t length)
@@ -44,7 +45,7 @@ static void add_record(Chunk *chunk, const uint8_t *record, uint32_t length)
     chunk->used += length;
 }
 
-static void merge(const Chunk *chunk, const uint32_t *from, uint32_t *to, uint32_t start,
+static void merge(const Chunk *chunk, const BorrowedWord *from, BorrowedWord *to, uint32_t start,
                   uint32_t middle, uint32_t end, const SortJob *job)
 {
     uint32_t left = start;
@@ -57,32 +58,32 @@ static void merge(const Chunk *chunk, const uint32_t *from, uint32_t *to, uint32
     }
 }
 
-static uint32_t *sort_chunk(Chunk *chunk, const SortJob *job)
+static BorrowedWord *sort_chunk(Chunk *chunk, const SortJob *job)
 {
     uint32_t count = chunk->count;
-    uint32_t *items = chunk_offsets(chunk);
+    BorrowedWord *items = chunk_offsets(chunk);
     for (uint32_t low = 0, high = count; low + 1 < high; low++, high--) {
         uint32_t swap = items[low];
         items[low] = items[high - 1];
         items[high - 1] = swap;
     }
-    uint32_t *scratch = (uint32_t *)(void *)(chunk->memory + ((chunk->used + 3) & ~3u));
-    uint32_t *from = items;
-    uint32_t *to = scratch;
+    BorrowedWord *scratch = (BorrowedWord *)(chunk->memory + ((chunk->used + 3) & ~3u));
+    BorrowedWord *from = items;
+    BorrowedWord *to = scratch;
     for (uint32_t width = 1; width < count; width *= 2) {
         for (uint32_t start = 0; start < count; start += 2 * width) {
             uint32_t middle = start + width < count ? start + width : count;
             uint32_t end = start + 2 * width < count ? start + 2 * width : count;
             merge(chunk, from, to, start, middle, end, job);
         }
-        uint32_t *swap = from;
+        BorrowedWord *swap = from;
         from = to;
         to = swap;
     }
     return from;
 }
 
-static bool write_run(const Chunk *chunk, const uint32_t *order, const SortJob *job,
+static bool write_run(const Chunk *chunk, const BorrowedWord *order, const SortJob *job,
                       uint8_t *buffer, Runs *runs)
 {
     if (runs->count >= MAX_RUNS) {

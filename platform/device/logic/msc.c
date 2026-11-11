@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#include "core/borrowed.h"
+
 enum {
     CBW_LENGTH = 31,
     CSW_LENGTH = 13,
@@ -426,8 +428,8 @@ static void copy_bytes(uint8_t *to, const uint8_t *from, uint32_t count)
 {
     bool aligned = (((uintptr_t)to | (uintptr_t)from | count) & 3u) == 0;
     if (aligned) {
-        uint32_t *to_words = (uint32_t *)(void *)to;
-        const uint32_t *from_words = (const uint32_t *)(const void *)from;
+        BorrowedWord *to_words = (BorrowedWord *)to;
+        const BorrowedWord *from_words = (const BorrowedWord *)from;
         for (uint32_t index = 0; index < count / 4; index++) {
             to_words[index] = from_words[index];
         }

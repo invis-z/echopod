@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "core/borrowed.h"
 #include "library/playlist_reader.h"
 #include "library/track_fields.h"
 #include "library/track_tags.h"
@@ -27,7 +28,7 @@ typedef struct Level {
     bool partial;
 } Level;
 
-typedef struct ScanState {
+typedef struct ECHO_BORROWED ScanState {
     LibraryBuilder builder;
     TrackTags tags;
     TrackFields fields;
@@ -48,8 +49,8 @@ typedef struct ScanState {
 } ScanState;
 
 typedef struct Listing {
-    uint32_t *offsets;
-    uint32_t *scratch;
+    BorrowedWord *offsets;
+    BorrowedWord *scratch;
 } Listing;
 
 static uint32_t text_length(const char *text)
@@ -87,8 +88,8 @@ static int compare_names(const ScanState *state, uint32_t left, uint32_t right)
     return compare_texts(entry_name(state, left), entry_name(state, right));
 }
 
-static void merge_names(const ScanState *state, const uint32_t *from, uint32_t *to, uint32_t start,
-                        uint32_t middle, uint32_t end)
+static void merge_names(const ScanState *state, const BorrowedWord *from, BorrowedWord *to,
+                        uint32_t start, uint32_t middle, uint32_t end)
 {
     uint32_t left = start;
     uint32_t right = middle;
@@ -99,17 +100,18 @@ static void merge_names(const ScanState *state, const uint32_t *from, uint32_t *
     }
 }
 
-static void sort_names(const ScanState *state, uint32_t *items, uint32_t *scratch, uint32_t count)
+static void sort_names(const ScanState *state, BorrowedWord *items, BorrowedWord *scratch,
+                       uint32_t count)
 {
-    uint32_t *from = items;
-    uint32_t *to = scratch;
+    BorrowedWord *from = items;
+    BorrowedWord *to = scratch;
     for (uint32_t width = 1; width < count; width *= 2) {
         for (uint32_t start = 0; start < count; start += 2 * width) {
             uint32_t middle = start + width < count ? start + width : count;
             uint32_t end = start + 2 * width < count ? start + 2 * width : count;
             merge_names(state, from, to, start, middle, end);
         }
-        uint32_t *swap = from;
+        BorrowedWord *swap = from;
         from = to;
         to = swap;
     }
@@ -138,10 +140,10 @@ static uint32_t align4(uint32_t value)
     return (value + 3) & ~3u;
 }
 
-static uint32_t *sorted_offsets(ScanState *state, uint32_t start, uint32_t count)
+static BorrowedWord *sorted_offsets(ScanState *state, uint32_t start, uint32_t count)
 {
     uint32_t table = align4(state->listing_used);
-    uint32_t *offsets = (uint32_t *)(void *)(state->listing + table);
+    BorrowedWord *offsets = (BorrowedWord *)(state->listing + table);
     uint32_t cursor = start;
     for (uint32_t index = 0; index < count; index++) {
         offsets[index] = cursor;
@@ -210,7 +212,7 @@ static bool batch_fits(const ScanState *state, const Batch *batch, uint32_t leng
 
 static void keep_smaller_half(ScanState *state, Batch *batch)
 {
-    uint32_t *offsets = sorted_offsets(state, batch->start, batch->count);
+    BorrowedWord *offsets = sorted_offsets(state, batch->start, batch->count);
     uint32_t keep = batch->count / 2;
     const char *first_dropped = entry_name(state, offsets[keep]);
     uint32_t length = text_length(first_dropped);
@@ -305,7 +307,7 @@ static ScanResult read_listing(ScanState *state, const ScanFileSystem *files, Le
 
 static ScanResult read_next_batch(ScanState *state, const ScanFileSystem *files, Level *level)
 {
-    const uint32_t *offsets = (const uint32_t *)(const void *)(state->listing + level->first);
+    const BorrowedWord *offsets = (const BorrowedWord *)(state->listing + level->first);
     const char *last = entry_name(state, offsets[level->count - 1]);
     uint32_t length = text_length(last);
     char *resume = (char *)state->listing + level->start + 2;
@@ -477,7 +479,7 @@ static ScanResult walk(ScanState *state, const ScanJob *job, ScanStats *stats)
                           state->depth > 0 ? state->levels[state->depth - 1].path_length : 1);
             continue;
         }
-        const uint32_t *offsets = (const uint32_t *)(const void *)(state->listing + level->first);
+        const BorrowedWord *offsets = (const BorrowedWord *)(state->listing + level->first);
         result = visit_entry(state, job, stats, offsets[level->next++]);
     }
     return result;
@@ -501,7 +503,7 @@ static bool split_memory(ScanState **state, const ScanJob *job)
     listing &= ~(uint32_t)(ALIGNMENT - 1);
     uint8_t *memory = (uint8_t *)job->memory + skip;
     uint32_t taken = separate ? 0 : listing;
-    *state = (ScanState *)(void *)memory;
+    *state = (ScanState *)memory;
     (*state)->listing = separate ? (uint8_t *)job->listing + listing_skip : memory + header;
     (*state)->listing_size = listing;
     (*state)->listing_used = 0;
