@@ -90,10 +90,10 @@ typedef struct Ink {
     FaceAlign align;
 } Ink;
 
-ECHO_NP_FACES_DATA static const char LETTER[] = "A";
-ECHO_NP_FACES_DATA static const uint8_t TOOTH_STEPS[TEETH] = {0, 85, 171};
+RIPPL_NP_FACES_DATA static const char LETTER[] = "A";
+RIPPL_NP_FACES_DATA static const uint8_t TOOTH_STEPS[TEETH] = {0, 85, 171};
 
-ECHO_NP_FACES_DATA static const Layout LANDSCAPE = {
+RIPPL_NP_FACES_DATA static const Layout LANDSCAPE = {
     .shell = {11, 27, 297, 140},
     .highlight = {17, 28, 285, 1},
     .label = {25, 32, 269, 92},
@@ -128,7 +128,7 @@ ECHO_NP_FACES_DATA static const Layout LANDSCAPE = {
     .codec_align = FACE_ALIGN_CENTRE,
 };
 
-ECHO_NP_FACES_DATA static const Layout PORTRAIT = {
+RIPPL_NP_FACES_DATA static const Layout PORTRAIT = {
     .shell = {8, 0, 153, 100},
     .highlight = {14, 1, 141, 1},
     .label = {20, 5, 129, 63},
@@ -163,39 +163,39 @@ ECHO_NP_FACES_DATA static const Layout PORTRAIT = {
     .codec_align = FACE_ALIGN_RIGHT,
 };
 
-ECHO_NP_FACES_CODE static bool present(const char *text)
+RIPPL_NP_FACES_CODE static bool present(const char *text)
 {
     return text != NULL && text[0] != '\0';
 }
 
-ECHO_NP_FACES_CODE static Rect rect_at(Box box, int top)
+RIPPL_NP_FACES_CODE static Rect rect_at(Box box, int top)
 {
     return (Rect){box.x, box.y + top, box.width, box.height};
 }
 
-ECHO_NP_FACES_CODE static void paint(const Pen *pen, Box box, Color color)
+RIPPL_NP_FACES_CODE static void paint(const Pen *pen, Box box, Color color)
 {
     canvas_fill_rect(pen->canvas, rect_at(box, pen->top), color);
 }
 
-ECHO_NP_FACES_CODE static Point centre_q4(int x, int y)
+RIPPL_NP_FACES_CODE static Point centre_q4(int x, int y)
 {
     return (Point){x * SHAPE_Q4 + SHAPE_Q4 / HALF, y * SHAPE_Q4 + SHAPE_Q4 / HALF};
 }
 
-ECHO_NP_FACES_CODE static void disc(Canvas *canvas, Point centre, int radius, Color color)
+RIPPL_NP_FACES_CODE static void disc(Canvas *canvas, Point centre, int radius, Color color)
 {
     shape_ring(canvas, (ShapeRing){(int16_t)centre.x, (int16_t)centre.y, (int16_t)radius, 0},
                color);
 }
 
-ECHO_NP_FACES_CODE static void put(Canvas *canvas, Ink ink, Rect box, const char *text)
+RIPPL_NP_FACES_CODE static void put(Canvas *canvas, Ink ink, Rect box, const char *text)
 {
     Rect fitted = face_fitted_area(ink.font, box, text, ink.align);
     label_draw(canvas, (TextStyle){ink.font, ink.color}, (Label){fitted, text});
 }
 
-ECHO_NP_FACES_CODE static void draw_screws(const Pen *pen)
+RIPPL_NP_FACES_CODE static void draw_screws(const Pen *pen)
 {
     const Layout *layout = pen->layout;
     for (int index = 0; index < 4; index++) {
@@ -206,7 +206,7 @@ ECHO_NP_FACES_CODE static void draw_screws(const Pen *pen)
     }
 }
 
-ECHO_NP_FACES_CODE static void draw_shell(const Pen *pen)
+RIPPL_NP_FACES_CODE static void draw_shell(const Pen *pen)
 {
     const Layout *layout = pen->layout;
     shape_rounded(pen->canvas, rect_at(layout->shell, pen->top), SHELL_RADIUS, SHELL);
@@ -214,7 +214,7 @@ ECHO_NP_FACES_CODE static void draw_shell(const Pen *pen)
     draw_screws(pen);
 }
 
-ECHO_NP_FACES_CODE static void draw_letters(const Pen *pen, const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static void draw_letters(const Pen *pen, const NowPlayingFrame *frame)
 {
     const Layout *layout = pen->layout;
     const ThemeFonts *fonts = &frame->theme->fonts;
@@ -226,7 +226,7 @@ ECHO_NP_FACES_CODE static void draw_letters(const Pen *pen, const NowPlayingFram
     }
 }
 
-ECHO_NP_FACES_CODE static void draw_label(const Pen *pen, const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static void draw_label(const Pen *pen, const NowPlayingFrame *frame)
 {
     const Layout *layout = pen->layout;
     paint(pen, layout->label, LABEL);
@@ -239,7 +239,7 @@ ECHO_NP_FACES_CODE static void draw_label(const Pen *pen, const NowPlayingFrame 
     draw_letters(pen, frame);
 }
 
-ECHO_NP_FACES_CODE static void draw_reel(Canvas *window, const Layout *layout, const Reel *reel)
+RIPPL_NP_FACES_CODE static void draw_reel(Canvas *window, const Layout *layout, const Reel *reel)
 {
     disc(window, reel->centre, reel->pack, TAPE);
     disc(window, reel->centre, layout->hub, LABEL);
@@ -252,7 +252,7 @@ ECHO_NP_FACES_CODE static void draw_reel(Canvas *window, const Layout *layout, c
     }
 }
 
-ECHO_NP_FACES_CODE static void draw_reels(const Pen *pen, const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static void draw_reels(const Pen *pen, const NowPlayingFrame *frame)
 {
     const Layout *layout = pen->layout;
     int high = layout->pack_max;
@@ -270,7 +270,7 @@ ECHO_NP_FACES_CODE static void draw_reels(const Pen *pen, const NowPlayingFrame 
     }
 }
 
-ECHO_NP_FACES_CODE static void draw_window(const Pen *pen, const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static void draw_window(const Pen *pen, const NowPlayingFrame *frame)
 {
     const Layout *layout = pen->layout;
     shape_rounded(pen->canvas, rect_at(layout->frame, pen->top), FRAME_RADIUS, SHELL);
@@ -283,7 +283,7 @@ ECHO_NP_FACES_CODE static void draw_window(const Pen *pen, const NowPlayingFrame
     face_icon_draw(pen->canvas, icon, rect_at(layout->icon, pen->top), LABEL);
 }
 
-ECHO_NP_FACES_CODE static void draw_head(const Pen *pen, const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static void draw_head(const Pen *pen, const NowPlayingFrame *frame)
 {
     const Layout *layout = pen->layout;
     shape_trapezoid(pen->canvas, rect_at(layout->trap, pen->top), layout->inset, SHELL_HI);
@@ -296,7 +296,7 @@ ECHO_NP_FACES_CODE static void draw_head(const Pen *pen, const NowPlayingFrame *
     face_bar_draw(pen->canvas, frame, &bar);
 }
 
-ECHO_NP_FACES_CODE static void draw_text(Canvas *canvas, const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static void draw_text(Canvas *canvas, const NowPlayingFrame *frame)
 {
     const ThemeFonts *fonts = &frame->theme->fonts;
     FaceLine title = {fonts->title, {33, 33, 253, 20}, INK, INK, FACE_ALIGN_LEFT};
@@ -307,7 +307,7 @@ ECHO_NP_FACES_CODE static void draw_text(Canvas *canvas, const NowPlayingFrame *
     face_times_draw(canvas, frame, &times);
 }
 
-ECHO_NP_FACES_CODE static void draw_format(Canvas *canvas, const NowPlayingFrame *frame, int top)
+RIPPL_NP_FACES_CODE static void draw_format(Canvas *canvas, const NowPlayingFrame *frame, int top)
 {
     char buffer[FACE_FEEDBACK_CAPACITY];
     const char *feedback = face_feedback_text(frame, buffer, sizeof buffer);
@@ -318,7 +318,7 @@ ECHO_NP_FACES_CODE static void draw_format(Canvas *canvas, const NowPlayingFrame
     }
 }
 
-ECHO_NP_FACES_CODE static void draw_card_text(Canvas *canvas, const NowPlayingFrame *frame, int c)
+RIPPL_NP_FACES_CODE static void draw_card_text(Canvas *canvas, const NowPlayingFrame *frame, int c)
 {
     const ThemeFonts *fonts = &frame->theme->fonts;
     bool lyric = present(frame->lyric);
@@ -334,7 +334,7 @@ ECHO_NP_FACES_CODE static void draw_card_text(Canvas *canvas, const NowPlayingFr
     face_times_draw(canvas, frame, &times);
 }
 
-ECHO_NP_FACES_CODE static void draw_card(Canvas *canvas, const NowPlayingFrame *frame, int c)
+RIPPL_NP_FACES_CODE static void draw_card(Canvas *canvas, const NowPlayingFrame *frame, int c)
 {
     canvas_fill_rect(canvas, (Rect){8, c, 153, 109}, LABEL);
     canvas_fill_rect(canvas, (Rect){8, c, 153, 2}, RED);
@@ -344,7 +344,7 @@ ECHO_NP_FACES_CODE static void draw_card(Canvas *canvas, const NowPlayingFrame *
     draw_card_text(canvas, frame, c);
 }
 
-ECHO_NP_FACES_CODE void face_cassette_draw(const NowPlayingFrame *frame, Canvas *canvas)
+RIPPL_NP_FACES_CODE void face_cassette_draw(const NowPlayingFrame *frame, Canvas *canvas)
 {
     bool landscape = frame->area.width > frame->area.height;
     int top = landscape ? 0 : frame->area.y + (frame->area.height - CARD_HEIGHT) / HALF;

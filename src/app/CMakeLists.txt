@@ -1,4 +1,4 @@
-add_library(echo_app STATIC
+add_library(rippl_app STATIC
     app.c
     card_files.c
     clock_store.c
@@ -11,7 +11,7 @@ add_library(echo_app STATIC
     favorites_store.c
     diagnostics_values.c
     diagnostics_rows.c
-    $<IF:$<BOOL:${ECHO_RELEASE}>,diagnostics_menu_release.c,diagnostics_menu.c>
+    $<IF:$<BOOL:${RIPPL_RELEASE}>,diagnostics_menu_release.c,diagnostics_menu.c>
     draw_profile.c
     equalizer_files.c
     equalizer_store.c
@@ -40,11 +40,11 @@ add_library(echo_app STATIC
     screens/stopwatch_screen.c
     screens/test_pattern_screen.c
 )
-target_include_directories(echo_app PUBLIC include PRIVATE .)
+target_include_directories(rippl_app PUBLIC include PRIVATE .)
 if(CMAKE_CROSSCOMPILING)
-    target_compile_definitions(echo_app PRIVATE ECHO_RESIDENT_TABLES ECHO_EQ_FILES_HIDDEN)
+    target_compile_definitions(rippl_app PRIVATE RIPPL_RESIDENT_TABLES RIPPL_EQ_FILES_HIDDEN)
 endif()
-target_link_libraries(echo_app
-    PUBLIC echo_core echo_gfx echo_ui echo_fonts echo_library echo_playback echo_np_faces echo_settings echo_sound echo_hal
-    PRIVATE echo_options echo_compact echo_lto
+target_link_libraries(rippl_app
+    PUBLIC rippl_core rippl_gfx rippl_ui rippl_fonts rippl_library rippl_playback rippl_np_faces rippl_settings rippl_sound rippl_hal
+    PRIVATE rippl_options rippl_compact rippl_lto
 )

@@ -2,6 +2,6 @@
 
 #include <stdint.h>
 
-#define ECHO_BORROWED __attribute__((__may_alias__))
+#define RIPPL_BORROWED __attribute__((__may_alias__))
 
-typedef uint32_t ECHO_BORROWED BorrowedWord;
+typedef uint32_t RIPPL_BORROWED BorrowedWord;

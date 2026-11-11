@@ -9,8 +9,8 @@
 #include "playback/resume_state.h"
 #include "playback/spoken.h"
 
-const char PLAYER_RESUME_PATH[] = "/.echo/resume.bin";
-const char PLAYER_UP_NEXT_PATH[] = "/.echo/upnext.bin";
+const char PLAYER_RESUME_PATH[] = "/.rippl/resume.bin";
+const char PLAYER_UP_NEXT_PATH[] = "/.rippl/upnext.bin";
 
 static uint32_t current_position(const Player *player)
 {

@@ -15,7 +15,7 @@ typedef struct FaceFile {
     uint32_t size;
 } FaceFile;
 
-static const char FACE_PATHS[] = ECHO_GLYPH_FACE_PATHS;
+static const char FACE_PATHS[] = RIPPL_GLYPH_FACE_PATHS;
 static FaceFile faces[FONT_PACK_FACES];
 static uint32_t cache[SIM_GLYPHS_CACHE_BYTES / 4];
 static uint32_t loaded;

@@ -91,12 +91,12 @@ typedef struct VuMono {
     int value;
 } VuMono;
 
-ECHO_NP_FACES_DATA static const VuMark MARKS[MARK_COUNT] = {
+RIPPL_NP_FACES_DATA static const VuMark MARKS[MARK_COUNT] = {
     {-23, TICK_MAJOR, "20"}, {-13, TICK_MAJOR, "10"}, {-9, TICK_MINOR, ""},  {-6, TICK_MAJOR, "5"},
     {0, TICK_MAJOR, "3"},    {3, TICK_MINOR, ""},     {7, TICK_MINOR, ""},   {12, TICK_MAJOR, "0"},
     {17, TICK_MINOR, ""},    {21, TICK_MINOR, ""},    {25, TICK_MAJOR, "+3"}};
 
-ECHO_NP_FACES_DATA static const VuLayout LAND = {
+RIPPL_NP_FACES_DATA static const VuLayout LAND = {
     .text = {[ROW_TITLE] = {{10, 102, 300, 20}, VU_CREAM, VU_CREAM, FONT_TITLE, FACE_ALIGN_CENTRE},
              [ROW_SECOND] = {{10, 121, 300, 20}, VU_CREAM, VU_MUTED, FONT_BODY, FACE_ALIGN_CENTRE},
              [ROW_TIMES] = {{10, 147, 300, 16}, VU_CREAM, VU_MUTED, FONT_SMALL, FACE_ALIGN_LEFT}},
@@ -104,7 +104,7 @@ ECHO_NP_FACES_DATA static const VuLayout LAND = {
     .icon = {66, 150, 10, 10},
 };
 
-ECHO_NP_FACES_DATA static const VuLayout PORT = {
+RIPPL_NP_FACES_DATA static const VuLayout PORT = {
     .text = {[ROW_TITLE] = {{10, 174, 150, 22}, VU_CREAM, VU_CREAM, FONT_TITLE, FACE_ALIGN_CENTRE},
              [ROW_ARTIST] = {{10, 196, 150, 22}, VU_MUTED, VU_MUTED, FONT_BODY, FACE_ALIGN_CENTRE},
              [ROW_ALBUM] = {{10, 218, 150, 22}, VU_CREAM, VU_MUTED, FONT_BODY, FACE_ALIGN_CENTRE},
@@ -115,15 +115,15 @@ ECHO_NP_FACES_DATA static const VuLayout PORT = {
     .icon = {80, 305, 10, 10},
 };
 
-ECHO_NP_FACES_DATA static const uint8_t SWAY_WEIGHT[SWAY_TERMS] = {11, 7, 3};
-ECHO_NP_FACES_DATA static const uint8_t SWAY_RATE[2][SWAY_TERMS] = {{3, 7, 17}, {4, 6, 13}};
-ECHO_NP_FACES_DATA static const uint8_t SWAY_PHASE[2][SWAY_TERMS] = {{0, 64, 0}, {96, 160, 48}};
+RIPPL_NP_FACES_DATA static const uint8_t SWAY_WEIGHT[SWAY_TERMS] = {11, 7, 3};
+RIPPL_NP_FACES_DATA static const uint8_t SWAY_RATE[2][SWAY_TERMS] = {{3, 7, 17}, {4, 6, 13}};
+RIPPL_NP_FACES_DATA static const uint8_t SWAY_PHASE[2][SWAY_TERMS] = {{0, 64, 0}, {96, 160, 48}};
 
-ECHO_NP_FACES_DATA static const char LEGEND[] = "VU";
-ECHO_NP_FACES_DATA static const char LETTER_LEFT[] = "L";
-ECHO_NP_FACES_DATA static const char LETTER_RIGHT[] = "R";
+RIPPL_NP_FACES_DATA static const char LEGEND[] = "VU";
+RIPPL_NP_FACES_DATA static const char LETTER_LEFT[] = "L";
+RIPPL_NP_FACES_DATA static const char LETTER_RIGHT[] = "R";
 
-ECHO_NP_FACES_CODE static int vu_needle(uint32_t tick, uint32_t channel, bool playing)
+RIPPL_NP_FACES_CODE static int vu_needle(uint32_t tick, uint32_t channel, bool playing)
 {
     if (!playing) {
         return 0;
@@ -138,7 +138,7 @@ ECHO_NP_FACES_CODE static int vu_needle(uint32_t tick, uint32_t channel, bool pl
     return value > NEEDLE_MAX ? NEEDLE_MAX : value;
 }
 
-ECHO_NP_FACES_CODE static FaceLine text_line(const NowPlayingFrame *frame, const VuText *text)
+RIPPL_NP_FACES_CODE static FaceLine text_line(const NowPlayingFrame *frame, const VuText *text)
 {
     const ThemeFonts *fonts = &frame->theme->fonts;
     const Font *font = text->font == FONT_TITLE  ? fonts->title
@@ -147,23 +147,23 @@ ECHO_NP_FACES_CODE static FaceLine text_line(const NowPlayingFrame *frame, const
     return (FaceLine){font, text->area, text->emphasis, text->color, (FaceAlign)text->align};
 }
 
-ECHO_NP_FACES_CODE static FaceLine plain_line(const Font *font, Rect area, Color color,
-                                              FaceAlign align)
+RIPPL_NP_FACES_CODE static FaceLine plain_line(const Font *font, Rect area, Color color,
+                                               FaceAlign align)
 {
     return (FaceLine){font, area, color, color, align};
 }
 
-ECHO_NP_FACES_CODE static Point pivot_of(Point origin)
+RIPPL_NP_FACES_CODE static Point pivot_of(Point origin)
 {
     return (Point){origin.x + PIVOT_X, origin.y + PIVOT_Y};
 }
 
-ECHO_NP_FACES_CODE static int16_t centre_q4(int pixel)
+RIPPL_NP_FACES_CODE static int16_t centre_q4(int pixel)
 {
     return (int16_t)(pixel * SHAPE_Q4 + SHAPE_Q4 / HALF);
 }
 
-ECHO_NP_FACES_CODE static Canvas dial_face(Canvas *canvas, Point origin)
+RIPPL_NP_FACES_CODE static Canvas dial_face(Canvas *canvas, Point origin)
 {
     shape_rounded(canvas, (Rect){origin.x, origin.y, DIAL_WIDTH, DIAL_HEIGHT}, 4, VU_BEZEL);
     Rect face = {origin.x + FACE_INSET, origin.y + FACE_INSET, FACE_WIDTH, FACE_HEIGHT};
@@ -171,12 +171,12 @@ ECHO_NP_FACES_CODE static Canvas dial_face(Canvas *canvas, Point origin)
     return canvas_clipped(canvas, face);
 }
 
-ECHO_NP_FACES_CODE static int arc_x(Point pivot, int angle, int radius)
+RIPPL_NP_FACES_CODE static int arc_x(Point pivot, int angle, int radius)
 {
     return shape_polar(pivot, (uint8_t)angle, radius).x;
 }
 
-ECHO_NP_FACES_CODE static void dial_arcs(Canvas *face, Point origin)
+RIPPL_NP_FACES_CODE static void dial_arcs(Canvas *face, Point origin)
 {
     Point pivot = pivot_of(origin);
     int left = arc_x(pivot, ANGLE_FIRST, ARC_OUTER) - 1;
@@ -191,8 +191,8 @@ ECHO_NP_FACES_CODE static void dial_arcs(Canvas *face, Point origin)
     shape_ring(&red, ring, VU_RED);
 }
 
-ECHO_NP_FACES_CODE static void dial_mark(Canvas *face, const NowPlayingFrame *frame,
-                                         const VuMark *mark, Point pivot)
+RIPPL_NP_FACES_CODE static void dial_mark(Canvas *face, const NowPlayingFrame *frame,
+                                          const VuMark *mark, Point pivot)
 {
     Color color = mark->angle > ANGLE_ZERO ? VU_RED : VU_INK;
     ShapeSpoke spoke = {pivot, (uint8_t)mark->angle, TICK_WIDTH, ARC_OUTER, mark->reach};
@@ -207,7 +207,7 @@ ECHO_NP_FACES_CODE static void dial_mark(Canvas *face, const NowPlayingFrame *fr
     label_draw(face, (TextStyle){font, color}, (Label){box, mark->text});
 }
 
-ECHO_NP_FACES_CODE static void dial_scale(Canvas *face, const NowPlayingFrame *frame, Point origin)
+RIPPL_NP_FACES_CODE static void dial_scale(Canvas *face, const NowPlayingFrame *frame, Point origin)
 {
     dial_arcs(face, origin);
     for (int index = 0; index < MARK_COUNT; index++) {
@@ -218,21 +218,21 @@ ECHO_NP_FACES_CODE static void dial_scale(Canvas *face, const NowPlayingFrame *f
     face_line(face, frame, &line, LEGEND);
 }
 
-ECHO_NP_FACES_CODE static void dial_needle(Canvas *face, Point origin, int value, Color color)
+RIPPL_NP_FACES_CODE static void dial_needle(Canvas *face, Point origin, int value, Color color)
 {
     uint8_t angle = (uint8_t)(value * 7 / 8 - 28);
     ShapeSpoke spoke = {pivot_of(origin), angle, NEEDLE_WIDTH, 0, NEEDLE_LENGTH};
     shape_spoke(face, &spoke, color);
 }
 
-ECHO_NP_FACES_CODE static void lamp(Canvas *canvas, Point centre, bool lit)
+RIPPL_NP_FACES_CODE static void lamp(Canvas *canvas, Point centre, bool lit)
 {
     ShapeRing ring = {centre_q4(centre.x), centre_q4(centre.y), PEAK_RADIUS, 0};
     shape_ring(canvas, ring, lit ? VU_AMBER : VU_TRACK);
 }
 
-ECHO_NP_FACES_CODE static void mono_dial(Canvas *canvas, const NowPlayingFrame *frame,
-                                         const VuMono *mono)
+RIPPL_NP_FACES_CODE static void mono_dial(Canvas *canvas, const NowPlayingFrame *frame,
+                                          const VuMono *mono)
 {
     Point origin = mono->origin;
     Canvas face = dial_face(canvas, origin);
@@ -244,8 +244,8 @@ ECHO_NP_FACES_CODE static void mono_dial(Canvas *canvas, const NowPlayingFrame *
     dial_needle(&face, origin, mono->value, VU_INK);
 }
 
-ECHO_NP_FACES_CODE static void stereo_letters(Canvas *face, const NowPlayingFrame *frame,
-                                              Point origin)
+RIPPL_NP_FACES_CODE static void stereo_letters(Canvas *face, const NowPlayingFrame *frame,
+                                               Point origin)
 {
     const Font *font = frame->theme->fonts.small;
     Rect left_area = {origin.x + 10, origin.y + 40, 10, 16};
@@ -256,8 +256,8 @@ ECHO_NP_FACES_CODE static void stereo_letters(Canvas *face, const NowPlayingFram
     face_line(face, frame, &right, LETTER_RIGHT);
 }
 
-ECHO_NP_FACES_CODE static void stereo_dial(Canvas *canvas, const NowPlayingFrame *frame,
-                                           Point origin)
+RIPPL_NP_FACES_CODE static void stereo_dial(Canvas *canvas, const NowPlayingFrame *frame,
+                                            Point origin)
 {
     int left = vu_needle(frame->tick, 0, frame->playing);
     int right = vu_needle(frame->tick, 1, frame->playing);
@@ -269,7 +269,7 @@ ECHO_NP_FACES_CODE static void stereo_dial(Canvas *canvas, const NowPlayingFrame
     dial_needle(&face, origin, right, VU_RED);
 }
 
-ECHO_NP_FACES_CODE static void badge(Canvas *canvas, const NowPlayingFrame *frame, Point at)
+RIPPL_NP_FACES_CODE static void badge(Canvas *canvas, const NowPlayingFrame *frame, Point at)
 {
     if (face_badge_kind(frame) == FACE_ICON_NONE) {
         return;
@@ -281,8 +281,8 @@ ECHO_NP_FACES_CODE static void badge(Canvas *canvas, const NowPlayingFrame *fram
     face_badge_draw(canvas, frame, icon, VU_CREAM);
 }
 
-ECHO_NP_FACES_CODE static void transport(Canvas *canvas, const NowPlayingFrame *frame,
-                                         const VuLayout *layout)
+RIPPL_NP_FACES_CODE static void transport(Canvas *canvas, const NowPlayingFrame *frame,
+                                          const VuLayout *layout)
 {
     FaceBar bar = {layout->bar, VU_TRACK, VU_AMBER, VU_CREAM};
     face_bar_draw(canvas, frame, &bar);
@@ -292,14 +292,14 @@ ECHO_NP_FACES_CODE static void transport(Canvas *canvas, const NowPlayingFrame *
     face_times_draw(canvas, frame, &times);
 }
 
-ECHO_NP_FACES_CODE static void still_text(Canvas *canvas, const FaceLine *line, const char *text,
-                                          Color color)
+RIPPL_NP_FACES_CODE static void still_text(Canvas *canvas, const FaceLine *line, const char *text,
+                                           Color color)
 {
     Rect fitted = face_fitted_area(line->font, line->area, text, line->align);
     label_draw(canvas, (TextStyle){line->font, color}, (Label){fitted, text});
 }
 
-ECHO_NP_FACES_CODE static void landscape(Canvas *canvas, const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static void landscape(Canvas *canvas, const NowPlayingFrame *frame)
 {
     VuMono left = {{10, 28}, LETTER_LEFT, vu_needle(frame->tick, 0, frame->playing)};
     VuMono right = {{164, 28}, LETTER_RIGHT, vu_needle(frame->tick, 1, frame->playing)};
@@ -313,7 +313,7 @@ ECHO_NP_FACES_CODE static void landscape(Canvas *canvas, const NowPlayingFrame *
     transport(canvas, frame, &LAND);
 }
 
-ECHO_NP_FACES_CODE static void portrait_format(Canvas *canvas, const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static void portrait_format(Canvas *canvas, const NowPlayingFrame *frame)
 {
     FaceLine line = text_line(frame, &PORT.text[ROW_FORMAT]);
     char buffer[FACE_FEEDBACK_CAPACITY];
@@ -325,7 +325,7 @@ ECHO_NP_FACES_CODE static void portrait_format(Canvas *canvas, const NowPlayingF
     }
 }
 
-ECHO_NP_FACES_CODE static void portrait_text(Canvas *canvas, const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static void portrait_text(Canvas *canvas, const NowPlayingFrame *frame)
 {
     FaceLine title = text_line(frame, &PORT.text[ROW_TITLE]);
     face_line(canvas, frame, &title, frame->song);
@@ -340,7 +340,7 @@ ECHO_NP_FACES_CODE static void portrait_text(Canvas *canvas, const NowPlayingFra
     still_text(canvas, &modes, frame->modes, modes.color);
 }
 
-ECHO_NP_FACES_CODE static void portrait(Canvas *canvas, const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static void portrait(Canvas *canvas, const NowPlayingFrame *frame)
 {
     Point origin = {12, frame->area.y + 31};
     stereo_dial(canvas, frame, origin);
@@ -349,7 +349,7 @@ ECHO_NP_FACES_CODE static void portrait(Canvas *canvas, const NowPlayingFrame *f
     transport(canvas, frame, &PORT);
 }
 
-ECHO_NP_FACES_CODE void face_vu_draw(const NowPlayingFrame *frame, Canvas *canvas)
+RIPPL_NP_FACES_CODE void face_vu_draw(const NowPlayingFrame *frame, Canvas *canvas)
 {
     canvas_fill_rect(canvas, frame->area, VU_PLATE);
     if (frame->area.width > frame->area.height) {

@@ -1,4 +1,4 @@
-add_library(echo_gfx STATIC
+add_library(rippl_gfx STATIC
     canvas.c
     color.c
     font.c
@@ -9,11 +9,11 @@ add_library(echo_gfx STATIC
     strip_renderer.c
     text.c
 )
-target_include_directories(echo_gfx PUBLIC include)
+target_include_directories(rippl_gfx PUBLIC include)
 if(CMAKE_CROSSCOMPILING)
     set_source_files_properties(font_pack.c PROPERTIES COMPILE_OPTIONS -Os)
 endif()
-target_link_libraries(echo_gfx
-    PUBLIC echo_core
-    PRIVATE echo_options echo_lto
+target_link_libraries(rippl_gfx
+    PUBLIC rippl_core
+    PRIVATE rippl_options rippl_lto
 )

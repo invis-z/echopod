@@ -89,15 +89,15 @@ typedef struct LcdReadout {
     bool colon;
 } LcdReadout;
 
-ECHO_NP_FACES_DATA static const uint32_t HASH_MIX_FRAME = 0x9E3779B1u;
-ECHO_NP_FACES_DATA static const uint32_t HASH_MIX_BAND = 0x85EBCA6Bu;
-ECHO_NP_FACES_DATA static const uint32_t HASH_MULTIPLY = 0x2C1B3C6Du;
+RIPPL_NP_FACES_DATA static const uint32_t HASH_MIX_FRAME = 0x9E3779B1u;
+RIPPL_NP_FACES_DATA static const uint32_t HASH_MIX_BAND = 0x85EBCA6Bu;
+RIPPL_NP_FACES_DATA static const uint32_t HASH_MULTIPLY = 0x2C1B3C6Du;
 
-ECHO_NP_FACES_DATA static const char TRACK_LEGEND[] = "TRACK";
+RIPPL_NP_FACES_DATA static const char TRACK_LEGEND[] = "TRACK";
 
-ECHO_NP_FACES_DATA static const uint8_t BIG_PITCH[DIGIT_COUNT] = {0, 30, 56, 86, 112};
+RIPPL_NP_FACES_DATA static const uint8_t BIG_PITCH[DIGIT_COUNT] = {0, 30, 56, 86, 112};
 
-ECHO_NP_FACES_DATA static const LcdLayout LANDSCAPE = {
+RIPPL_NP_FACES_DATA static const LcdLayout LANDSCAPE = {
     .glass_x = 5,
     .glass_width = 310,
     .play_x = 12,
@@ -120,7 +120,7 @@ ECHO_NP_FACES_DATA static const LcdLayout LANDSCAPE = {
     .info = {12, 122, 296, LEGEND_HEIGHT},
 };
 
-ECHO_NP_FACES_DATA static const LcdLayout PORTRAIT = {
+RIPPL_NP_FACES_DATA static const LcdLayout PORTRAIT = {
     .glass_x = 4,
     .glass_width = 162,
     .play_x = 10,
@@ -143,32 +143,32 @@ ECHO_NP_FACES_DATA static const LcdLayout PORTRAIT = {
     .info = {10, 248, 150, LEGEND_HEIGHT},
 };
 
-ECHO_NP_FACES_CODE static Color lit_colour(bool lit)
+RIPPL_NP_FACES_CODE static Color lit_colour(bool lit)
 {
     return lit ? INK : GHOST;
 }
 
-ECHO_NP_FACES_CODE static bool has_text(const char *text)
+RIPPL_NP_FACES_CODE static bool has_text(const char *text)
 {
     return text != NULL && text[0] != '\0';
 }
 
-ECHO_NP_FACES_CODE static Rect lowered(const LcdPane *pane, Rect area)
+RIPPL_NP_FACES_CODE static Rect lowered(const LcdPane *pane, Rect area)
 {
     return (Rect){area.x, pane->top + area.y, area.width, area.height};
 }
 
-ECHO_NP_FACES_CODE static Point placed(const LcdPane *pane, Point point)
+RIPPL_NP_FACES_CODE static Point placed(const LcdPane *pane, Point point)
 {
     return (Point){point.x, pane->top + point.y};
 }
 
-ECHO_NP_FACES_CODE static void cell_fill(const LcdPane *pane, Rect cell, Color color)
+RIPPL_NP_FACES_CODE static void cell_fill(const LcdPane *pane, Rect cell, Color color)
 {
     canvas_fill_rect(pane->canvas, cell, color);
 }
 
-ECHO_NP_FACES_CODE static void glass_draw(const LcdPane *pane)
+RIPPL_NP_FACES_CODE static void glass_draw(const LcdPane *pane)
 {
     const LcdLayout *layout = pane->layout;
     Rect glass = {layout->glass_x, pane->top, layout->glass_width,
@@ -183,7 +183,7 @@ ECHO_NP_FACES_CODE static void glass_draw(const LcdPane *pane)
     }
 }
 
-ECHO_NP_FACES_CODE static bool legend_lit(const PlayerStatus *status, int index)
+RIPPL_NP_FACES_CODE static bool legend_lit(const PlayerStatus *status, int index)
 {
     switch (index) {
     case 0:
@@ -199,7 +199,7 @@ ECHO_NP_FACES_CODE static bool legend_lit(const PlayerStatus *status, int index)
     }
 }
 
-ECHO_NP_FACES_CODE static void legends_draw(const LcdPane *pane)
+RIPPL_NP_FACES_CODE static void legends_draw(const LcdPane *pane)
 {
     const Font *font = pane->frame->theme->fonts.small;
     for (int index = 0; index < LEGEND_COUNT; index++) {
@@ -211,7 +211,7 @@ ECHO_NP_FACES_CODE static void legends_draw(const LcdPane *pane)
     }
 }
 
-ECHO_NP_FACES_CODE static void transport_draw(const LcdPane *pane)
+RIPPL_NP_FACES_CODE static void transport_draw(const LcdPane *pane)
 {
     const LcdLayout *layout = pane->layout;
     bool paused = pane->frame->status->state == PLAYER_PAUSED;
@@ -221,7 +221,7 @@ ECHO_NP_FACES_CODE static void transport_draw(const LcdPane *pane)
     face_icon_draw(pane->canvas, FACE_ICON_PAUSE, pause, lit_colour(paused));
 }
 
-ECHO_NP_FACES_CODE static void codec_draw(const LcdPane *pane)
+RIPPL_NP_FACES_CODE static void codec_draw(const LcdPane *pane)
 {
     const Font *font = pane->frame->theme->fonts.small;
     int width = face_codec_width(font, pane->frame->codec);
@@ -231,12 +231,12 @@ ECHO_NP_FACES_CODE static void codec_draw(const LcdPane *pane)
     face_codec_draw(pane->canvas, &line, pane->frame->codec);
 }
 
-ECHO_NP_FACES_CODE static uint8_t digit_at(unsigned value, unsigned divisor, bool always)
+RIPPL_NP_FACES_CODE static uint8_t digit_at(unsigned value, unsigned divisor, bool always)
 {
     return value >= divisor || always ? shape_digit_mask(value / divisor % 10) : 0;
 }
 
-ECHO_NP_FACES_CODE static LcdReadout readout_of(const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static LcdReadout readout_of(const NowPlayingFrame *frame)
 {
     unsigned seconds = frame->shown_ms / MILLISECONDS_PER_SECOND;
     unsigned level = frame->status->volume < MAX_LEVEL ? frame->status->volume : MAX_LEVEL;
@@ -255,7 +255,7 @@ ECHO_NP_FACES_CODE static LcdReadout readout_of(const NowPlayingFrame *frame)
                         true};
 }
 
-ECHO_NP_FACES_CODE static void big_draw(const LcdPane *pane)
+RIPPL_NP_FACES_CODE static void big_draw(const LcdPane *pane)
 {
     SegmentStyle style = {22, 40, 5, 8, INK, GHOST};
     LcdReadout readout = readout_of(pane->frame);
@@ -268,7 +268,7 @@ ECHO_NP_FACES_CODE static void big_draw(const LcdPane *pane)
     shape_colon(pane->canvas, &style, (Point){origin.x + BIG_COLON_RIGHT, origin.y}, readout.colon);
 }
 
-ECHO_NP_FACES_CODE static void track_draw(const LcdPane *pane)
+RIPPL_NP_FACES_CODE static void track_draw(const LcdPane *pane)
 {
     const Font *font = pane->frame->theme->fonts.small;
     SegmentStyle style = {13, 24, 3, 8, INK, GHOST};
@@ -286,7 +286,7 @@ ECHO_NP_FACES_CODE static void track_draw(const LcdPane *pane)
                 digit_at(number, 1, true));
 }
 
-ECHO_NP_FACES_CODE static uint32_t spectrum_hash(uint32_t frame, uint32_t band)
+RIPPL_NP_FACES_CODE static uint32_t spectrum_hash(uint32_t frame, uint32_t band)
 {
     uint32_t value = frame * HASH_MIX_FRAME + band * HASH_MIX_BAND;
     value ^= value >> 15;
@@ -294,7 +294,7 @@ ECHO_NP_FACES_CODE static uint32_t spectrum_hash(uint32_t frame, uint32_t band)
     return value ^ (value >> 12);
 }
 
-ECHO_NP_FACES_CODE static int spectrum_raw(uint32_t frame, int band, int bands)
+RIPPL_NP_FACES_CODE static int spectrum_raw(uint32_t frame, int band, int bands)
 {
     uint32_t phase = frame % BEAT_PERIOD;
     int beat = phase == 0 ? BEAT_STRONG : phase == 1 ? BEAT_WEAK : 0;
@@ -303,7 +303,7 @@ ECHO_NP_FACES_CODE static int spectrum_raw(uint32_t frame, int band, int bands)
            (int)((value >> 28) & 3) / 2;
 }
 
-ECHO_NP_FACES_CODE static int spectrum_level(uint32_t frame, int band, int bands)
+RIPPL_NP_FACES_CODE static int spectrum_level(uint32_t frame, int band, int bands)
 {
     int level = spectrum_raw(frame, band, bands);
     int echo = spectrum_raw(frame - 1, band, bands) - 2;
@@ -313,7 +313,7 @@ ECHO_NP_FACES_CODE static int spectrum_level(uint32_t frame, int band, int bands
     return level < 0 ? 0 : level > SPECTRUM_MAX ? SPECTRUM_MAX : level;
 }
 
-ECHO_NP_FACES_CODE static void band_draw(const LcdPane *pane, int band, int level)
+RIPPL_NP_FACES_CODE static void band_draw(const LcdPane *pane, int band, int level)
 {
     Point base = placed(pane, pane->layout->spectrum);
     for (int cell = 0; cell < CELL_COUNT; cell++) {
@@ -323,7 +323,7 @@ ECHO_NP_FACES_CODE static void band_draw(const LcdPane *pane, int band, int leve
     }
 }
 
-ECHO_NP_FACES_CODE static void spectrum_draw(const LcdPane *pane)
+RIPPL_NP_FACES_CODE static void spectrum_draw(const LcdPane *pane)
 {
     const NowPlayingFrame *frame = pane->frame;
     Point badge = placed(pane, pane->layout->badge);
@@ -337,17 +337,17 @@ ECHO_NP_FACES_CODE static void spectrum_draw(const LcdPane *pane)
     }
 }
 
-ECHO_NP_FACES_CODE static FaceLine ink_line(const LcdPane *pane, const Font *font, Rect area)
+RIPPL_NP_FACES_CODE static FaceLine ink_line(const LcdPane *pane, const Font *font, Rect area)
 {
     return (FaceLine){font, lowered(pane, area), INK, INK, pane->layout->align};
 }
 
-ECHO_NP_FACES_CODE static const char *lyric_or(const NowPlayingFrame *frame, const char *text)
+RIPPL_NP_FACES_CODE static const char *lyric_or(const NowPlayingFrame *frame, const char *text)
 {
     return has_text(frame->lyric) ? frame->lyric : text;
 }
 
-ECHO_NP_FACES_CODE static void title_draw(const LcdPane *pane)
+RIPPL_NP_FACES_CODE static void title_draw(const LcdPane *pane)
 {
     FaceLine line = ink_line(pane, pane->frame->theme->fonts.title, pane->layout->title);
     cell_fill(pane, line.area, GHOST);
@@ -355,7 +355,7 @@ ECHO_NP_FACES_CODE static void title_draw(const LcdPane *pane)
     face_line(pane->canvas, pane->frame, &line, pane->frame->song);
 }
 
-ECHO_NP_FACES_CODE static void credits_draw(const LcdPane *pane)
+RIPPL_NP_FACES_CODE static void credits_draw(const LcdPane *pane)
 {
     const NowPlayingFrame *frame = pane->frame;
     const Font *font = frame->theme->fonts.body;
@@ -369,7 +369,7 @@ ECHO_NP_FACES_CODE static void credits_draw(const LcdPane *pane)
     face_line(pane->canvas, frame, &album, lyric_or(frame, frame->album));
 }
 
-ECHO_NP_FACES_CODE static void progress_draw(const LcdPane *pane)
+RIPPL_NP_FACES_CODE static void progress_draw(const LcdPane *pane)
 {
     Point origin = placed(pane, pane->layout->progress);
     int filled = face_bar_fill(pane->frame, pane->layout->track_count).width;
@@ -380,7 +380,7 @@ ECHO_NP_FACES_CODE static void progress_draw(const LcdPane *pane)
     }
 }
 
-ECHO_NP_FACES_CODE static void stream_draw(const LcdPane *pane, const FaceTimes *times)
+RIPPL_NP_FACES_CODE static void stream_draw(const LcdPane *pane, const FaceTimes *times)
 {
     const Font *font = pane->frame->theme->fonts.small;
     FaceLine line = ink_line(pane, font, pane->layout->info);
@@ -393,7 +393,7 @@ ECHO_NP_FACES_CODE static void stream_draw(const LcdPane *pane, const FaceTimes 
     }
 }
 
-ECHO_NP_FACES_CODE static void info_draw(const LcdPane *pane)
+RIPPL_NP_FACES_CODE static void info_draw(const LcdPane *pane)
 {
     char buffer[FACE_FEEDBACK_CAPACITY];
     const char *feedback = face_feedback_text(pane->frame, buffer, sizeof buffer);
@@ -408,7 +408,7 @@ ECHO_NP_FACES_CODE static void info_draw(const LcdPane *pane)
     stream_draw(pane, &times);
 }
 
-ECHO_NP_FACES_CODE void face_lcd_draw(const NowPlayingFrame *frame, Canvas *canvas)
+RIPPL_NP_FACES_CODE void face_lcd_draw(const NowPlayingFrame *frame, Canvas *canvas)
 {
     bool wide = frame->area.width >= LANDSCAPE_MIN_WIDTH;
     LcdPane pane = {canvas, frame, wide ? &LANDSCAPE : &PORTRAIT, frame->area.y + TOP_INSET};

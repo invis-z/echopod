@@ -12,7 +12,7 @@ enum {
     UNMAPPED = '~'
 };
 
-ECHO_RESIDENT static const char LATIN_INITIALS[] =
+RIPPL_RESIDENT static const char LATIN_INITIALS[] =
     "aaaaaa~ceeeeiiii~nooooo~~uuuuy~saaaaaa~ceeeeiiii~nooooo~~uuuuy~y"
     "aaaaaaccccccccdd~~eeeeeeeeeegggggggghh~~iiiiiiiii~iijjkk~lllllll"
     "l~~nnnnnn~~~oooooo~~rrrrrrsssssssstttt~~uuuuuuuuuuuuwwyyyzzzzzzs";

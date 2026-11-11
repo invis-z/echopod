@@ -39,7 +39,7 @@ static const double MICROSECONDS_PER_MILLISECOND = 1000.0;
 
 static void print_usage(void)
 {
-    fputs("usage: echo_sim [--scale N] [--frames N] [--headless] [--screenshot FILE.bmp]\n"
+    fputs("usage: rippl_sim [--scale N] [--frames N] [--headless] [--screenshot FILE.bmp]\n"
           "                [--keys up,down,play,menu,back,power[:long],...]\n"
           "                [--card MUSIC_DIR] [--system-dir DIR_WITH_LIBRARY_DB]\n"
           "                [--internal INTERNAL_MUSIC_DIR]\n"
@@ -120,7 +120,7 @@ static void refresh_title(void)
     char stats_text[TITLE_CAPACITY];
     char title[TITLE_CAPACITY * 2];
     format_frame_stats(stats_text, sizeof stats_text);
-    snprintf(title, sizeof title, "EchoPod | %s | %s", app_screen_title(), stats_text);
+    snprintf(title, sizeof title, "Rippl | %s | %s", app_screen_title(), stats_text);
     sim_display_set_title(title);
 }
 

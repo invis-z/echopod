@@ -647,7 +647,7 @@ def check_overlay_copies(main_elf, overlay_elf, label):
     copies = overlay_copies(main_elf, overlay_elf)
     if copies:
         raise ImageError(f"the {label} has its own copy of what the main program has: "
-                         + ", ".join(copies) + " (add them to ECHO_OVERLAY_IMPORTS)")
+                         + ", ".join(copies) + " (add them to RIPPL_OVERLAY_IMPORTS)")
 
 
 NM_LINE = re.compile(r"^([0-9a-f]+) (?:([0-9a-f]+) )?(\S) (\S+)(?:\t(.+):\d+)?$")
@@ -685,7 +685,7 @@ def check_np_faces_symbols(rows):
                          + ", ".join(sorted(set(inside))))
     if outside:
         raise ImageError("src/np_faces code outside the faces region "
-                         "(a function without ECHO_NP_FACES_CODE): "
+                         "(a function without RIPPL_NP_FACES_CODE): "
                          + ", ".join(sorted(set(outside))))
 
 
@@ -739,7 +739,7 @@ def parse_arguments(argv):
                         help="device ELF with .code at 0x03050000 and .data at 0x03004000")
     parser.add_argument("--nm", default="arm-none-eabi-nm",
                         help="the nm that attributes the faces region's symbols to sources")
-    parser.add_argument("--brand", default="EchoPod")
+    parser.add_argument("--brand", default="Rippl")
     parser.add_argument("--build-tag", help="defaults to the short git commit, + when dirty")
     parser.add_argument("--date", type=parse_date, help="YYYY-MM-DD; defaults to today")
     parser.add_argument("--overlay", type=Path, help="rescan overlay ELF linked at 0x0307A000")

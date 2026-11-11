@@ -19,7 +19,7 @@ static CoverCache *cache_with_covers(void)
     uint32_t size = 0;
     const uint8_t *bytes = fixture_covers_bytes(&size);
     fake_hal_reset();
-    fake_hal_add_file("/.echo/covers.bin", bytes, size);
+    fake_hal_add_file("/.rippl/covers.bin", bytes, size);
     cover_cache_open(&cache, fixture_library_open(&fixture));
     return &cache;
 }

@@ -29,9 +29,9 @@ If FiiO's updater won't take the file, maskrom can write the image straight into
    ```
 
    Both read-backs must equal the first 512 bytes of `slot.bin`.
-4. `./rkdeveloptool rd`. The player starts EchoPod.
+4. `./rkdeveloptool rd`. The player starts Rippl.
 
-## Later updates: EchoPod's own updater
+## Later updates: Rippl's own updater
 
 1. Connect the player. It shows "Computer found", and two drives appear: internal storage ("ECHO MINI") and the SD card.
 2. Copy the new image to the top level of internal storage and check it:
@@ -44,12 +44,12 @@ The updater takes the highest-numbered `HIFIECnn.IMG`. It checks the image's sha
 
 ## What to check after an install
 
-- **Home screen:** "EchoPod" with Music, Now Playing, Settings and Diagnostics. Without a card (none inserted, or one the player can't mount), the Home panel says "No microSD card", the Music lists say "No microSD card" with how to fix it, and changing a setting says "Insert a microSD card to save settings". With a card but no library, the Music lists say "No library".
+- **Home screen:** "Rippl" with Music, Now Playing, Settings and Diagnostics. Without a card (none inserted, or one the player can't mount), the Home panel says "No microSD card", the Music lists say "No microSD card" with how to fix it, and changing a setting says "Insert a microSD card to save settings". With a card but no library, the Music lists say "No library".
 - **Diagnostics → Firmware:** the commit you built.
 - **Keys:** Diagnostics → Key test.
 - **Power:** a tap turns the screen off and on. Holding it for 2 s switches the player off; with a cable in, it shows the charge screen instead, and holding Power again turns the player back on.
 - **USB:** "Computer found" appears and the drives mount within about 10 s.
-- **Card:** on the first start with a card, the player creates `/.echo` with `settings.bin`, `resume.bin`, `favorites.bin`, `scan.bin`, `upnext.bin`, `bluetooth.bin`, `library.db` (4 MB), `covers.bin` (80 MB) and `build.tmp` (24 MB), then scans the card and builds the covers. If the card has no room it says "The card is full", and nothing is saved.
+- **Card:** on the first start with a card, the player creates `/.rippl` with `settings.bin`, `resume.bin`, `favorites.bin`, `scan.bin`, `upnext.bin`, `bluetooth.bin`, `library.db` (4 MB), `covers.bin` (80 MB) and `build.tmp` (24 MB), then scans the card and builds the covers. If the card has no room it says "The card is full", and nothing is saved.
 
 ## If something goes wrong
 

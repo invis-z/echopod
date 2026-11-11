@@ -70,7 +70,7 @@ static const StringId COVER_ORDER_OPTIONS[2] = {STR_SETTINGS_BY_ALBUM_ARTIST,
                                                 STR_SETTINGS_BY_ALBUM_TITLE};
 static const StringId ARTIST_VIEW_OPTIONS[2] = {STR_SETTINGS_LIST, STR_MENU_COVER_FLOW};
 static const StringId BLUETOOTH_LEVEL_OPTIONS[2] = {STR_SETTINGS_STANDARD, STR_SETTINGS_LOUDER};
-ECHO_RESIDENT static const StringId NP_FACE_OPTIONS[NP_FACE_COUNT] = {
+RIPPL_RESIDENT static const StringId NP_FACE_OPTIONS[NP_FACE_COUNT] = {
     STR_SETTINGS_STANDARD, STR_SETTINGS_CASSETTE, STR_SETTINGS_VU_METERS, STR_SETTINGS_TURNTABLE,
     STR_SETTINGS_LCD_DECK};
 static const StringId COVER_COUNT_OPTIONS[2] = {STR_SETTINGS_FIVE_COVERS,
@@ -339,7 +339,7 @@ static void choose_slot(void *context, int index)
     {(title), (options), NULL, (int)(sizeof(options) / sizeof((options)[0])),                      \
      NULL,    NULL,      NULL, (option) + 1}
 
-ECHO_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
+RIPPL_RESIDENT static const SettingChoice CHOICES[SETTINGS_CHOICE_COUNT] = {
     {STR_SETTINGS_SHUFFLE, SHUFFLE_OPTIONS, NULL, SHUFFLE_MODE_COUNT, current_shuffle,
      choose_shuffle, NULL, 0},
     {STR_SETTINGS_REPEAT, REPEAT_OPTIONS, NULL, REPEAT_MODE_COUNT, current_repeat, choose_repeat,
@@ -490,7 +490,7 @@ typedef struct SettingsGroupRows {
     uint8_t count;
 } SettingsGroupRows;
 
-ECHO_RESIDENT static const SettingsLink LINKS[ROW_GROUP - ROW_BLUETOOTH] = {
+RIPPL_RESIDENT static const SettingsLink LINKS[ROW_GROUP - ROW_BLUETOOTH] = {
     {STR_BT_TITLE, bluetooth_screen_open, bluetooth_screen_summary},
     {STR_SETTINGS_EQUALIZER, equalizer_screen_open, equalizer_screen_summary},
     {STR_SETTINGS_DATE_TIME, date_time_screen_open, date_time_screen_summary},
@@ -498,50 +498,50 @@ ECHO_RESIDENT static const SettingsLink LINKS[ROW_GROUP - ROW_BLUETOOTH] = {
     {STR_SETTINGS_RESCAN, request_rescan, NULL},
 };
 
-ECHO_RESIDENT static const uint8_t ROWS[] = {CHOICE_SHUFFLE,
-                                             CHOICE_REPEAT,
-                                             ROW_BLUETOOTH,
-                                             ROW_EQUALIZER,
-                                             CHOICE_SLEEP,
-                                             ROW_GROUP,
-                                             ROW_GROUP + 1,
-                                             ROW_GROUP + 2,
-                                             ROW_GROUP + 3,
-                                             ROW_GROUP + 4,
-                                             CHOICE_GAIN,
-                                             CHOICE_OUTPUT,
-                                             CHOICE_FILTER,
-                                             CHOICE_BALANCE,
-                                             CHOICE_BLUETOOTH_LEVEL,
-                                             CHOICE_THEME,
-                                             CHOICE_ACCENT,
-                                             CHOICE_HIGHLIGHT,
-                                             CHOICE_NOW_PLAYING_FACE,
-                                             CHOICE_BRIGHTNESS,
-                                             CHOICE_TIMEOUT,
-                                             CHOICE_ORIENTATION,
-                                             CHOICE_ANIMATIONS,
-                                             CHOICE_BATTERY,
-                                             CHOICE_STATUS_BAR,
-                                             CHOICE_CLOCK,
-                                             ROW_FOLDERS,
-                                             ROW_RESCAN,
-                                             CHOICE_START,
-                                             CHOICE_COVERS,
-                                             CHOICE_COVER_ORDER,
-                                             CHOICE_ARTIST_VIEW,
-                                             CHOICE_FOLDER_VIEW,
-                                             CHOICE_LYRICS,
-                                             CHOICE_HISTORY,
-                                             CHOICE_ROCKER,
-                                             CHOICE_SWAP,
-                                             CHOICE_MENU_KEY,
-                                             CHOICE_POWER_ON,
-                                             CHOICE_LANGUAGE,
-                                             ROW_DATE_TIME,
-                                             CHOICE_AUTO_OFF,
-                                             CHOICE_USB_MODE,
-                                             CHOICE_USB_PROMPT};
+RIPPL_RESIDENT static const uint8_t ROWS[] = {CHOICE_SHUFFLE,
+                                              CHOICE_REPEAT,
+                                              ROW_BLUETOOTH,
+                                              ROW_EQUALIZER,
+                                              CHOICE_SLEEP,
+                                              ROW_GROUP,
+                                              ROW_GROUP + 1,
+                                              ROW_GROUP + 2,
+                                              ROW_GROUP + 3,
+                                              ROW_GROUP + 4,
+                                              CHOICE_GAIN,
+                                              CHOICE_OUTPUT,
+                                              CHOICE_FILTER,
+                                              CHOICE_BALANCE,
+                                              CHOICE_BLUETOOTH_LEVEL,
+                                              CHOICE_THEME,
+                                              CHOICE_ACCENT,
+                                              CHOICE_HIGHLIGHT,
+                                              CHOICE_NOW_PLAYING_FACE,
+                                              CHOICE_BRIGHTNESS,
+                                              CHOICE_TIMEOUT,
+                                              CHOICE_ORIENTATION,
+                                              CHOICE_ANIMATIONS,
+                                              CHOICE_BATTERY,
+                                              CHOICE_STATUS_BAR,
+                                              CHOICE_CLOCK,
+                                              ROW_FOLDERS,
+                                              ROW_RESCAN,
+                                              CHOICE_START,
+                                              CHOICE_COVERS,
+                                              CHOICE_COVER_ORDER,
+                                              CHOICE_ARTIST_VIEW,
+                                              CHOICE_FOLDER_VIEW,
+                                              CHOICE_LYRICS,
+                                              CHOICE_HISTORY,
+                                              CHOICE_ROCKER,
+                                              CHOICE_SWAP,
+                                              CHOICE_MENU_KEY,
+                                              CHOICE_POWER_ON,
+                                              CHOICE_LANGUAGE,
+                                              ROW_DATE_TIME,
+                                              CHOICE_AUTO_OFF,
+                                              CHOICE_USB_MODE,
+                                              CHOICE_USB_PROMPT};
 
 enum {
     SOUND_ROWS = 5,
@@ -555,7 +555,7 @@ enum {
     SYSTEM_ROWS = 5
 };
 
-ECHO_RESIDENT static const SettingsGroupRows GROUPS[SETTINGS_GROUP_COUNT] = {
+RIPPL_RESIDENT static const SettingsGroupRows GROUPS[SETTINGS_GROUP_COUNT] = {
     {STR_SETTINGS_SOUND, SETTINGS_TOP_COUNT, SOUND_ROWS},
     {STR_SETTINGS_DISPLAY, DISPLAY_FIRST, DISPLAY_ROWS},
     {STR_SETTINGS_LIBRARY, LIBRARY_FIRST, LIBRARY_ROWS},

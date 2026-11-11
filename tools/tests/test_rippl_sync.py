@@ -14,17 +14,17 @@ TOOLS_DIRECTORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS_DIRECTORY))
 
 import cover_export
-import echo_history
-import echo_sync
+import rippl_history
+import rippl_sync
 import library_index
 from test_cover_export import image_bytes
 from test_library_index import write_silent_flac
 
 SCAN_RECORD = struct.Struct("<4sIII16s")
 MEBIBYTE = 1024 * 1024
-FIXED_UTC = echo_sync.CardVolume("FAT32", True, False, 0, "")
-EXFAT = echo_sync.CardVolume("exFAT", True, True, 0, "")
-VOLUME_LABEL = echo_sync.volume_label
+FIXED_UTC = rippl_sync.CardVolume("FAT32", True, False, 0, "")
+EXFAT = rippl_sync.CardVolume("exFAT", True, True, 0, "")
+VOLUME_LABEL = rippl_sync.volume_label
 
 
 class MemoryCard:
@@ -40,12 +40,12 @@ class MemoryCard:
     def list_folder(self, path):
         if path != "/" and not any(node[0] == path for node in self.nodes):
             return None
-        return [echo_sync.CardEntry(name.encode("utf-8"), directory, size, modified,
-                                    echo_sync.child_path(parent.encode(), name.encode()).decode())
+        return [rippl_sync.CardEntry(name.encode("utf-8"), directory, size, modified,
+                                    rippl_sync.child_path(parent.encode(), name.encode()).decode())
                 for parent, name, directory, size, modified in self.nodes if parent == path]
 
     def fingerprint(self, excluded=frozenset()):
-        return echo_sync.music_fingerprint(self.list_folder, "/", excluded)
+        return rippl_sync.music_fingerprint(self.list_folder, "/", excluded)
 
 
 def players_test_card():
@@ -56,14 +56,14 @@ def players_test_card():
     card.add("/AC DC/Back In Black", "02 - Shoot to Thrill.flac", False, 29000000, 101)
     card.add("/AC DC/Back In Black", "cover.jpg", False, 80000, 102)
     card.add("/", "Mix.m3u8", False, 400, 3)
-    card.add("/", ".echo", True, 0, 4)
-    card.add("/.echo", "library.db", False, 4194304, 5)
+    card.add("/", ".rippl", True, 0, 4)
+    card.add("/.rippl", "library.db", False, 4194304, 5)
     return card
 
 
 class PlayerFingerprintTest(unittest.TestCase):
     def test_the_players_test_card_gives_the_fingerprint_the_player_stores(self):
-        self.assertEqual(echo_sync.Fingerprint(True, 3518657026, 2077149385, 6),
+        self.assertEqual(rippl_sync.Fingerprint(True, 3518657026, 2077149385, 6),
                          players_test_card().fingerprint())
 
     def test_internal_storage_folds_in_as_the_last_root_folder_as_on_the_player(self):
@@ -73,14 +73,14 @@ class PlayerFingerprintTest(unittest.TestCase):
         card.add("/:internal/Artist", "01 - Song.flac", False, 5000000, 12)
         card.add("/:internal", "System Volume Information", True, 0, 13)
         card.add("/:internal", "HIFIEC90.IMG", False, 9000000, 14)
-        self.assertEqual(echo_sync.Fingerprint(True, 1993034583, 148508692, 9),
+        self.assertEqual(rippl_sync.Fingerprint(True, 1993034583, 148508692, 9),
                          card.fingerprint())
 
     def test_folders_that_cannot_be_opened_count_as_empty_as_on_the_player(self):
         card = players_test_card()
         card.add("/", "Empty", True, 0, 6)
         card.add("/AC DC", "Live", True, 0, 7)
-        self.assertEqual(echo_sync.Fingerprint(True, 732559337, 1706284886, 8),
+        self.assertEqual(rippl_sync.Fingerprint(True, 732559337, 1706284886, 8),
                          card.fingerprint())
 
     def test_a_left_out_internal_folder_gives_the_fingerprint_the_player_stores(self):
@@ -93,7 +93,7 @@ class PlayerFingerprintTest(unittest.TestCase):
         card_artist = frozenset({library_index.folder_key(b"Artist")})
         self.assertEqual(card.fingerprint(), card.fingerprint(card_artist))
         internal_artist = frozenset({library_index.folder_key(b"Artist", internal=True)})
-        self.assertEqual(echo_sync.Fingerprint(True, 4104151954, 1967075651, 9),
+        self.assertEqual(rippl_sync.Fingerprint(True, 4104151954, 1967075651, 9),
                          card.fingerprint(internal_artist))
 
     def test_a_left_out_folder_counts_as_if_it_were_not_there(self):
@@ -134,11 +134,11 @@ class PlayerFingerprintTest(unittest.TestCase):
         ignored = ["x.aac", "x.txt", "x.aiff", "x.mp4", "x.flac.txt", "scan 01.jpg",
                    "covers.jpg", "folder.gif"]
         for name in counted:
-            self.assertTrue(echo_sync.fingerprint_counts(name.encode(), False), name)
+            self.assertTrue(rippl_sync.fingerprint_counts(name.encode(), False), name)
         for name in ignored:
-            self.assertFalse(echo_sync.fingerprint_counts(name.encode(), False), name)
-        self.assertTrue(echo_sync.fingerprint_counts(b"notes.txt", True))
-        self.assertFalse(echo_sync.fingerprint_counts(b"SYSTEM VOLUME INFORMATION", True))
+            self.assertFalse(rippl_sync.fingerprint_counts(name.encode(), False), name)
+        self.assertTrue(rippl_sync.fingerprint_counts(b"notes.txt", True))
+        self.assertFalse(rippl_sync.fingerprint_counts(b"SYSTEM VOLUME INFORMATION", True))
 
     def test_a_changed_stamp_size_or_name_changes_it(self):
         before = players_test_card().fingerprint()
@@ -153,17 +153,17 @@ class PlayerFingerprintTest(unittest.TestCase):
     def test_a_card_deeper_than_the_player_walks_is_incomplete(self):
         card = MemoryCard()
         parent = "/"
-        for _ in range(echo_sync.MAX_DEPTH + 1):
+        for _ in range(rippl_sync.MAX_DEPTH + 1):
             card.add(parent, "d", True, 0, 1)
-            parent = echo_sync.child_path(parent.encode(), b"d").decode()
+            parent = rippl_sync.child_path(parent.encode(), b"d").decode()
         self.assertFalse(card.fingerprint().complete)
 
     def test_the_deepest_folder_the_player_walks_is_complete(self):
         card = MemoryCard()
         parent = "/"
-        for _ in range(echo_sync.MAX_DEPTH - 1):
+        for _ in range(rippl_sync.MAX_DEPTH - 1):
             card.add(parent, "d", True, 0, 1)
-            parent = echo_sync.child_path(parent.encode(), b"d").decode()
+            parent = rippl_sync.child_path(parent.encode(), b"d").decode()
         self.assertTrue(card.fingerprint().complete)
 
     def test_a_path_longer_than_the_player_holds_is_incomplete(self):
@@ -175,56 +175,56 @@ class PlayerFingerprintTest(unittest.TestCase):
         self.assertFalse(card.fingerprint().complete)
 
     def test_a_card_without_a_root_is_incomplete(self):
-        self.assertFalse(echo_sync.music_fingerprint(lambda location: None, "/").complete)
+        self.assertFalse(rippl_sync.music_fingerprint(lambda location: None, "/").complete)
 
 
 class StampTest(unittest.TestCase):
     def test_dates_and_times_pack_like_a_fat_directory_entry(self):
         seconds = int(datetime(2026, 1, 1, tzinfo=timezone.utc).timestamp())
-        self.assertEqual(0x5C210000, echo_sync.dos_stamp(seconds))
+        self.assertEqual(0x5C210000, rippl_sync.dos_stamp(seconds))
         seconds = int(datetime(2024, 7, 9, 13, 45, 59, tzinfo=timezone.utc).timestamp())
         expected = ((2024 - 1980) << 9 | 7 << 5 | 9) << 16 | 13 << 11 | 45 << 5 | 29
-        self.assertEqual(expected, echo_sync.dos_stamp(seconds))
+        self.assertEqual(expected, rippl_sync.dos_stamp(seconds))
 
     def test_times_fat_cannot_hold_are_zero(self):
-        self.assertEqual(0, echo_sync.dos_stamp(0))
-        self.assertEqual(0, echo_sync.dos_stamp(-11644473600))
+        self.assertEqual(0, rippl_sync.dos_stamp(0))
+        self.assertEqual(0, rippl_sync.dos_stamp(-11644473600))
 
     def test_a_fixed_offset_shifts_utc_to_the_cards_clock(self):
-        volume = echo_sync.CardVolume("FAT32", True, False, 3600, "")
+        volume = rippl_sync.CardVolume("FAT32", True, False, 3600, "")
         stat = FakeStat(datetime(2025, 3, 1, 10, 0, 0, tzinfo=timezone.utc))
-        entry = echo_sync.host_entry(FakeEntry("a.flac", stat), volume)
-        self.assertEqual(echo_sync.dos_stamp(stat.st_mtime_ns // 10 ** 9 + 3600), entry.modified)
+        entry = rippl_sync.host_entry(FakeEntry("a.flac", stat), volume)
+        self.assertEqual(rippl_sync.dos_stamp(stat.st_mtime_ns // 10 ** 9 + 3600), entry.modified)
 
     def test_hundredths_of_a_second_are_dropped_as_the_player_does(self):
         written = datetime(2025, 3, 1, 10, 0, 0, tzinfo=timezone.utc)
-        exact = echo_sync.host_entry(FakeEntry("a.flac", FakeStat(written)), FIXED_UTC)
+        exact = rippl_sync.host_entry(FakeEntry("a.flac", FakeStat(written)), FIXED_UTC)
         later = FakeStat(written, extra_ns=1_990_000_000)
         self.assertEqual(exact.modified,
-                         echo_sync.host_entry(FakeEntry("a.flac", later), FIXED_UTC).modified)
+                         rippl_sync.host_entry(FakeEntry("a.flac", later), FIXED_UTC).modified)
 
     def test_exfat_times_are_utc_half_seconds_as_the_player_computes(self):
         written = datetime(2026, 7, 11, 13, 32, 22, tzinfo=timezone.utc)
-        entry = echo_sync.host_entry(FakeEntry("a.flac", FakeStat(written)), EXFAT)
+        entry = rippl_sync.host_entry(FakeEntry("a.flac", FakeStat(written)), EXFAT)
         self.assertEqual(891888371, entry.modified)
         later = FakeStat(written, extra_ns=1_990_000_000)
-        self.assertEqual(891888371, echo_sync.host_entry(FakeEntry("a.flac", later), EXFAT).modified)
+        self.assertEqual(891888371, rippl_sync.host_entry(FakeEntry("a.flac", later), EXFAT).modified)
 
     def test_exfat_needs_no_time_zone_guess_on_any_computer(self):
         for platform in ("win32", "darwin", "linux"):
-            volume = echo_sync.card_volume("exFAT", "", platform)
+            volume = rippl_sync.card_volume("exFAT", "", platform)
             self.assertTrue(volume.exfat)
             self.assertEqual("", volume.caveat)
 
     def test_exfat_files_of_4_gib_or_more_are_left_out_as_the_player_does(self):
         volume = EXFAT
         stat = FakeStat(datetime(2025, 1, 1, tzinfo=timezone.utc), size=1 << 32)
-        self.assertIsNone(echo_sync.host_entry(FakeEntry("big.wav", stat), volume))
-        self.assertIsNotNone(echo_sync.host_entry(FakeEntry("big.wav", stat), FIXED_UTC))
+        self.assertIsNone(rippl_sync.host_entry(FakeEntry("big.wav", stat), volume))
+        self.assertIsNotNone(rippl_sync.host_entry(FakeEntry("big.wav", stat), FIXED_UTC))
 
     def test_folders_count_with_size_zero(self):
         stat = FakeStat(datetime(2025, 1, 1, tzinfo=timezone.utc), size=4096)
-        entry = echo_sync.host_entry(FakeEntry("Album", stat, directory=True), FIXED_UTC)
+        entry = rippl_sync.host_entry(FakeEntry("Album", stat, directory=True), FIXED_UTC)
         self.assertEqual((True, 0), (entry.directory, entry.size))
 
 
@@ -249,14 +249,14 @@ class FakeEntry:
 
 class NameTest(unittest.TestCase):
     def test_names_are_utf8(self):
-        self.assertEqual("Ältere.m3u".encode("utf-8"), echo_sync.card_name("Ältere.m3u", "win32"))
+        self.assertEqual("Ältere.m3u".encode("utf-8"), rippl_sync.card_name("Ältere.m3u", "win32"))
 
     def test_a_mac_lists_names_decomposed_and_they_are_recomposed(self):
         decomposed = unicodedata.normalize("NFD", "Ältere.m3u")
-        self.assertEqual("Ältere.m3u".encode("utf-8"), echo_sync.card_name(decomposed, "darwin"))
+        self.assertEqual("Ältere.m3u".encode("utf-8"), rippl_sync.card_name(decomposed, "darwin"))
 
     def test_an_unpaired_surrogate_is_encoded_as_the_player_does(self):
-        self.assertEqual(b"a\xed\xa0\x80", echo_sync.card_name("a\ud800", "win32"))
+        self.assertEqual(b"a\xed\xa0\x80", rippl_sync.card_name("a\ud800", "win32"))
 
 
 class HostCardTest(unittest.TestCase):
@@ -282,11 +282,11 @@ class HostCardTest(unittest.TestCase):
             folder, card_folder = folders.pop(0)
             for entry in os.scandir(folder):
                 stat = entry.stat()
-                modified = echo_sync.dos_stamp(stat.st_mtime_ns // 10 ** 9)
+                modified = rippl_sync.dos_stamp(stat.st_mtime_ns // 10 ** 9)
                 card.add(card_folder, entry.name, entry.is_dir(),
                          0 if entry.is_dir() else stat.st_size, modified)
                 if entry.is_dir():
-                    path = echo_sync.child_path(card_folder.encode(), entry.name.encode())
+                    path = rippl_sync.child_path(card_folder.encode(), entry.name.encode())
                     folders.append((entry.path, path.decode()))
         return card
 
@@ -294,9 +294,9 @@ class HostCardTest(unittest.TestCase):
         self.make("Artist/Album/01 - Song.flac", b"12345")
         self.make("Artist/Album/cover.jpg", b"123")
         self.make("Artist/Album/notes.txt")
-        self.make(".echo/library.db")
+        self.make(".rippl/library.db")
         self.make("Mix.m3u8", b"#EXTM3U")
-        computed = echo_sync.card_fingerprint(self.root, FIXED_UTC)
+        computed = rippl_sync.card_fingerprint(self.root, FIXED_UTC)
         self.assertEqual(self.listed_card().fingerprint(), computed)
         self.assertEqual(5, computed.entries)
 
@@ -311,16 +311,16 @@ class HostCardTest(unittest.TestCase):
             seconds = datetime(2024, 5, 6, 7, 8, 10, tzinfo=timezone.utc).timestamp()
             os.utime(song, (seconds, seconds))
             os.utime(song.parent, (seconds, seconds))
-            drive = echo_sync.InternalDrive(internal, FIXED_UTC)
-            computed = echo_sync.card_fingerprint(self.root, FIXED_UTC, drive)
-        stamp = echo_sync.dos_stamp(int(seconds))
+            drive = rippl_sync.InternalDrive(internal, FIXED_UTC)
+            computed = rippl_sync.card_fingerprint(self.root, FIXED_UTC, drive)
+        stamp = rippl_sync.dos_stamp(int(seconds))
         expected = self.listed_card()
         expected.add("/", ":internal", True, 0, 0)
         expected.add("/:internal", "Band", True, 0, stamp)
         expected.add("/:internal/Band", "02 - Tune.mp3", False, 3, stamp)
         self.assertEqual(expected.fingerprint(), computed)
         self.assertEqual(6, computed.entries)
-        self.assertNotEqual(echo_sync.card_fingerprint(self.root, FIXED_UTC), computed)
+        self.assertNotEqual(rippl_sync.card_fingerprint(self.root, FIXED_UTC), computed)
 
 
 class InternalDriveTest(unittest.TestCase):
@@ -329,43 +329,43 @@ class InternalDriveTest(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.top = Path(directory.name).resolve()
         self.labels = {}
-        patcher = mock.patch.object(echo_sync, "volume_label",
+        patcher = mock.patch.object(rippl_sync, "volume_label",
                                     lambda root: self.labels.get(root.name))
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def drive(self, name, label, echo=False):
+    def drive(self, name, label, rippl=False):
         root = self.top / name
         root.mkdir()
-        if echo:
-            (root / ".echo").mkdir()
+        if rippl:
+            (root / ".rippl").mkdir()
         self.labels[name] = label
         return root
 
     def test_the_internal_drive_is_the_one_called_echo_mini(self):
-        card = self.drive("E", "MUSIC", echo=True)
+        card = self.drive("E", "MUSIC", rippl=True)
         internal = self.drive("F", "ECHO MINI")
         stick = self.drive("G", "BACKUP")
         unlabelled = self.drive("H", None)
-        self.assertEqual([internal], echo_sync.player_internal_drives(
+        self.assertEqual([internal], rippl_sync.player_internal_drives(
             card, [card, stick, unlabelled, internal, self.top / "missing"]))
         self.labels["F"] = "echo mini "
-        self.assertEqual([internal], echo_sync.player_internal_drives(card, [card, internal]))
-        self.assertEqual([], echo_sync.player_internal_drives(card, [card, stick]))
+        self.assertEqual([internal], rippl_sync.player_internal_drives(card, [card, internal]))
+        self.assertEqual([], rippl_sync.player_internal_drives(card, [card, stick]))
 
     def test_a_card_called_echo_mini_is_not_its_own_internal_storage(self):
-        card = self.drive("E", "ECHO MINI", echo=True)
+        card = self.drive("E", "ECHO MINI", rippl=True)
         internal = self.drive("F", "ECHO MINI")
-        self.assertEqual([internal], echo_sync.player_internal_drives(card, [card, internal]))
-        self.assertEqual([], echo_sync.player_internal_drives(card, [card]))
+        self.assertEqual([internal], rippl_sync.player_internal_drives(card, [card, internal]))
+        self.assertEqual([], rippl_sync.player_internal_drives(card, [card]))
 
-    def test_a_drive_without_an_echo_folder_wins_over_another_players_card(self):
-        card = self.drive("E", "MUSIC", echo=True)
-        other_card = self.drive("F", "ECHO MINI", echo=True)
+    def test_a_drive_without_a_rippl_folder_wins_over_another_players_card(self):
+        card = self.drive("E", "MUSIC", rippl=True)
+        other_card = self.drive("F", "ECHO MINI", rippl=True)
         internal = self.drive("G", "ECHO MINI")
         self.assertEqual([internal],
-                         echo_sync.player_internal_drives(card, [card, other_card, internal]))
-        self.assertEqual([other_card], echo_sync.player_internal_drives(card, [card, other_card]))
+                         rippl_sync.player_internal_drives(card, [card, other_card, internal]))
+        self.assertEqual([other_card], rippl_sync.player_internal_drives(card, [card, other_card]))
 
     def test_outside_windows_the_label_is_the_mount_point_name(self):
         self.assertEqual("ECHO MINI", VOLUME_LABEL(Path("/Volumes/ECHO MINI"), "darwin"))
@@ -376,19 +376,19 @@ class CardFileTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.path = Path(self.directory.name) / "file.bin"
-        self.card_file = echo_sync.CardFile("file.bin", 64 * 1024, 16)
+        self.card_file = rippl_sync.CardFile("file.bin", 64 * 1024, 16)
 
     def tearDown(self):
         self.directory.cleanup()
 
     def test_the_standard_sizes_are_the_ones_the_player_reserves(self):
-        self.assertEqual(4 * MEBIBYTE, echo_sync.LIBRARY_FILE.standard_size)
-        self.assertEqual(80 * MEBIBYTE, echo_sync.COVERS_FILE.standard_size)
-        self.assertEqual(4096, echo_sync.SCAN_FILE.standard_size)
+        self.assertEqual(4 * MEBIBYTE, rippl_sync.LIBRARY_FILE.standard_size)
+        self.assertEqual(80 * MEBIBYTE, rippl_sync.COVERS_FILE.standard_size)
+        self.assertEqual(4096, rippl_sync.SCAN_FILE.standard_size)
 
     def test_a_missing_file_is_created_at_the_standard_size(self):
         data = bytes(range(40))
-        self.assertEqual(64 * 1024, echo_sync.write_card_file(self.path, data, self.card_file))
+        self.assertEqual(64 * 1024, rippl_sync.write_card_file(self.path, data, self.card_file))
         written = self.path.read_bytes()
         self.assertEqual(64 * 1024, len(written))
         self.assertEqual(data, written[:40])
@@ -397,7 +397,7 @@ class CardFileTest(unittest.TestCase):
     def test_an_existing_file_is_written_in_place_and_keeps_its_size(self):
         self.path.write_bytes(b"\xAA" * 100_000)
         data = bytes(range(1, 41))
-        self.assertEqual(100_000, echo_sync.write_card_file(self.path, data, self.card_file))
+        self.assertEqual(100_000, rippl_sync.write_card_file(self.path, data, self.card_file))
         written = self.path.read_bytes()
         self.assertEqual(100_000, len(written))
         self.assertEqual(data, written[:40])
@@ -405,18 +405,18 @@ class CardFileTest(unittest.TestCase):
 
     def test_a_file_too_small_for_the_data_grows_to_the_standard_size(self):
         self.path.write_bytes(b"\xAA" * 10)
-        echo_sync.write_card_file(self.path, bytes(range(1, 41)), self.card_file)
+        rippl_sync.write_card_file(self.path, bytes(range(1, 41)), self.card_file)
         self.assertEqual(64 * 1024, self.path.stat().st_size)
 
     def test_data_bigger_than_the_standard_size_gets_a_file_of_its_size(self):
         data = b"\x01" * (100 * 1024)
-        echo_sync.write_card_file(self.path, data, self.card_file)
+        rippl_sync.write_card_file(self.path, data, self.card_file)
         self.assertEqual(data, self.path.read_bytes())
 
     def test_forgetting_the_fingerprint_clears_only_its_magic(self):
         record = SCAN_RECORD.pack(b"MESC", 1, 2, 3, b"v1.2.3".ljust(16, b"\0"))
         self.path.write_bytes(record + bytes(4096 - len(record)))
-        echo_sync.forget_fingerprint(self.path)
+        rippl_sync.forget_fingerprint(self.path)
         written = self.path.read_bytes()
         self.assertEqual(bytes(4) + record[4:], written[:len(record)])
         self.assertEqual(4096, len(written))
@@ -425,71 +425,71 @@ class CardFileTest(unittest.TestCase):
 class ScanRecordTest(unittest.TestCase):
     def test_the_record_holds_the_magic_both_hashes_the_count_and_the_firmware_tag(self):
         tag = b"0.1.0".ljust(16, b"\0")
-        record = echo_sync.scan_record(echo_sync.Fingerprint(True, 0x11223344, 5, 6), tag)
+        record = rippl_sync.scan_record(rippl_sync.Fingerprint(True, 0x11223344, 5, 6), tag)
         self.assertEqual(b"MESC" + bytes([0x44, 0x33, 0x22, 0x11]) + struct.pack("<II", 5, 6) + tag,
                          record)
 
     def test_a_stored_record_reads_back(self):
-        fingerprint = echo_sync.Fingerprint(True, 1, 2, 3)
-        record = echo_sync.scan_record(fingerprint, bytes(16))
-        self.assertEqual(fingerprint, echo_sync.stored_fingerprint(record))
-        self.assertIsNone(echo_sync.stored_fingerprint(bytes(32)))
+        fingerprint = rippl_sync.Fingerprint(True, 1, 2, 3)
+        record = rippl_sync.scan_record(fingerprint, bytes(16))
+        self.assertEqual(fingerprint, rippl_sync.stored_fingerprint(record))
+        self.assertIsNone(rippl_sync.stored_fingerprint(bytes(32)))
 
     def test_the_firmware_tag_is_kept_or_empty(self):
         record = SCAN_RECORD.pack(b"MESC", 1, 2, 3, b"tag".ljust(16, b"\0"))
-        self.assertEqual(b"tag".ljust(16, b"\0"), echo_sync.stored_version(record))
-        self.assertEqual(bytes(16), echo_sync.stored_version(b""))
+        self.assertEqual(b"tag".ljust(16, b"\0"), rippl_sync.stored_version(record))
+        self.assertEqual(bytes(16), rippl_sync.stored_version(b""))
 
 
 class ClockRecordTest(unittest.TestCase):
     def test_the_record_holds_the_time_the_offset_and_a_checksum(self):
-        record = echo_sync.clock_record(1_793_880_000, -300)
+        record = rippl_sync.clock_record(1_793_880_000, -300)
         self.assertEqual(20, len(record))
         self.assertEqual(b"ECLK\x01\x00\x00\x00", record[:8])
         self.assertEqual(struct.pack("<Ih", 1_793_880_000, -300), record[8:14])
         self.assertEqual(cover_export.fnv1a(record[:16]), struct.unpack("<I", record[16:])[0])
-        self.assertEqual((1_793_880_000, -300), echo_sync.stored_clock(record))
+        self.assertEqual((1_793_880_000, -300), rippl_sync.stored_clock(record))
 
     def test_a_damaged_or_foreign_record_reads_as_none(self):
-        record = bytearray(echo_sync.clock_record(1_793_880_000, 60))
+        record = bytearray(rippl_sync.clock_record(1_793_880_000, 60))
         record[9] ^= 1
-        self.assertIsNone(echo_sync.stored_clock(bytes(record)))
-        self.assertIsNone(echo_sync.stored_clock(b"MESC" + bytes(16)))
-        self.assertIsNone(echo_sync.stored_clock(b""))
+        self.assertIsNone(rippl_sync.stored_clock(bytes(record)))
+        self.assertIsNone(rippl_sync.stored_clock(b"MESC" + bytes(16)))
+        self.assertIsNone(rippl_sync.stored_clock(b""))
 
     def test_the_record_is_described_in_local_time(self):
-        self.assertEqual("2026-11-05 07:00 UTC-05:00", echo_sync.clock_text(1_793_880_000, -300))
-        self.assertEqual("2026-11-05 17:30 UTC+05:30", echo_sync.clock_text(1_793_880_000, 330))
+        self.assertEqual("2026-11-05 07:00 UTC-05:00", rippl_sync.clock_text(1_793_880_000, -300))
+        self.assertEqual("2026-11-05 17:30 UTC+05:30", rippl_sync.clock_text(1_793_880_000, 330))
 
     def test_write_clock_writes_the_record_unless_dry_or_out_of_range(self):
         with tempfile.TemporaryDirectory() as directory:
-            echo = Path(directory)
+            rippl = Path(directory)
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
-                dry = echo_sync.write_clock(echo, echo_sync.SyncOptions(dry_run=True),
+                dry = rippl_sync.write_clock(rippl, rippl_sync.SyncOptions(dry_run=True),
                                             now=1_793_880_000, offset_minutes=60)
                 self.assertFalse(dry)
-                self.assertFalse((echo / "clock.bin").exists())
-                self.assertFalse(echo_sync.write_clock(echo, echo_sync.SyncOptions(),
+                self.assertFalse((rippl / "clock.bin").exists())
+                self.assertFalse(rippl_sync.write_clock(rippl, rippl_sync.SyncOptions(),
                                                        now=1_000_000_000, offset_minutes=0))
-                self.assertFalse((echo / "clock.bin").exists())
-                self.assertTrue(echo_sync.write_clock(echo, echo_sync.SyncOptions(),
+                self.assertFalse((rippl / "clock.bin").exists())
+                self.assertTrue(rippl_sync.write_clock(rippl, rippl_sync.SyncOptions(),
                                                       now=1_793_880_000, offset_minutes=60))
             self.assertEqual((1_793_880_000, 60),
-                             echo_sync.stored_clock((echo / "clock.bin").read_bytes()))
+                             rippl_sync.stored_clock((rippl / "clock.bin").read_bytes()))
         self.assertIn("would write clock.bin: 2026-11-05 13:00 UTC+01:00", output.getvalue())
         self.assertIn("clock.bin   2026-11-05 13:00 UTC+01:00", output.getvalue())
 
     def test_the_clock_is_written_unless_no_clock_is_given(self):
-        self.assertTrue(echo_sync.options_from(echo_sync.parse_arguments([])).clock)
-        self.assertFalse(echo_sync.options_from(echo_sync.parse_arguments(["--no-clock"])).clock)
+        self.assertTrue(rippl_sync.options_from(rippl_sync.parse_arguments([])).clock)
+        self.assertFalse(rippl_sync.options_from(rippl_sync.parse_arguments(["--no-clock"])).clock)
 
 
 class SyncTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.card = Path(self.directory.name)
-        self.echo = self.card / ".echo"
+        self.rippl = self.card / ".rippl"
         album = self.card / "Artist" / "Album"
         album.mkdir(parents=True)
         write_silent_flac(album / "01 - Song.flac", 1)
@@ -500,7 +500,7 @@ class SyncTest(unittest.TestCase):
         self.drives = {self.card: "SDCARD", self.internal: "ECHO MINI"}
         for name, replacement in (("mounted_roots", lambda: list(self.drives)),
                                   ("volume_label", lambda root: self.drives.get(root))):
-            patcher = mock.patch.object(echo_sync, name, replacement)
+            patcher = mock.patch.object(rippl_sync, name, replacement)
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -508,97 +508,97 @@ class SyncTest(unittest.TestCase):
         self.directory.cleanup()
 
     def internal_drive(self):
-        return echo_sync.InternalDrive(self.internal, echo_sync.detect_volume(self.internal))
+        return rippl_sync.InternalDrive(self.internal, rippl_sync.detect_volume(self.internal))
 
     def run_sync(self, *arguments):
         output = io.StringIO()
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
-            status = echo_sync.main([str(self.card), *arguments])
+            status = rippl_sync.main([str(self.card), *arguments])
         return status, output.getvalue()
 
-    def prepare_echo(self, covers_size=MEBIBYTE):
-        self.echo.mkdir()
-        (self.echo / "covers.bin").write_bytes(bytes(covers_size))
+    def prepare_rippl(self, covers_size=MEBIBYTE):
+        self.rippl.mkdir()
+        (self.rippl / "covers.bin").write_bytes(bytes(covers_size))
 
     def test_a_sync_writes_the_library_the_covers_and_the_fingerprint(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         status, output = self.run_sync()
         self.assertEqual(0, status, output)
-        library = (self.echo / "library.db").read_bytes()
+        library = (self.rippl / "library.db").read_bytes()
         expected = library_index.encode_library(library_index.build_library(
             *library_index.scan(self.card)[:2]))
         self.assertEqual(4 * MEBIBYTE, len(library))
         self.assertEqual(expected, library[:len(expected)])
-        covers = (self.echo / "covers.bin").read_bytes()
+        covers = (self.rippl / "covers.bin").read_bytes()
         self.assertEqual(MEBIBYTE, len(covers))
         self.assertEqual((b"EMCV", 1, 1), struct.unpack_from("<4sHH", covers))
-        scan = (self.echo / "scan.bin").read_bytes()
+        scan = (self.rippl / "scan.bin").read_bytes()
         self.assertEqual(4096, len(scan))
-        volume = echo_sync.detect_volume(self.card)
-        self.assertEqual(echo_sync.card_fingerprint(self.card, volume, self.internal_drive()),
-                         echo_sync.stored_fingerprint(scan))
+        volume = rippl_sync.detect_volume(self.card)
+        self.assertEqual(rippl_sync.card_fingerprint(self.card, volume, self.internal_drive()),
+                         rippl_sync.stored_fingerprint(scan))
         self.assertIn(f"and the internal storage {self.internal}", output)
         self.assertIn("Eject the card safely", output.replace("eject", "Eject"))
         self.assertIn("sets its clock", output)
-        self.assertIsNotNone(echo_sync.stored_clock((self.echo / "clock.bin").read_bytes()))
+        self.assertIsNotNone(rippl_sync.stored_clock((self.rippl / "clock.bin").read_bytes()))
         self.assertEqual(0, self.run_sync("--check")[0])
 
     def test_no_clock_leaves_the_clock_record_out(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         status, output = self.run_sync("--no-clock")
         self.assertEqual(0, status, output)
-        self.assertFalse((self.echo / "clock.bin").exists())
+        self.assertFalse((self.rippl / "clock.bin").exists())
         self.assertNotIn("sets its clock", output)
 
     def test_covers_use_the_players_layout_for_the_cards_file(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         status, output = self.run_sync()
         self.assertEqual(0, status, output)
-        covers = (self.echo / "covers.bin").read_bytes()
+        covers = (self.rippl / "covers.bin").read_bytes()
         slots, stamps_start, records_start = cover_export.stamped_layout(MEBIBYTE)
         self.assertEqual(stamps_start, struct.unpack_from("<I", covers, 12)[0])
         self.assertEqual(records_start, struct.unpack_from("<I", covers, 20)[0])
         art = cover_export.locate_art(self.card, ["Artist/Album/01 - Song.flac"])
-        describe = echo_sync.art_describer(echo_sync.detect_volume(self.card))
+        describe = rippl_sync.art_describer(rippl_sync.detect_volume(self.card))
         stamp = cover_export.stamp_for(art, describe)
         self.assertEqual(stamp, struct.unpack_from("<I", covers, stamps_start)[0])
 
     def test_cover_files_are_described_with_the_players_name_and_time(self):
         image = self.card / "Artist" / "Album" / "cover.png"
-        describe = echo_sync.art_describer(FIXED_UTC)
-        expected = echo_sync.card_stamp(image.stat(), FIXED_UTC)
+        describe = rippl_sync.art_describer(FIXED_UTC)
+        expected = rippl_sync.card_stamp(image.stat(), FIXED_UTC)
         self.assertEqual((b"cover.png", expected), describe(image))
-        unsupported = echo_sync.CardVolume("NTFS", False, False, 0, "")
-        self.assertIsNone(echo_sync.art_describer(unsupported))
+        unsupported = rippl_sync.CardVolume("NTFS", False, False, 0, "")
+        self.assertIsNone(rippl_sync.art_describer(unsupported))
 
     def test_the_firmware_tag_in_scan_bin_is_kept(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         tag = b"0.1.0-abc".ljust(16, b"\0")
-        (self.echo / "scan.bin").write_bytes(SCAN_RECORD.pack(b"MESC", 1, 2, 3, tag) + bytes(4064))
+        (self.rippl / "scan.bin").write_bytes(SCAN_RECORD.pack(b"MESC", 1, 2, 3, tag) + bytes(4064))
         self.run_sync()
-        scan = (self.echo / "scan.bin").read_bytes()
+        scan = (self.rippl / "scan.bin").read_bytes()
         self.assertEqual(tag, scan[16:32])
         self.assertEqual(4096, len(scan))
 
     def test_a_dry_run_writes_nothing(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         status, output = self.run_sync("--dry-run")
         self.assertEqual(0, status, output)
-        self.assertEqual(["covers.bin"], sorted(path.name for path in self.echo.iterdir()))
-        self.assertEqual(bytes(MEBIBYTE), (self.echo / "covers.bin").read_bytes())
+        self.assertEqual(["covers.bin"], sorted(path.name for path in self.rippl.iterdir()))
+        self.assertEqual(bytes(MEBIBYTE), (self.rippl / "covers.bin").read_bytes())
 
     def test_without_a_fingerprint_scan_bin_is_left_alone(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         record = SCAN_RECORD.pack(b"MESC", 1, 2, 3, bytes(16))
-        (self.echo / "scan.bin").write_bytes(record)
+        (self.rippl / "scan.bin").write_bytes(record)
         self.run_sync("--no-fingerprint")
-        self.assertEqual(record, (self.echo / "scan.bin").read_bytes())
-        self.assertTrue((self.echo / "library.db").exists())
+        self.assertEqual(record, (self.rippl / "scan.bin").read_bytes())
+        self.assertTrue((self.rippl / "library.db").exists())
 
     def test_covers_only_uses_the_cards_library(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         self.run_sync("--no-covers")
-        self.assertEqual(bytes(MEBIBYTE), (self.echo / "covers.bin").read_bytes())
+        self.assertEqual(bytes(MEBIBYTE), (self.rippl / "covers.bin").read_bytes())
         original = library_index.scan
         library_index.scan = lambda *_: self.fail("scanned the music again")
         try:
@@ -606,7 +606,7 @@ class SyncTest(unittest.TestCase):
         finally:
             library_index.scan = original
         self.assertEqual(0, status, output)
-        self.assertEqual(b"EMCV", (self.echo / "covers.bin").read_bytes()[:4])
+        self.assertEqual(b"EMCV", (self.rippl / "covers.bin").read_bytes()[:4])
 
     def make_internal(self, internal):
         album = internal / "Band" / "Live"
@@ -618,29 +618,29 @@ class SyncTest(unittest.TestCase):
         return internal
 
     def test_the_internal_drive_is_found_and_both_drives_make_one_library(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         internal = self.make_internal(self.internal)
         status, output = self.run_sync()
         self.assertEqual(0, status, output)
         self.assertIn(f"and the internal storage {internal}", output)
-        library = (self.echo / "library.db").read_bytes()
+        library = (self.rippl / "library.db").read_bytes()
         expected = library_index.encode_library(library_index.build_library(
             *library_index.scan(self.card, internal)[:2]))
         self.assertEqual(expected, library[:len(expected)])
         self.assertIn(b":internal/Band/Live/01 - Tune.flac", library)
         self.assertNotIn(b"HIFIEC", library)
-        covers = (self.echo / "covers.bin").read_bytes()
+        covers = (self.rippl / "covers.bin").read_bytes()
         self.assertEqual((b"EMCV", 1, 2), struct.unpack_from("<4sHH", covers))
-        self.assertEqual(echo_sync.card_fingerprint(self.card, echo_sync.detect_volume(self.card),
+        self.assertEqual(rippl_sync.card_fingerprint(self.card, rippl_sync.detect_volume(self.card),
                                                     self.internal_drive()),
-                         echo_sync.stored_fingerprint((self.echo / "scan.bin").read_bytes()))
+                         rippl_sync.stored_fingerprint((self.rippl / "scan.bin").read_bytes()))
         self.assertIn("will use this library", output)
         self.assertEqual(0, self.run_sync("--check")[0])
         del self.drives[self.internal]
         self.assertEqual(1, self.run_sync("--check")[0])
 
     def test_internal_names_a_drive_with_another_name(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         del self.drives[self.internal]
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
@@ -649,55 +649,55 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(0, status, output)
         self.assertIn(f"and the internal storage {internal.resolve()}", output)
         self.assertIn(b":internal/Band/Live/01 - Tune.flac",
-                      (self.echo / "library.db").read_bytes())
+                      (self.rippl / "library.db").read_bytes())
         self.assertIn("will use this library", output)
         self.assertEqual(2, self.run_sync("--internal", str(self.card))[0])
 
     def test_without_the_internal_drive_the_card_is_synced_and_the_player_scans_again(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         del self.drives[self.internal]
-        (self.echo / "scan.bin").write_bytes(SCAN_RECORD.pack(b"MESC", 1, 2, 3, bytes(16)))
+        (self.rippl / "scan.bin").write_bytes(SCAN_RECORD.pack(b"MESC", 1, 2, 3, bytes(16)))
         status, output = self.run_sync()
         self.assertEqual(0, status, output)
         self.assertIn("(the drive called ECHO MINI) wasn't found", output)
         self.assertIn("scan the card once more", output)
-        self.assertEqual(bytes(4), (self.echo / "scan.bin").read_bytes()[:4])
-        library = (self.echo / "library.db").read_bytes()
+        self.assertEqual(bytes(4), (self.rippl / "scan.bin").read_bytes()[:4])
+        library = (self.rippl / "library.db").read_bytes()
         self.assertIn(b"Artist/Album/01 - Song.flac", library)
         self.assertNotIn(b":internal", library)
 
     def test_two_drives_called_echo_mini_need_internal(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.drives[Path(directory.name)] = "ECHO MINI"
         status, output = self.run_sync()
         self.assertEqual(2, status, output)
         self.assertIn("More than one drive is called ECHO MINI", output)
-        self.assertFalse((self.echo / "library.db").exists())
+        self.assertFalse((self.rippl / "library.db").exists())
 
     def test_unticked_music_folders_are_left_out_of_the_library_and_the_fingerprint(self):
-        self.prepare_echo()
+        self.prepare_rippl()
         spoken = self.card / "Talks" / "Episode"
         spoken.mkdir(parents=True)
         write_silent_flac(spoken / "01 - Talk.flac", 1)
-        (self.echo / "folders.bin").write_bytes(library_index.encode_excluded_folders(
+        (self.rippl / "folders.bin").write_bytes(library_index.encode_excluded_folders(
             [library_index.folder_key(b"Talks")]) + bytes(4096 - 140))
         status, output = self.run_sync()
         self.assertEqual(0, status, output)
         self.assertIn("Leaving out 1 top-level folder", output)
-        library = (self.echo / "library.db").read_bytes()
+        library = (self.rippl / "library.db").read_bytes()
         self.assertIn(b"Artist/Album/01 - Song.flac", library)
         self.assertNotIn(b"Talks", library)
-        excluded = library_index.read_excluded_folders(self.echo / "folders.bin")
+        excluded = library_index.read_excluded_folders(self.rippl / "folders.bin")
         expected = library_index.encode_library(library_index.build_library(
             *library_index.scan(self.card, None, excluded)[:2]))
         self.assertEqual(expected, library[:len(expected)])
-        volume = echo_sync.detect_volume(self.card)
-        stored = echo_sync.stored_fingerprint((self.echo / "scan.bin").read_bytes())
+        volume = rippl_sync.detect_volume(self.card)
+        stored = rippl_sync.stored_fingerprint((self.rippl / "scan.bin").read_bytes())
         drive = self.internal_drive()
-        self.assertEqual(echo_sync.card_fingerprint(self.card, volume, drive, excluded), stored)
-        self.assertNotEqual(echo_sync.card_fingerprint(self.card, volume, drive), stored)
+        self.assertEqual(rippl_sync.card_fingerprint(self.card, volume, drive, excluded), stored)
+        self.assertNotEqual(rippl_sync.card_fingerprint(self.card, volume, drive), stored)
         self.assertEqual(0, self.run_sync("--check")[0])
         write_silent_flac(spoken / "02 - More.flac", 1)
         self.assertEqual(0, self.run_sync("--check")[0])
@@ -706,55 +706,55 @@ class SyncTest(unittest.TestCase):
         status, output = self.run_sync()
         self.assertEqual(2, status)
         self.assertIn("isn't the top of a memory card", output)
-        self.assertFalse(self.echo.exists())
+        self.assertFalse(self.rippl.exists())
 
 
 class AskForCardTest(unittest.TestCase):
     def test_dragged_and_quoted_paths_are_cleaned_up(self):
-        self.assertEqual("E:\\Music", echo_sync.typed_path('  "E:\\Music" ', "win32"))
-        self.assertEqual("/Volumes/MY CARD", echo_sync.typed_path("/Volumes/MY\\ CARD ", "darwin"))
-        self.assertEqual("/Volumes/MY CARD", echo_sync.typed_path("'/Volumes/MY CARD'", "darwin"))
+        self.assertEqual("E:\\Music", rippl_sync.typed_path('  "E:\\Music" ', "win32"))
+        self.assertEqual("/Volumes/MY CARD", rippl_sync.typed_path("/Volumes/MY\\ CARD ", "darwin"))
+        self.assertEqual("/Volumes/MY CARD", rippl_sync.typed_path("'/Volumes/MY CARD'", "darwin"))
 
-    def test_only_folders_with_an_echo_folder_are_offered(self):
+    def test_only_folders_with_a_rippl_folder_are_offered(self):
         with tempfile.TemporaryDirectory() as directory:
             player, other = Path(directory, "player"), Path(directory, "other")
-            (player / ".echo").mkdir(parents=True)
+            (player / ".rippl").mkdir(parents=True)
             other.mkdir()
-            self.assertEqual([player], echo_sync.player_cards([other, player,
+            self.assertEqual([player], rippl_sync.player_cards([other, player,
                                                                Path(directory, "missing")]))
 
     def test_one_known_card_is_the_default(self):
         card = Path("/Volumes/CARD")
-        self.assertEqual(str(card), echo_sync.ask_for_card([card], read=lambda prompt: ""))
+        self.assertEqual(str(card), rippl_sync.ask_for_card([card], read=lambda prompt: ""))
         self.assertEqual("/elsewhere",
-                         echo_sync.ask_for_card([card], read=lambda prompt: "/elsewhere"))
+                         rippl_sync.ask_for_card([card], read=lambda prompt: "/elsewhere"))
 
     def test_an_empty_answer_without_a_known_card_writes_nothing(self):
-        with self.assertRaises(echo_sync.SyncError):
-            echo_sync.ask_for_card([], read=lambda prompt: " ")
+        with self.assertRaises(rippl_sync.SyncError):
+            rippl_sync.ask_for_card([], read=lambda prompt: " ")
 
     def test_the_card_can_be_left_out_of_the_command(self):
-        self.assertIsNone(echo_sync.parse_arguments([]).card)
+        self.assertIsNone(rippl_sync.parse_arguments([]).card)
 
     def test_history_export_is_opt_in_and_adds_the_plays_to_the_log(self):
-        self.assertFalse(echo_sync.parse_arguments([]).history)
-        self.assertTrue(echo_sync.parse_arguments(["--history"]).history)
-        record = echo_history.Record(1, 1, echo_history.PLAY, 1, 0, 200_000, 0, 200_000,
+        self.assertFalse(rippl_sync.parse_arguments([]).history)
+        self.assertTrue(rippl_sync.parse_arguments(["--history"]).history)
+        record = rippl_history.Record(1, 1, rippl_history.PLAY, 1, 0, 200_000, 0, 200_000,
                                      240_000, 0, 200_000, "Artist", "Album", "Song")
         with tempfile.TemporaryDirectory() as directory:
             card = Path(directory)
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
-                echo_sync.export_history(card, dry_run=False)
+                rippl_sync.export_history(card, dry_run=False)
             self.assertIn("none on this card", output.getvalue())
-            (card / ".echo").mkdir()
-            slot = echo_history.pack_slot(record)
-            (card / ".echo" / "history.bin").write_bytes(slot + bytes(512))
+            (card / ".rippl").mkdir()
+            slot = rippl_history.pack_slot(record)
+            (card / ".rippl" / "history.bin").write_bytes(slot + bytes(512))
             with contextlib.redirect_stdout(output):
-                echo_sync.export_history(card, dry_run=True)
+                rippl_sync.export_history(card, dry_run=True)
             self.assertFalse((card / ".scrobbler.log").exists())
             with contextlib.redirect_stdout(output):
-                echo_sync.export_history(card, dry_run=False)
+                rippl_sync.export_history(card, dry_run=False)
             log = (card / ".scrobbler.log").read_text(encoding="utf-8")
         self.assertIn("Artist	Album	Song	1	240	L	", log)
         self.assertIn("1 new plays added", output.getvalue())

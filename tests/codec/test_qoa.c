@@ -15,7 +15,7 @@ static QoaDecoder decoder;
 static Buffer load(const char *name, const char *extension)
 {
     char path[512];
-    snprintf(path, sizeof path, "%s/qoa/%s.%s", ECHO_FIXTURE_DIR, name, extension);
+    snprintf(path, sizeof path, "%s/qoa/%s.%s", RIPPL_FIXTURE_DIR, name, extension);
     Buffer buffer = {NULL, 0};
     FILE *file = fopen(path, "rb");
     if (file == NULL) {

@@ -1,77 +1,77 @@
-set(ECHO_LIBMAD_DIR ${PROJECT_SOURCE_DIR}/third_party/libmad)
+set(RIPPL_LIBMAD_DIR ${PROJECT_SOURCE_DIR}/third_party/libmad)
 set(FPM_64BIT ON)
 set(SIZEOF_INT 4)
-configure_file(${ECHO_LIBMAD_DIR}/mad.h.in ${CMAKE_CURRENT_BINARY_DIR}/libmad/mad.h @ONLY)
-add_library(echo_libmad STATIC
-    ${ECHO_LIBMAD_DIR}/bit.c
-    ${ECHO_LIBMAD_DIR}/fixed.c
-    ${ECHO_LIBMAD_DIR}/frame.c
-    ${ECHO_LIBMAD_DIR}/huffman.c
-    ${ECHO_LIBMAD_DIR}/layer12.c
-    ${ECHO_LIBMAD_DIR}/layer3.c
-    ${ECHO_LIBMAD_DIR}/stream.c
-    ${ECHO_LIBMAD_DIR}/synth.c
-    ${ECHO_LIBMAD_DIR}/timer.c
-    ${ECHO_LIBMAD_DIR}/version.c
+configure_file(${RIPPL_LIBMAD_DIR}/mad.h.in ${CMAKE_CURRENT_BINARY_DIR}/libmad/mad.h @ONLY)
+add_library(rippl_libmad STATIC
+    ${RIPPL_LIBMAD_DIR}/bit.c
+    ${RIPPL_LIBMAD_DIR}/fixed.c
+    ${RIPPL_LIBMAD_DIR}/frame.c
+    ${RIPPL_LIBMAD_DIR}/huffman.c
+    ${RIPPL_LIBMAD_DIR}/layer12.c
+    ${RIPPL_LIBMAD_DIR}/layer3.c
+    ${RIPPL_LIBMAD_DIR}/stream.c
+    ${RIPPL_LIBMAD_DIR}/synth.c
+    ${RIPPL_LIBMAD_DIR}/timer.c
+    ${RIPPL_LIBMAD_DIR}/version.c
 )
-target_include_directories(echo_libmad SYSTEM
+target_include_directories(rippl_libmad SYSTEM
     PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/libmad
-    PRIVATE ${ECHO_LIBMAD_DIR}
+    PRIVATE ${RIPPL_LIBMAD_DIR}
 )
-target_compile_definitions(echo_libmad PRIVATE OPT_ACCURACY NDEBUG)
-target_compile_options(echo_libmad PRIVATE -w)
+target_compile_definitions(rippl_libmad PRIVATE OPT_ACCURACY NDEBUG)
+target_compile_options(rippl_libmad PRIVATE -w)
 if(CMAKE_CROSSCOMPILING)
-    target_include_directories(echo_libmad SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/libmad_libc)
+    target_include_directories(rippl_libmad SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/libmad_libc)
 endif()
 
-set(ECHO_FAAD2_DIR ${PROJECT_SOURCE_DIR}/third_party/faad2)
-file(GLOB ECHO_FAAD2_SOURCES ${ECHO_FAAD2_DIR}/libfaad/*.c)
-add_library(echo_faad2 STATIC ${ECHO_FAAD2_SOURCES})
-target_include_directories(echo_faad2 SYSTEM
-    PUBLIC ${ECHO_FAAD2_DIR}/include
-    PRIVATE ${ECHO_FAAD2_DIR}/libfaad
+set(RIPPL_FAAD2_DIR ${PROJECT_SOURCE_DIR}/third_party/faad2)
+file(GLOB RIPPL_FAAD2_SOURCES ${RIPPL_FAAD2_DIR}/libfaad/*.c)
+add_library(rippl_faad2 STATIC ${RIPPL_FAAD2_SOURCES})
+target_include_directories(rippl_faad2 SYSTEM
+    PUBLIC ${RIPPL_FAAD2_DIR}/include
+    PRIVATE ${RIPPL_FAAD2_DIR}/libfaad
 )
-target_compile_definitions(echo_faad2 PRIVATE
+target_compile_definitions(rippl_faad2 PRIVATE
     FIXED_POINT LC_ONLY_DECODER DISABLE_SBR NDEBUG PACKAGE_VERSION="2.11.4"
 )
 if(NOT CMAKE_CROSSCOMPILING)
-    target_compile_definitions(echo_faad2 PRIVATE HAVE_INTTYPES_H=1)
+    target_compile_definitions(rippl_faad2 PRIVATE HAVE_INTTYPES_H=1)
 endif()
-target_compile_options(echo_faad2 PRIVATE -w)
-set_target_properties(echo_faad2 PROPERTIES C_EXTENSIONS ON)
+target_compile_options(rippl_faad2 PRIVATE -w)
+set_target_properties(rippl_faad2 PROPERTIES C_EXTENSIONS ON)
 if(CMAKE_CROSSCOMPILING)
-    target_compile_definitions(echo_faad2 PRIVATE abs=__builtin_abs)
-    target_compile_options(echo_faad2 PRIVATE -O2)
-    target_include_directories(echo_faad2 SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/libmad_libc)
+    target_compile_definitions(rippl_faad2 PRIVATE abs=__builtin_abs)
+    target_compile_options(rippl_faad2 PRIVATE -O2)
+    target_include_directories(rippl_faad2 SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/libmad_libc)
 else()
-    target_compile_definitions(echo_faad2 PRIVATE HAVE_STDINT_H=1)
+    target_compile_definitions(rippl_faad2 PRIVATE HAVE_STDINT_H=1)
 endif()
 
-set(ECHO_OPUS_DIR ${PROJECT_SOURCE_DIR}/third_party/opus)
-file(GLOB ECHO_OPUS_SOURCES ${ECHO_OPUS_DIR}/celt/*.c ${ECHO_OPUS_DIR}/silk/*.c)
-add_library(echo_opus STATIC
-    ${ECHO_OPUS_SOURCES}
-    ${ECHO_OPUS_DIR}/src/opus.c
-    ${ECHO_OPUS_DIR}/src/opus_decoder.c
-    ${ECHO_OPUS_DIR}/src/extensions.c
+set(RIPPL_OPUS_DIR ${PROJECT_SOURCE_DIR}/third_party/opus)
+file(GLOB RIPPL_OPUS_SOURCES ${RIPPL_OPUS_DIR}/celt/*.c ${RIPPL_OPUS_DIR}/silk/*.c)
+add_library(rippl_opus STATIC
+    ${RIPPL_OPUS_SOURCES}
+    ${RIPPL_OPUS_DIR}/src/opus.c
+    ${RIPPL_OPUS_DIR}/src/opus_decoder.c
+    ${RIPPL_OPUS_DIR}/src/extensions.c
 )
-target_include_directories(echo_opus SYSTEM
-    PUBLIC ${ECHO_OPUS_DIR}/include
-    PRIVATE ${ECHO_OPUS_DIR} ${ECHO_OPUS_DIR}/celt ${ECHO_OPUS_DIR}/silk ${ECHO_OPUS_DIR}/silk/fixed
-        ${ECHO_OPUS_DIR}/src
+target_include_directories(rippl_opus SYSTEM
+    PUBLIC ${RIPPL_OPUS_DIR}/include
+    PRIVATE ${RIPPL_OPUS_DIR} ${RIPPL_OPUS_DIR}/celt ${RIPPL_OPUS_DIR}/silk ${RIPPL_OPUS_DIR}/silk/fixed
+        ${RIPPL_OPUS_DIR}/src
 )
-target_compile_definitions(echo_opus PRIVATE
+target_compile_definitions(rippl_opus PRIVATE
     FIXED_POINT DISABLE_FLOAT_API OPUS_BUILD USE_ALLOCA NDEBUG PACKAGE_VERSION="1.6.1"
 )
-target_compile_options(echo_opus PRIVATE -w)
-set_target_properties(echo_opus PROPERTIES C_EXTENSIONS ON)
+target_compile_options(rippl_opus PRIVATE -w)
+set_target_properties(rippl_opus PROPERTIES C_EXTENSIONS ON)
 if(CMAKE_CROSSCOMPILING)
-    target_compile_definitions(echo_opus PRIVATE alloca=__builtin_alloca abs=__builtin_abs)
-    target_compile_options(echo_opus PRIVATE -O2)
-    target_include_directories(echo_opus SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/libmad_libc)
+    target_compile_definitions(rippl_opus PRIVATE alloca=__builtin_alloca abs=__builtin_abs)
+    target_compile_options(rippl_opus PRIVATE -O2)
+    target_include_directories(rippl_opus SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/third_party/libmad_libc)
 endif()
 
-set(ECHO_DEVICE_LOGIC_SOURCES
+set(RIPPL_DEVICE_LOGIC_SOURCES
     audio_engine.c
     audio_math.c
     backlight.c
@@ -126,7 +126,7 @@ set(ECHO_DEVICE_LOGIC_SOURCES
     vbus_debounce.c
     wav_source.c
 )
-add_library(echo_device_logic STATIC ${ECHO_DEVICE_LOGIC_SOURCES})
+add_library(rippl_device_logic STATIC ${RIPPL_DEVICE_LOGIC_SOURCES})
 if(CMAKE_CROSSCOMPILING)
     set_source_files_properties(
         audio_math.c
@@ -160,18 +160,18 @@ if(CMAKE_CROSSCOMPILING)
         PROPERTIES COMPILE_OPTIONS -Os
     )
 endif()
-target_include_directories(echo_device_logic PUBLIC include)
-target_link_libraries(echo_device_logic
-    PUBLIC echo_core echo_hal echo_codec echo_libmad echo_faad2 echo_opus
-    PRIVATE echo_options echo_lto
+target_include_directories(rippl_device_logic PUBLIC include)
+target_link_libraries(rippl_device_logic
+    PUBLIC rippl_core rippl_hal rippl_codec rippl_libmad rippl_faad2 rippl_opus
+    PRIVATE rippl_options rippl_lto
 )
 
 if(CMAKE_CROSSCOMPILING)
-    target_compile_definitions(echo_device_logic PRIVATE ECHO_RESIDENT_TABLES)
-    add_library(echo_device_logic_plain STATIC ${ECHO_DEVICE_LOGIC_SOURCES})
-    target_include_directories(echo_device_logic_plain PUBLIC include)
-    target_link_libraries(echo_device_logic_plain
-        PUBLIC echo_core_plain echo_hal_plain echo_codec_plain echo_libmad echo_faad2 echo_opus
-        PRIVATE echo_options
+    target_compile_definitions(rippl_device_logic PRIVATE RIPPL_RESIDENT_TABLES)
+    add_library(rippl_device_logic_plain STATIC ${RIPPL_DEVICE_LOGIC_SOURCES})
+    target_include_directories(rippl_device_logic_plain PUBLIC include)
+    target_link_libraries(rippl_device_logic_plain
+        PUBLIC rippl_core_plain rippl_hal_plain rippl_codec_plain rippl_libmad rippl_faad2 rippl_opus
+        PRIVATE rippl_options
     )
 endif()

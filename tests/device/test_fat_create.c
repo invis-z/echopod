@@ -123,7 +123,7 @@ static bool listed(Card *card, const char *folder, const char *name)
 static void save_card(Card *card, const char *name)
 {
     char path[1024];
-    snprintf(path, sizeof path, "%s/%s.img", ECHO_CREATED_DIR, name);
+    snprintf(path, sizeof path, "%s/%s.img", RIPPL_CREATED_DIR, name);
     FILE *file = fopen(path, "wb");
     CHECK(file != NULL);
     size_t start = (size_t)card->volume.volume_start * SECTOR_SIZE;

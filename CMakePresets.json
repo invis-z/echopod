@@ -7,7 +7,7 @@
       "binaryDir": "${sourceDir}/build/dev",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "ECHO_SANITIZE": "ON"
+        "RIPPL_SANITIZE": "ON"
       }
     },
     {
@@ -18,9 +18,9 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_FLAGS_RELEASE": "-O2",
-        "ECHO_BUILD_SIM": "OFF",
-        "ECHO_BUILD_TESTS": "OFF",
-        "ECHO_BUILD_DEVICE": "ON"
+        "RIPPL_BUILD_SIM": "OFF",
+        "RIPPL_BUILD_TESTS": "OFF",
+        "RIPPL_BUILD_DEVICE": "ON"
       }
     },
     {
@@ -29,7 +29,7 @@
       "inherits": "device",
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
-        "ECHO_RELEASE": "ON"
+        "RIPPL_RELEASE": "ON"
       }
     }
   ],

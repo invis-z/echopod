@@ -10,7 +10,7 @@ enum {
     PACK_LIMIT = 0x3000
 };
 
-static const char PACK_PATHS[] = ECHO_LANGUAGE_PACK_PATHS;
+static const char PACK_PATHS[] = RIPPL_LANGUAGE_PACK_PATHS;
 
 static uint32_t read_pack(const char *path, uint8_t *pack)
 {

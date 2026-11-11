@@ -114,14 +114,14 @@ def source_name(path):
 
 
 def object_name(origin):
-    """`libecho_app.a(player.c.obj)` -> `app/player.c`; a plain object -> its source path."""
+    """`librippl_app.a(player.c.obj)` -> `app/player.c`; a plain object -> its source path."""
     if origin == FILL:
         return FILL
     name = origin.replace("\\", "/")
     match = MEMBER.match(name)
     if match:
         archive = Path(match.group(1)).stem
-        for prefix in ("libecho_", "lib"):
+        for prefix in ("librippl_", "lib"):
             if archive.startswith(prefix):
                 archive = archive[len(prefix):]
                 break
@@ -281,12 +281,12 @@ def parse_arguments(argv):
     arguments = parser.parse_args(argv)
     if arguments.build is not None:
         directory = arguments.build / "platform" / "device"
-        arguments.map = arguments.map or directory / "echo_device.map"
-        arguments.elf = arguments.elf or directory / "echo_device.elf"
-        overlay = directory / "echo_rescan_overlay.map"
+        arguments.map = arguments.map or directory / "rippl_device.map"
+        arguments.elf = arguments.elf or directory / "rippl_device.elf"
+        overlay = directory / "rippl_rescan_overlay.map"
         if arguments.overlay_map is None and overlay.exists():
             arguments.overlay_map = overlay
-        usb_overlay = directory / "echo_usb_overlay.map"
+        usb_overlay = directory / "rippl_usb_overlay.map"
         if arguments.usb_overlay_map is None and usb_overlay.exists():
             arguments.usb_overlay_map = usb_overlay
     if arguments.map is None:

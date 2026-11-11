@@ -3,9 +3,7 @@
 #include "core/hash.h"
 
 enum {
-    VERSION = 2,
-    VERSION_1 = 1,
-    VERSION_1_SIZE = 20,
+    VERSION = 1,
     MAGIC_SIZE = 4,
     VERSION_FIELD = 4,
     PRESET_FIELD = 6,
@@ -13,7 +11,6 @@ enum {
     NAME_LENGTH_FIELD = 14,
     NAME_FIELD = 16,
     CHECKSUM_FIELD = NAME_FIELD + EQUALIZER_PRESET_NAME_CAPACITY,
-    VERSION_1_CHECKSUM_FIELD = 16,
     GAIN_OFFSET = -EQUALIZER_GAIN_MIN_DB,
     GAIN_STEPS = EQUALIZER_GAIN_MAX_DB - EQUALIZER_GAIN_MIN_DB,
     BITS_PER_BYTE = 8
@@ -65,17 +62,17 @@ static bool magic_valid(const uint8_t *bytes)
     return true;
 }
 
-static bool header_valid(const uint8_t *bytes, uint32_t checksum_field, uint8_t version)
+static bool header_valid(const uint8_t *bytes)
 {
     uint32_t checksum = 0;
     for (int index = 3; index >= 0; index--) {
-        checksum = checksum << BITS_PER_BYTE | bytes[checksum_field + (uint32_t)index];
+        checksum = checksum << BITS_PER_BYTE | bytes[CHECKSUM_FIELD + (uint32_t)index];
     }
-    return magic_valid(bytes) && bytes[VERSION_FIELD] == version &&
-           checksum == checksum_of(bytes, checksum_field);
+    return magic_valid(bytes) && bytes[VERSION_FIELD] == VERSION &&
+           checksum == checksum_of(bytes, CHECKSUM_FIELD);
 }
 
-static bool values_valid(const uint8_t *bytes, bool has_name)
+static bool values_valid(const uint8_t *bytes)
 {
     if (bytes[PRESET_FIELD] >= EQUALIZER_PRESET_COUNT) {
         return false;
@@ -85,40 +82,19 @@ static bool values_valid(const uint8_t *bytes, bool has_name)
             return false;
         }
     }
-    if (has_name && bytes[NAME_LENGTH_FIELD] >= EQUALIZER_PRESET_NAME_CAPACITY) {
-        return false;
-    }
-    return true;
-}
-
-static void decode_common(const uint8_t *bytes, EqualizerChoice *choice)
-{
-    choice->preset = (EqualizerPreset)bytes[PRESET_FIELD];
-    for (int band = 0; band < EQUALIZER_CUSTOM_BANDS; band++) {
-        choice->custom_gains[band] = (int8_t)(bytes[GAINS_FIELD + band] - GAIN_OFFSET);
-    }
+    return bytes[NAME_LENGTH_FIELD] < EQUALIZER_PRESET_NAME_CAPACITY;
 }
 
 bool equalizer_file_decode(const uint8_t *bytes, uint32_t length, EqualizerChoice *choice)
 {
-    if (length < VERSION_1_SIZE || !magic_valid(bytes)) {
-        return false;
-    }
-    if (bytes[VERSION_FIELD] == VERSION_1) {
-        if (!header_valid(bytes, VERSION_1_CHECKSUM_FIELD, VERSION_1) ||
-            !values_valid(bytes, false)) {
-            return false;
-        }
-        *choice = equalizer_file_defaults();
-        decode_common(bytes, choice);
-        return true;
-    }
-    if (bytes[VERSION_FIELD] != VERSION || length < EQUALIZER_FILE_SIZE ||
-        !header_valid(bytes, CHECKSUM_FIELD, VERSION) || !values_valid(bytes, true)) {
+    if (length < EQUALIZER_FILE_SIZE || !header_valid(bytes) || !values_valid(bytes)) {
         return false;
     }
     *choice = equalizer_file_defaults();
-    decode_common(bytes, choice);
+    choice->preset = (EqualizerPreset)bytes[PRESET_FIELD];
+    for (int band = 0; band < EQUALIZER_CUSTOM_BANDS; band++) {
+        choice->custom_gains[band] = (int8_t)(bytes[GAINS_FIELD + band] - GAIN_OFFSET);
+    }
     uint32_t name_length = bytes[NAME_LENGTH_FIELD];
     for (uint32_t index = 0; index < name_length; index++) {
         choice->preset_name[index] = (char)bytes[NAME_FIELD + index];

@@ -5,9 +5,9 @@
 #include "hal/system.h"
 
 const char SCROBBLER_LOG_PATH[] = "/.scrobbler.log";
-const char SCROBBLER_MARK_PATH[] = "/.echo/history-exported.txt";
+const char SCROBBLER_MARK_PATH[] = "/.rippl/history-exported.txt";
 
-static const char HEADER[] = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/EchoPod ";
+static const char HEADER[] = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/Rippl ";
 
 enum {
     LINE_LIMIT = HISTORY_CHECK_AT - HISTORY_TEXT_AT + 40,

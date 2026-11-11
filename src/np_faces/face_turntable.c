@@ -79,40 +79,40 @@ typedef struct Slot {
     Color color;
 } Slot;
 
-ECHO_NP_FACES_DATA static const Rows LANDSCAPE_ROWS = {
+RIPPL_NP_FACES_DATA static const Rows LANDSCAPE_ROWS = {
     170, 140, FACE_ALIGN_LEFT, 4, 26, 46, 73, 92, 107, 124, 129, true};
-ECHO_NP_FACES_DATA static const Rows PORTRAIT_ROWS = {
+RIPPL_NP_FACES_DATA static const Rows PORTRAIT_ROWS = {
     10, 150, FACE_ALIGN_CENTRE, 144, 166, 188, 212, 0, -42, -23, -18, false};
 
-ECHO_NP_FACES_CODE static ShapeRing ring_of(Point at, int outer, int inner)
+RIPPL_NP_FACES_CODE static ShapeRing ring_of(Point at, int outer, int inner)
 {
     return (ShapeRing){(int16_t)(at.x * Q4 + PIXEL_CENTRE), (int16_t)(at.y * Q4 + PIXEL_CENTRE),
                        (int16_t)outer, (int16_t)inner};
 }
 
-ECHO_NP_FACES_CODE static void ring(const Deck *deck, int outer, int inner, Color color)
+RIPPL_NP_FACES_CODE static void ring(const Deck *deck, int outer, int inner, Color color)
 {
     shape_ring(deck->canvas, ring_of(deck->centre, outer, inner), color);
 }
 
-ECHO_NP_FACES_CODE static void dot(Canvas *canvas, Point at, int radius, Color color)
+RIPPL_NP_FACES_CODE static void dot(Canvas *canvas, Point at, int radius, Color color)
 {
     shape_ring(canvas, ring_of(at, radius, 0), color);
 }
 
-ECHO_NP_FACES_CODE static void spoke(Canvas *canvas, ShapeSpoke geometry, Color color)
+RIPPL_NP_FACES_CODE static void spoke(Canvas *canvas, ShapeSpoke geometry, Color color)
 {
     shape_spoke(canvas, &geometry, color);
 }
 
-ECHO_NP_FACES_CODE static void plate(const Deck *deck)
+RIPPL_NP_FACES_CODE static void plate(const Deck *deck)
 {
     canvas_fill_gradient(deck->canvas, deck->frame->area, WALNUT_TOP, WALNUT_BOTTOM);
     ring(deck, RIM_OUTER * Q4, RIM_INNER * Q4, ALU);
     ring(deck, RIM_INNER * Q4, 0, VINYL);
 }
 
-ECHO_NP_FACES_CODE static void label_art(const Deck *deck)
+RIPPL_NP_FACES_CODE static void label_art(const Deck *deck)
 {
     Image cover = deck->frame->cover;
     int corner = deck->centre.y - LABEL_RADIUS;
@@ -127,7 +127,7 @@ ECHO_NP_FACES_CODE static void label_art(const Deck *deck)
     ring(deck, LABEL_MASK * Q4, LABEL_RADIUS * Q4, VINYL);
 }
 
-ECHO_NP_FACES_CODE static void grooves(const Deck *deck)
+RIPPL_NP_FACES_CODE static void grooves(const Deck *deck)
 {
     for (int index = 0; index < GROOVE_COUNT; index++) {
         int radius = GROOVE_FIRST + GROOVE_STEP * index;
@@ -138,7 +138,7 @@ ECHO_NP_FACES_CODE static void grooves(const Deck *deck)
     ring(deck, SPINDLE, 0, ALU);
 }
 
-ECHO_NP_FACES_CODE static void badge(const Deck *deck)
+RIPPL_NP_FACES_CODE static void badge(const Deck *deck)
 {
     if (face_badge_kind(deck->frame) == FACE_ICON_NONE) {
         return;
@@ -150,7 +150,7 @@ ECHO_NP_FACES_CODE static void badge(const Deck *deck)
                     CREAM);
 }
 
-ECHO_NP_FACES_CODE static void arm(const Deck *deck)
+RIPPL_NP_FACES_CODE static void arm(const Deck *deck)
 {
     const NowPlayingFrame *frame = deck->frame;
     int steps = face_progress_width(frame->shown_ms, frame->status->duration_ms, ARM_STEPS);
@@ -168,18 +168,18 @@ ECHO_NP_FACES_CODE static void arm(const Deck *deck)
     dot(canvas, pivot, 48, ALU_DARK);
 }
 
-ECHO_NP_FACES_CODE static void lamp(const Deck *deck)
+RIPPL_NP_FACES_CODE static void lamp(const Deck *deck)
 {
     Point at = {deck->centre.x + LAMP_DX, deck->centre.y + LAMP_DY};
     dot(deck->canvas, at, LAMP_RADIUS, deck->frame->playing ? AMBER : ALU_DARK);
 }
 
-ECHO_NP_FACES_CODE static const Rows *rows_of(const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE static const Rows *rows_of(const NowPlayingFrame *frame)
 {
     return frame->area.height > frame->area.width ? &PORTRAIT_ROWS : &LANDSCAPE_ROWS;
 }
 
-ECHO_NP_FACES_CODE static FaceLine line_of(const NowPlayingFrame *frame, Slot slot)
+RIPPL_NP_FACES_CODE static FaceLine line_of(const NowPlayingFrame *frame, Slot slot)
 {
     const Rows *rows = rows_of(frame);
     Rect area = frame->area;
@@ -188,7 +188,7 @@ ECHO_NP_FACES_CODE static FaceLine line_of(const NowPlayingFrame *frame, Slot sl
         slot.font, {rows->x, y, rows->width, slot.height}, slot.color, slot.color, rows->align};
 }
 
-ECHO_NP_FACES_CODE static void note(const Deck *deck, FaceLine line, const char *text)
+RIPPL_NP_FACES_CODE static void note(const Deck *deck, FaceLine line, const char *text)
 {
     if (text != NULL) {
         Rect fitted = face_fitted_area(line.font, line.area, text, line.align);
@@ -196,7 +196,7 @@ ECHO_NP_FACES_CODE static void note(const Deck *deck, FaceLine line, const char 
     }
 }
 
-ECHO_NP_FACES_CODE static void heading(const Deck *deck)
+RIPPL_NP_FACES_CODE static void heading(const Deck *deck)
 {
     const NowPlayingFrame *frame = deck->frame;
     const Rows *rows = rows_of(frame);
@@ -212,7 +212,7 @@ ECHO_NP_FACES_CODE static void heading(const Deck *deck)
     face_line(deck->canvas, frame, &album, sung ? lyric : frame->album);
 }
 
-ECHO_NP_FACES_CODE static void modes(const Deck *deck)
+RIPPL_NP_FACES_CODE static void modes(const Deck *deck)
 {
     const NowPlayingFrame *frame = deck->frame;
     char buffer[FACE_FEEDBACK_CAPACITY];
@@ -222,7 +222,7 @@ ECHO_NP_FACES_CODE static void modes(const Deck *deck)
     note(deck, line_of(frame, slot), feedback != NULL ? feedback : frame->modes);
 }
 
-ECHO_NP_FACES_CODE static void details(const Deck *deck)
+RIPPL_NP_FACES_CODE static void details(const Deck *deck)
 {
     const NowPlayingFrame *frame = deck->frame;
     const Rows *rows = rows_of(frame);
@@ -235,7 +235,7 @@ ECHO_NP_FACES_CODE static void details(const Deck *deck)
     modes(deck);
 }
 
-ECHO_NP_FACES_CODE static void progress(const Deck *deck)
+RIPPL_NP_FACES_CODE static void progress(const Deck *deck)
 {
     const NowPlayingFrame *frame = deck->frame;
     const Rows *rows = rows_of(frame);
@@ -246,7 +246,7 @@ ECHO_NP_FACES_CODE static void progress(const Deck *deck)
     face_times_draw(deck->canvas, frame, &times);
 }
 
-ECHO_NP_FACES_CODE void face_turntable_draw(const NowPlayingFrame *frame, Canvas *canvas)
+RIPPL_NP_FACES_CODE void face_turntable_draw(const NowPlayingFrame *frame, Canvas *canvas)
 {
     Deck deck = {canvas, frame, {CENTRE_X, frame->area.y + CENTRE_DROP}};
     plate(&deck);

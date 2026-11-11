@@ -22,17 +22,17 @@ enum {
     COLON_DOTS = 2
 };
 
-ECHO_NP_FACES_DATA static const uint8_t QUARTER[QUARTER_STEPS + 1] = {
+RIPPL_NP_FACES_DATA static const uint8_t QUARTER[QUARTER_STEPS + 1] = {
     0,   6,   13,  19,  25,  31,  37,  44,  50,  56,  62,  68,  74,  80,  86,  92,  98,
     103, 109, 115, 120, 126, 131, 136, 142, 147, 152, 157, 162, 167, 171, 176, 180, 185,
     189, 193, 197, 201, 205, 208, 212, 215, 219, 222, 225, 228, 231, 233, 236, 238, 240,
     242, 244, 246, 247, 249, 250, 251, 252, 253, 254, 254, 255, 255, 255};
 
-ECHO_NP_FACES_DATA static const uint8_t DIGIT_MASKS[DIGIT_SEGMENTS] = {
+RIPPL_NP_FACES_DATA static const uint8_t DIGIT_MASKS[DIGIT_SEGMENTS] = {
     0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
 
-ECHO_NP_FACES_DATA static const uint8_t BAR_BITS[BAR_COUNT] = {0, 6, 3};
-ECHO_NP_FACES_DATA static const uint8_t POST_BITS[POST_COUNT] = {5, 1, 4, 2};
+RIPPL_NP_FACES_DATA static const uint8_t BAR_BITS[BAR_COUNT] = {0, 6, 3};
+RIPPL_NP_FACES_DATA static const uint8_t POST_BITS[POST_COUNT] = {5, 1, 4, 2};
 
 typedef struct Bounds {
     int low;
@@ -71,28 +71,28 @@ typedef struct Post {
     int bottom;
 } Post;
 
-ECHO_NP_FACES_CODE static int round_div(int numerator, int denominator)
+RIPPL_NP_FACES_CODE static int round_div(int numerator, int denominator)
 {
     int half = denominator / 2;
     return (numerator + (numerator >= 0 ? half : -half)) / denominator;
 }
 
-ECHO_NP_FACES_CODE static int magnitude(int value)
+RIPPL_NP_FACES_CODE static int magnitude(int value)
 {
     return value < 0 ? -value : value;
 }
 
-ECHO_NP_FACES_CODE static int smaller(int first, int second)
+RIPPL_NP_FACES_CODE static int smaller(int first, int second)
 {
     return first < second ? first : second;
 }
 
-ECHO_NP_FACES_CODE static int larger(int first, int second)
+RIPPL_NP_FACES_CODE static int larger(int first, int second)
 {
     return first > second ? first : second;
 }
 
-ECHO_NP_FACES_CODE int shape_sine(uint8_t angle)
+RIPPL_NP_FACES_CODE int shape_sine(uint8_t angle)
 {
     unsigned quadrant = (unsigned)angle >> QUARTER_SHIFT;
     unsigned step = (unsigned)angle & QUARTER_MASK;
@@ -100,12 +100,12 @@ ECHO_NP_FACES_CODE int shape_sine(uint8_t angle)
     return quadrant >= NEGATIVE_QUARTER ? -value : value;
 }
 
-ECHO_NP_FACES_CODE int shape_cosine(uint8_t angle)
+RIPPL_NP_FACES_CODE int shape_cosine(uint8_t angle)
 {
     return shape_sine((uint8_t)(angle + QUARTER_TURN));
 }
 
-ECHO_NP_FACES_CODE uint32_t shape_isqrt(uint32_t value)
+RIPPL_NP_FACES_CODE uint32_t shape_isqrt(uint32_t value)
 {
     uint32_t root = 0;
     uint32_t bit = SQRT_TOP_BIT;
@@ -123,13 +123,13 @@ ECHO_NP_FACES_CODE uint32_t shape_isqrt(uint32_t value)
     return root;
 }
 
-ECHO_NP_FACES_CODE Point shape_polar(Point centre, uint8_t angle, int radius)
+RIPPL_NP_FACES_CODE Point shape_polar(Point centre, uint8_t angle, int radius)
 {
     return (Point){centre.x + round_div(radius * shape_sine(angle), SHAPE_UNIT),
                    centre.y - round_div(radius * shape_cosine(angle), SHAPE_UNIT)};
 }
 
-ECHO_NP_FACES_CODE static void blend_at(Canvas *canvas, Point point, Color color, uint8_t alpha)
+RIPPL_NP_FACES_CODE static void blend_at(Canvas *canvas, Point point, Color color, uint8_t alpha)
 {
     Rect clip = canvas->clip;
     bool inside = point.x >= clip.x && point.x < clip.x + clip.width && point.y >= clip.y &&
@@ -141,12 +141,12 @@ ECHO_NP_FACES_CODE static void blend_at(Canvas *canvas, Point point, Color color
     canvas->pixels[offset] = color_blend(canvas->pixels[offset], color, alpha);
 }
 
-ECHO_NP_FACES_CODE static uint8_t coverage(int fraction_q4)
+RIPPL_NP_FACES_CODE static uint8_t coverage(int fraction_q4)
 {
     return (uint8_t)(fraction_q4 * COLOR_ALPHA_OPAQUE / SHAPE_Q4);
 }
 
-ECHO_NP_FACES_CODE void shape_span(Canvas *canvas, ShapeSpan span, Color color)
+RIPPL_NP_FACES_CODE void shape_span(Canvas *canvas, ShapeSpan span, Color color)
 {
     Rect clip = canvas->clip;
     if (span.right_q4 <= span.left_q4 || span.y < clip.y || span.y >= clip.y + clip.height) {
@@ -168,12 +168,12 @@ ECHO_NP_FACES_CODE void shape_span(Canvas *canvas, ShapeSpan span, Color color)
     blend_at(canvas, (Point){right, span.y}, color, coverage(right_part));
 }
 
-ECHO_NP_FACES_CODE static ShapeSpan span_of(int y, int left_q4, int right_q4)
+RIPPL_NP_FACES_CODE static ShapeSpan span_of(int y, int left_q4, int right_q4)
 {
     return (ShapeSpan){(int16_t)y, (int16_t)left_q4, (int16_t)right_q4};
 }
 
-ECHO_NP_FACES_CODE static void ring_row(Canvas *canvas, const ShapeRing *ring, int y, Color color)
+RIPPL_NP_FACES_CODE static void ring_row(Canvas *canvas, const ShapeRing *ring, int y, Color color)
 {
     int dy = y * SHAPE_Q4 + HALF_PIXEL_Q4 - ring->y_q4;
     int outer = ring->outer_q4;
@@ -192,7 +192,7 @@ ECHO_NP_FACES_CODE static void ring_row(Canvas *canvas, const ShapeRing *ring, i
     shape_span(canvas, span_of(y, centre + hole, centre + reach), color);
 }
 
-ECHO_NP_FACES_CODE void shape_ring(Canvas *canvas, ShapeRing ring, Color color)
+RIPPL_NP_FACES_CODE void shape_ring(Canvas *canvas, ShapeRing ring, Color color)
 {
     int top = larger((ring.y_q4 - ring.outer_q4) >> PIXEL_SHIFT, canvas->clip.y);
     int bottom = smaller(((ring.y_q4 + ring.outer_q4) >> PIXEL_SHIFT) + 1,
@@ -202,21 +202,21 @@ ECHO_NP_FACES_CODE void shape_ring(Canvas *canvas, ShapeRing ring, Color color)
     }
 }
 
-ECHO_NP_FACES_CODE static int corner_inset(int radius, int edge_distance)
+RIPPL_NP_FACES_CODE static int corner_inset(int radius, int edge_distance)
 {
     int offset = (2 * (radius - edge_distance) - 1) * HALF_PIXEL_Q4;
     int radius_q4 = radius * SHAPE_Q4;
     return radius_q4 - (int)shape_isqrt((uint32_t)(radius_q4 * radius_q4 - offset * offset));
 }
 
-ECHO_NP_FACES_CODE static void inset_row(Canvas *canvas, Rect area, InsetRow at, Color color)
+RIPPL_NP_FACES_CODE static void inset_row(Canvas *canvas, Rect area, InsetRow at, Color color)
 {
     int left = area.x * SHAPE_Q4 + at.inset;
     int right = (area.x + area.width) * SHAPE_Q4 - at.inset;
     shape_span(canvas, span_of(area.y + at.row, left, right), color);
 }
 
-ECHO_NP_FACES_CODE void shape_rounded(Canvas *canvas, Rect area, int radius, Color color)
+RIPPL_NP_FACES_CODE void shape_rounded(Canvas *canvas, Rect area, int radius, Color color)
 {
     int first = larger(0, canvas->clip.y - area.y);
     int last = smaller(area.height, canvas->clip.y + canvas->clip.height - area.y);
@@ -227,7 +227,7 @@ ECHO_NP_FACES_CODE void shape_rounded(Canvas *canvas, Rect area, int radius, Col
     }
 }
 
-ECHO_NP_FACES_CODE void shape_trapezoid(Canvas *canvas, Rect area, int top_inset, Color color)
+RIPPL_NP_FACES_CODE void shape_trapezoid(Canvas *canvas, Rect area, int top_inset, Color color)
 {
     int first = larger(0, canvas->clip.y - area.y);
     int last = smaller(area.height, canvas->clip.y + canvas->clip.height - area.y);
@@ -237,7 +237,7 @@ ECHO_NP_FACES_CODE void shape_trapezoid(Canvas *canvas, Rect area, int top_inset
     }
 }
 
-ECHO_NP_FACES_CODE static Bounds axis_bounds(int factor, int low, int high, Bounds within)
+RIPPL_NP_FACES_CODE static Bounds axis_bounds(int factor, int low, int high, Bounds within)
 {
     if (factor == 0) {
         bool outside = low > 0 || high < 0;
@@ -253,7 +253,7 @@ ECHO_NP_FACES_CODE static Bounds axis_bounds(int factor, int low, int high, Boun
                     smaller(within.high, round_div(high, factor))};
 }
 
-ECHO_NP_FACES_CODE static Bounds spoke_bounds(const ShapeSpoke *spoke, int y)
+RIPPL_NP_FACES_CODE static Bounds spoke_bounds(const ShapeSpoke *spoke, int y)
 {
     int sine = shape_sine(spoke->angle);
     int cosine = shape_cosine(spoke->angle);
@@ -265,7 +265,7 @@ ECHO_NP_FACES_CODE static Bounds spoke_bounds(const ShapeSpoke *spoke, int y)
     return axis_bounds(cosine, -half - row * sine, half - row * sine, along);
 }
 
-ECHO_NP_FACES_CODE void shape_spoke(Canvas *canvas, const ShapeSpoke *spoke, Color color)
+RIPPL_NP_FACES_CODE void shape_spoke(Canvas *canvas, const ShapeSpoke *spoke, Color color)
 {
     int reach =
         larger(magnitude(spoke->from), magnitude(spoke->to)) + spoke->width_q4 / SHAPE_Q4 + 1;
@@ -280,7 +280,7 @@ ECHO_NP_FACES_CODE void shape_spoke(Canvas *canvas, const ShapeSpoke *spoke, Col
     }
 }
 
-ECHO_NP_FACES_CODE static void run_draw(const DigitPen *pen, Run run, Color color)
+RIPPL_NP_FACES_CODE static void run_draw(const DigitPen *pen, Run run, Color color)
 {
     if (run.right < run.left) {
         return;
@@ -292,7 +292,7 @@ ECHO_NP_FACES_CODE static void run_draw(const DigitPen *pen, Run run, Color colo
                      color);
 }
 
-ECHO_NP_FACES_CODE static DigitFrame digit_frame(const SegmentStyle *style, Point origin)
+RIPPL_NP_FACES_CODE static DigitFrame digit_frame(const SegmentStyle *style, Point origin)
 {
     int half = style->thickness / 2;
     return (DigitFrame){.left = origin.x + half,
@@ -303,13 +303,13 @@ ECHO_NP_FACES_CODE static DigitFrame digit_frame(const SegmentStyle *style, Poin
                         .half = half};
 }
 
-ECHO_NP_FACES_CODE static Color segment_color(const SegmentStyle *style, uint8_t mask, int bit)
+RIPPL_NP_FACES_CODE static Color segment_color(const SegmentStyle *style, uint8_t mask, int bit)
 {
     return ((mask >> bit) & 1) != 0 ? style->lit : style->unlit;
 }
 
-ECHO_NP_FACES_CODE static void digit_bar(const DigitPen *pen, const DigitFrame *frame, int row,
-                                         Color color)
+RIPPL_NP_FACES_CODE static void digit_bar(const DigitPen *pen, const DigitFrame *frame, int row,
+                                          Color color)
 {
     for (int offset = -frame->half; offset <= frame->half; offset++) {
         int slant = magnitude(offset) + 1;
@@ -317,8 +317,8 @@ ECHO_NP_FACES_CODE static void digit_bar(const DigitPen *pen, const DigitFrame *
     }
 }
 
-ECHO_NP_FACES_CODE static void digit_post(const DigitPen *pen, const DigitFrame *frame, Post post,
-                                          Color color)
+RIPPL_NP_FACES_CODE static void digit_post(const DigitPen *pen, const DigitFrame *frame, Post post,
+                                           Color color)
 {
     for (int row = post.top; row <= post.bottom; row++) {
         int reach = smaller(frame->half, smaller(row - post.top, post.bottom - row) - 1);
@@ -328,8 +328,8 @@ ECHO_NP_FACES_CODE static void digit_post(const DigitPen *pen, const DigitFrame 
     }
 }
 
-ECHO_NP_FACES_CODE static void digit_bars(const DigitPen *pen, const DigitFrame *frame,
-                                          uint8_t mask)
+RIPPL_NP_FACES_CODE static void digit_bars(const DigitPen *pen, const DigitFrame *frame,
+                                           uint8_t mask)
 {
     const int rows[BAR_COUNT] = {frame->top, frame->middle, frame->bottom};
     for (int index = 0; index < BAR_COUNT; index++) {
@@ -337,8 +337,8 @@ ECHO_NP_FACES_CODE static void digit_bars(const DigitPen *pen, const DigitFrame 
     }
 }
 
-ECHO_NP_FACES_CODE static void digit_posts(const DigitPen *pen, const DigitFrame *frame,
-                                           uint8_t mask)
+RIPPL_NP_FACES_CODE static void digit_posts(const DigitPen *pen, const DigitFrame *frame,
+                                            uint8_t mask)
 {
     const Post posts[POST_COUNT] = {{frame->left, frame->top, frame->middle},
                                     {frame->right, frame->top, frame->middle},
@@ -349,8 +349,8 @@ ECHO_NP_FACES_CODE static void digit_posts(const DigitPen *pen, const DigitFrame
     }
 }
 
-ECHO_NP_FACES_CODE void shape_digit(Canvas *canvas, const SegmentStyle *style, Point origin,
-                                    uint8_t mask)
+RIPPL_NP_FACES_CODE void shape_digit(Canvas *canvas, const SegmentStyle *style, Point origin,
+                                     uint8_t mask)
 {
     DigitPen pen = {canvas, style, origin};
     DigitFrame frame = digit_frame(style, origin);
@@ -358,8 +358,8 @@ ECHO_NP_FACES_CODE void shape_digit(Canvas *canvas, const SegmentStyle *style, P
     digit_posts(&pen, &frame, mask);
 }
 
-ECHO_NP_FACES_CODE void shape_colon(Canvas *canvas, const SegmentStyle *style, Point origin,
-                                    bool lit)
+RIPPL_NP_FACES_CODE void shape_colon(Canvas *canvas, const SegmentStyle *style, Point origin,
+                                     bool lit)
 {
     DigitPen pen = {canvas, style, origin};
     DigitFrame frame = digit_frame(style, origin);
@@ -375,12 +375,12 @@ ECHO_NP_FACES_CODE void shape_colon(Canvas *canvas, const SegmentStyle *style, P
     }
 }
 
-ECHO_NP_FACES_CODE uint8_t shape_digit_mask(unsigned digit)
+RIPPL_NP_FACES_CODE uint8_t shape_digit_mask(unsigned digit)
 {
     return digit < DIGIT_SEGMENTS ? DIGIT_MASKS[digit] : 0;
 }
 
-ECHO_NP_FACES_CODE void shape_lattice(Canvas *canvas, Rect area, int pitch, Color color)
+RIPPL_NP_FACES_CODE void shape_lattice(Canvas *canvas, Rect area, int pitch, Color color)
 {
     if (pitch <= 0) {
         return;

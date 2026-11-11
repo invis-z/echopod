@@ -349,7 +349,7 @@ static void no_card_fails_without_sending_commands(void)
     CHECK_EQUAL(0, card.log_count);
 }
 
-static void a_wrong_cmd8_echo_fails(void)
+static void a_wrong_cmd8_rippl_fails(void)
 {
     FakeCard card = sdhc_card(100);
     card.cmd8_echo = 0x0AA;
@@ -512,7 +512,7 @@ int main(void)
         TEST_CASE(a_card_without_a_wide_bus_stays_at_1_bit),
         TEST_CASE(a_card_that_stays_busy_fails_after_100_tries),
         TEST_CASE(no_card_fails_without_sending_commands),
-        TEST_CASE(a_wrong_cmd8_echo_fails),
+        TEST_CASE(a_wrong_cmd8_rippl_fails),
         TEST_CASE(a_good_transfer_runs_once),
         TEST_CASE(one_failure_resumes_the_card_and_tries_again),
         TEST_CASE(a_second_failure_restarts_the_card),

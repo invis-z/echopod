@@ -14,7 +14,7 @@ enum {
     HALF = 2
 };
 
-ECHO_NP_FACES_DATA static const uint8_t BADGE_ICONS[BADGE_ICON_COUNT] = {
+RIPPL_NP_FACES_DATA static const uint8_t BADGE_ICONS[BADGE_ICON_COUNT] = {
     [NOW_PLAYING_FEEDBACK_NONE] = FACE_ICON_NONE,
     [NOW_PLAYING_FEEDBACK_VOLUME] = FACE_ICON_NONE,
     [NOW_PLAYING_FEEDBACK_NEXT] = FACE_ICON_NEXT,
@@ -23,23 +23,23 @@ ECHO_NP_FACES_DATA static const uint8_t BADGE_ICONS[BADGE_ICON_COUNT] = {
     [NOW_PLAYING_FEEDBACK_PLAY] = FACE_ICON_PLAY,
 };
 
-ECHO_NP_FACES_CODE static int larger(int first, int second)
+RIPPL_NP_FACES_CODE static int larger(int first, int second)
 {
     return first > second ? first : second;
 }
 
-ECHO_NP_FACES_CODE static int smaller(int first, int second)
+RIPPL_NP_FACES_CODE static int smaller(int first, int second)
 {
     return first < second ? first : second;
 }
 
-ECHO_NP_FACES_CODE static bool has_text(const char *text)
+RIPPL_NP_FACES_CODE static bool has_text(const char *text)
 {
     return text != NULL && text[0] != '\0';
 }
 
-ECHO_NP_FACES_CODE int face_scroll_offset(MarqueeTiming timing, int text_width, int view_width,
-                                          uint32_t elapsed_ms)
+RIPPL_NP_FACES_CODE int face_scroll_offset(MarqueeTiming timing, int text_width, int view_width,
+                                           uint32_t elapsed_ms)
 {
     if (text_width <= view_width || timing.speed_px_per_s == 0) {
         return 0;
@@ -53,8 +53,8 @@ ECHO_NP_FACES_CODE int face_scroll_offset(MarqueeTiming timing, int text_width, 
     return (int)((phase - timing.pause_ms) * timing.speed_px_per_s / MILLISECONDS_PER_SECOND);
 }
 
-ECHO_NP_FACES_CODE Rect face_fitted_area(const Font *font, Rect area, const char *text,
-                                         FaceAlign align)
+RIPPL_NP_FACES_CODE Rect face_fitted_area(const Font *font, Rect area, const char *text,
+                                          FaceAlign align)
 {
     int width = smaller(text_width(font, text), area.width);
     if (align == FACE_ALIGN_CENTRE) {
@@ -66,8 +66,8 @@ ECHO_NP_FACES_CODE Rect face_fitted_area(const Font *font, Rect area, const char
     return area;
 }
 
-ECHO_NP_FACES_CODE static void scroll_draw(Canvas *canvas, const NowPlayingFrame *frame,
-                                           TextStyle style, Label label)
+RIPPL_NP_FACES_CODE static void scroll_draw(Canvas *canvas, const NowPlayingFrame *frame,
+                                            TextStyle style, Label label)
 {
     MarqueeTiming timing = frame->theme->marquee;
     int width = text_width(style.font, label.text);
@@ -76,8 +76,8 @@ ECHO_NP_FACES_CODE static void scroll_draw(Canvas *canvas, const NowPlayingFrame
     label_draw_scrolling(canvas, style, label, (Marquee){offset, timing.gap_px});
 }
 
-ECHO_NP_FACES_CODE void face_line(Canvas *canvas, const NowPlayingFrame *frame,
-                                  const FaceLine *line, const char *text)
+RIPPL_NP_FACES_CODE void face_line(Canvas *canvas, const NowPlayingFrame *frame,
+                                   const FaceLine *line, const char *text)
 {
     if (text == NULL) {
         return;
@@ -93,8 +93,8 @@ ECHO_NP_FACES_CODE void face_line(Canvas *canvas, const NowPlayingFrame *frame,
     }
 }
 
-ECHO_NP_FACES_CODE const char *face_feedback_text(const NowPlayingFrame *frame, char *buffer,
-                                                  size_t capacity)
+RIPPL_NP_FACES_CODE const char *face_feedback_text(const NowPlayingFrame *frame, char *buffer,
+                                                   size_t capacity)
 {
     if (frame->scrubbing) {
         return i18n_text(STR_MENU_SEEKING_HINT);
@@ -109,8 +109,8 @@ ECHO_NP_FACES_CODE const char *face_feedback_text(const NowPlayingFrame *frame, 
     return buffer;
 }
 
-ECHO_NP_FACES_CODE void face_feedback_line(Canvas *canvas, const NowPlayingFrame *frame,
-                                           const FaceLine *line, const char *text)
+RIPPL_NP_FACES_CODE void face_feedback_line(Canvas *canvas, const NowPlayingFrame *frame,
+                                            const FaceLine *line, const char *text)
 {
     char buffer[FACE_FEEDBACK_CAPACITY];
     const char *feedback = face_feedback_text(frame, buffer, sizeof buffer);
@@ -126,7 +126,7 @@ ECHO_NP_FACES_CODE void face_feedback_line(Canvas *canvas, const NowPlayingFrame
     }
 }
 
-ECHO_NP_FACES_CODE void face_times_text(const NowPlayingFrame *frame, FaceTimes *times)
+RIPPL_NP_FACES_CODE void face_times_text(const NowPlayingFrame *frame, FaceTimes *times)
 {
     uint32_t shown = frame->shown_ms;
     uint32_t duration = frame->status->duration_ms;
@@ -136,8 +136,8 @@ ECHO_NP_FACES_CODE void face_times_text(const NowPlayingFrame *frame, FaceTimes 
                     sizeof times->remaining - 1);
 }
 
-ECHO_NP_FACES_CODE void face_times_draw(Canvas *canvas, const NowPlayingFrame *frame,
-                                        const FaceLine *line)
+RIPPL_NP_FACES_CODE void face_times_draw(Canvas *canvas, const NowPlayingFrame *frame,
+                                         const FaceLine *line)
 {
     FaceTimes times;
     face_times_text(frame, &times);
@@ -146,7 +146,7 @@ ECHO_NP_FACES_CODE void face_times_draw(Canvas *canvas, const NowPlayingFrame *f
     label_draw(canvas, (TextStyle){line->font, line->color}, (Label){right, times.remaining});
 }
 
-ECHO_NP_FACES_CODE int face_progress_width(uint32_t position_ms, uint32_t duration_ms, int width)
+RIPPL_NP_FACES_CODE int face_progress_width(uint32_t position_ms, uint32_t duration_ms, int width)
 {
     if (duration_ms == 0) {
         return 0;
@@ -157,13 +157,13 @@ ECHO_NP_FACES_CODE int face_progress_width(uint32_t position_ms, uint32_t durati
     return (int)((uint64_t)position_ms * (uint64_t)width / duration_ms);
 }
 
-ECHO_NP_FACES_CODE int face_volume_width(uint8_t volume, int width)
+RIPPL_NP_FACES_CODE int face_volume_width(uint8_t volume, int width)
 {
     int level = volume < SETTINGS_VOLUME_MAX ? volume : SETTINGS_VOLUME_MAX;
     return level * width / SETTINGS_VOLUME_MAX;
 }
 
-ECHO_NP_FACES_CODE FaceFill face_bar_fill(const NowPlayingFrame *frame, int width)
+RIPPL_NP_FACES_CODE FaceFill face_bar_fill(const NowPlayingFrame *frame, int width)
 {
     if (frame->volume_shown) {
         return (FaceFill){face_volume_width(frame->status->volume, width), true};
@@ -172,8 +172,8 @@ ECHO_NP_FACES_CODE FaceFill face_bar_fill(const NowPlayingFrame *frame, int widt
                       frame->scrubbing};
 }
 
-ECHO_NP_FACES_CODE void face_bar_draw(Canvas *canvas, const NowPlayingFrame *frame,
-                                      const FaceBar *bar)
+RIPPL_NP_FACES_CODE void face_bar_draw(Canvas *canvas, const NowPlayingFrame *frame,
+                                       const FaceBar *bar)
 {
     FaceFill fill = face_bar_fill(frame, bar->area.width);
     canvas_fill_rect(canvas, bar->area, bar->track);
@@ -181,13 +181,13 @@ ECHO_NP_FACES_CODE void face_bar_draw(Canvas *canvas, const NowPlayingFrame *fra
                      fill.hot ? bar->hot : bar->normal);
 }
 
-ECHO_NP_FACES_CODE FaceIcon face_badge_kind(const NowPlayingFrame *frame)
+RIPPL_NP_FACES_CODE FaceIcon face_badge_kind(const NowPlayingFrame *frame)
 {
     return (unsigned)frame->feedback < BADGE_ICON_COUNT ? (FaceIcon)BADGE_ICONS[frame->feedback]
                                                         : FACE_ICON_NONE;
 }
 
-ECHO_NP_FACES_CODE static void triangle(Canvas *canvas, Rect box, Color color, bool points_right)
+RIPPL_NP_FACES_CODE static void triangle(Canvas *canvas, Rect box, Color color, bool points_right)
 {
     for (int row = 0; row < box.height; row++) {
         int reach = row < box.height / HALF ? row : box.height - 1 - row;
@@ -197,14 +197,14 @@ ECHO_NP_FACES_CODE static void triangle(Canvas *canvas, Rect box, Color color, b
     }
 }
 
-ECHO_NP_FACES_CODE static void pause_icon(Canvas *canvas, Rect box, Color color)
+RIPPL_NP_FACES_CODE static void pause_icon(Canvas *canvas, Rect box, Color color)
 {
     int bar = larger(box.width * PAUSE_BAR_PERCENT / 100, 1);
     canvas_fill_rect(canvas, (Rect){box.x, box.y, bar, box.height}, color);
     canvas_fill_rect(canvas, (Rect){box.x + box.width - bar, box.y, bar, box.height}, color);
 }
 
-ECHO_NP_FACES_CODE static void next_icon(Canvas *canvas, Rect box, Color color)
+RIPPL_NP_FACES_CODE static void next_icon(Canvas *canvas, Rect box, Color color)
 {
     int bar = larger(box.width / SKIP_BAR_DIVISOR, 1);
     int half = (box.width - bar) / HALF;
@@ -213,7 +213,7 @@ ECHO_NP_FACES_CODE static void next_icon(Canvas *canvas, Rect box, Color color)
     canvas_fill_rect(canvas, (Rect){box.x + box.width - bar, box.y, bar, box.height}, color);
 }
 
-ECHO_NP_FACES_CODE static void previous_icon(Canvas *canvas, Rect box, Color color)
+RIPPL_NP_FACES_CODE static void previous_icon(Canvas *canvas, Rect box, Color color)
 {
     int bar = larger(box.width / SKIP_BAR_DIVISOR, 1);
     int half = (box.width - bar) / HALF;
@@ -222,7 +222,7 @@ ECHO_NP_FACES_CODE static void previous_icon(Canvas *canvas, Rect box, Color col
     triangle(canvas, (Rect){box.x + bar + half, box.y, half, box.height}, color, false);
 }
 
-ECHO_NP_FACES_CODE void face_icon_draw(Canvas *canvas, FaceIcon icon, Rect box, Color color)
+RIPPL_NP_FACES_CODE void face_icon_draw(Canvas *canvas, FaceIcon icon, Rect box, Color color)
 {
     switch (icon) {
     case FACE_ICON_PLAY:
@@ -242,13 +242,13 @@ ECHO_NP_FACES_CODE void face_icon_draw(Canvas *canvas, FaceIcon icon, Rect box, 
     }
 }
 
-ECHO_NP_FACES_CODE void face_badge_draw(Canvas *canvas, const NowPlayingFrame *frame, Rect box,
-                                        Color color)
+RIPPL_NP_FACES_CODE void face_badge_draw(Canvas *canvas, const NowPlayingFrame *frame, Rect box,
+                                         Color color)
 {
     face_icon_draw(canvas, face_badge_kind(frame), box, color);
 }
 
-ECHO_NP_FACES_CODE void face_outline(Canvas *canvas, Rect box, Color color)
+RIPPL_NP_FACES_CODE void face_outline(Canvas *canvas, Rect box, Color color)
 {
     canvas_fill_rect(canvas, (Rect){box.x, box.y, box.width, 1}, color);
     canvas_fill_rect(canvas, (Rect){box.x, box.y + box.height - 1, box.width, 1}, color);
@@ -256,12 +256,12 @@ ECHO_NP_FACES_CODE void face_outline(Canvas *canvas, Rect box, Color color)
     canvas_fill_rect(canvas, (Rect){box.x + box.width - 1, box.y, 1, box.height}, color);
 }
 
-ECHO_NP_FACES_CODE int face_codec_width(const Font *font, const char *codec)
+RIPPL_NP_FACES_CODE int face_codec_width(const Font *font, const char *codec)
 {
     return has_text(codec) ? text_width(font, codec) + FACE_CODEC_PADDING : 0;
 }
 
-ECHO_NP_FACES_CODE void face_codec_draw(Canvas *canvas, const FaceLine *line, const char *codec)
+RIPPL_NP_FACES_CODE void face_codec_draw(Canvas *canvas, const FaceLine *line, const char *codec)
 {
     if (!has_text(codec)) {
         return;
@@ -271,7 +271,7 @@ ECHO_NP_FACES_CODE void face_codec_draw(Canvas *canvas, const FaceLine *line, co
     label_draw(canvas, (TextStyle){line->font, line->color}, (Label){fitted, codec});
 }
 
-ECHO_NP_FACES_CODE static int format_origin(const FaceLine *line, int box_width, int stream_width)
+RIPPL_NP_FACES_CODE static int format_origin(const FaceLine *line, int box_width, int stream_width)
 {
     int total = box_width + (box_width > 0 ? FACE_FORMAT_GAP : 0) + stream_width;
     if (line->align == FACE_ALIGN_CENTRE && total < line->area.width) {
@@ -280,8 +280,8 @@ ECHO_NP_FACES_CODE static int format_origin(const FaceLine *line, int box_width,
     return line->area.x;
 }
 
-ECHO_NP_FACES_CODE void face_format_row(Canvas *canvas, const NowPlayingFrame *frame,
-                                        const FaceLine *line)
+RIPPL_NP_FACES_CODE void face_format_row(Canvas *canvas, const NowPlayingFrame *frame,
+                                         const FaceLine *line)
 {
     const char *stream = frame->stream;
     int box_width = face_codec_width(line->font, frame->codec);

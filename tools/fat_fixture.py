@@ -23,7 +23,7 @@ def pattern(seed, length):
 
 
 FIXTURE_FILES = [
-    (".echo/library.db", 1, 3000),
+    (".rippl/library.db", 1, 3000),
     ("README.TXT", 2, 100),
     ("notes.txt", 3, 700),
     ("Music/Sigur Rós/Ágætis byrjun/01 Intro.flac", 4, 9000),

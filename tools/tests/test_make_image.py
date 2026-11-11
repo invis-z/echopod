@@ -111,9 +111,9 @@ class CrcTest(unittest.TestCase):
 
 
 class BrandTest(unittest.TestCase):
-    def test_the_default_brand_is_echopod(self):
+    def test_the_default_brand_is_rippl(self):
         arguments = make_image.parse_arguments(["--elf", "a.elf", "--output", "b.img"])
-        self.assertEqual("EchoPod", arguments.brand)
+        self.assertEqual("Rippl", arguments.brand)
 
 
 class FwEndTest(unittest.TestCase):
@@ -818,7 +818,7 @@ class WindowReferenceTest(unittest.TestCase):
         section = (".np_faces", SHT_PROGBITS, SHF_ALLOC, 0x0308BA00, parts.np_faces,
                    len(parts.np_faces))
         with tempfile.TemporaryDirectory() as directory:
-            elf = Path(directory) / "echo.elf"
+            elf = Path(directory) / "rippl.elf"
             elf.write_bytes(firmware_elf(parts, [section]))
             arguments = ["--elf", str(elf), "--output", str(Path(directory) / "out.img"),
                          "--build-tag", "t", "--date", "2026-10-22"]

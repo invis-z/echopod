@@ -28,7 +28,7 @@ typedef struct Level {
     bool partial;
 } Level;
 
-typedef struct ECHO_BORROWED ScanState {
+typedef struct RIPPL_BORROWED ScanState {
     LibraryBuilder builder;
     TrackTags tags;
     TrackFields fields;

@@ -2,7 +2,7 @@
 
 The PC indexer (`tools/library_index.py`) writes the library database. The device reads it (`src/library`). Everything is sorted on the PC, so the device never sorts. It reads fixed-size records by index and strings by offset, a few hundred bytes at a time.
 
-- Location on the card: `/.echo/library.db`
+- Location on the card: `/.rippl/library.db`
 - Byte order: little-endian
 - Indices: `u16` (at most 65,535 tracks, albums, groups and folders)
 - `0xFFFF` means "none"
@@ -42,7 +42,7 @@ Each section directory entry is `u32 offset`, `u32 count`, `u16 record size`, `u
 
 Field notes:
 - `u32` string fields hold an offset into the strings section.
-- Track `path` is relative to the music root and uses `/`. A track on the player's internal storage has a path under `:internal/`, a top-level folder no FAT or exFAT card can hold (`:` isn't allowed in names): `:internal/Artist/Album/01.flac` is `Artist/Album/01.flac` on internal storage. The folder is sorted among the root's names by its bytes like any other, and its folder record is named `:internal` (the player shows it as "Internal storage"). A library built without internal storage (echo-sync with no internal drive found, or a player whose internal volume didn't mount) has no such paths. Every string is Unicode NFC (composed). FAT cards store names in NFC, but macOS lists them decomposed (NFD), so the indexer recomposes paths, playlist names, playlist entries and tags. The device then matches paths against the card's names without any Unicode tables. Track `artist` indexes the artists section, and `genre` indexes genres.
+- Track `path` is relative to the music root and uses `/`. A track on the player's internal storage has a path under `:internal/`, a top-level folder no FAT or exFAT card can hold (`:` isn't allowed in names): `:internal/Artist/Album/01.flac` is `Artist/Album/01.flac` on internal storage. The folder is sorted among the root's names by its bytes like any other, and its folder record is named `:internal` (the player shows it as "Internal storage"). A library built without internal storage (rippl-sync with no internal drive found, or a player whose internal volume didn't mount) has no such paths. Every string is Unicode NFC (composed). FAT cards store names in NFC, but macOS lists them decomposed (NFD), so the indexer recomposes paths, playlist names, playlist entries and tags. The device then matches paths against the card's names without any Unicode tables. Track `artist` indexes the artists section, and `genre` indexes genres.
 - Track `chapters` is the number of chapters in the file's `moov.udta.chpl` atom (Nero chapters, written by m4b-tool, mp4v2 and ffmpeg): 0 when there is none, when it is unreadable or out of order, or when the atom uses a 64-bit size. It holds at most 255. A library built before this field existed has 0 there, and the format version stays 3.
 - An album's tracks are `tracks[first_track .. first_track + track_count)`. Album `cover` is reserved and always `0xFFFF`. Covers live in their own file, keyed by album key (see Covers file).
 - A group's albums are `links[first_link .. first_link + link_count)`. Artists list every album containing at least one of their tracks. Artist and album-artist albums are ordered by year, then title; genre albums are ordered by title. Within each section the groups' links are consecutive and in group order (group `n + 1` starts where group `n` ends). Cover Flow relies on this for album artists to read its order straight from `links`; a file that breaks it gets Cover Flow in album order instead.
@@ -75,7 +75,7 @@ The indexer lists every format stock plays, `.flac`, `.ogg`, `.mp3`, `.m4a` and 
 | track | `tracknumber` | `TRCK` | `trkn` (first number) | `Track` | `WM/TrackNumber` |
 | album version | `albumversion` | `TXXX` described `ALBUMVERSION` (any case) | `----` named `ALBUMVERSION` (any case, any mean) | `AlbumVersion` | not read |
 
-**Album versions.** When a track has both an album tag and an album version (the `ALBUMVERSION` tag Navidrome uses to tell editions apart; Picard users usually set it from `%_releasecomment%` with a script), the album title becomes `Album (Version)`, for example `Abbey Road (2019 Remix)`. The version is part of the title everywhere (lists, Now Playing, Cover Flow, sorting) and of the album key, so two editions of one album are two albums, each with its own cover and favorite. Albums without a version keep their key, so favorites and stored covers of those survive. A version without an album tag is ignored (the folder name stays the album). Navidrome also reads `MUSICBRAINZ_ALBUMCOMMENT` as the version; EchoPod doesn't.
+**Album versions.** When a track has both an album tag and an album version (the `ALBUMVERSION` tag Navidrome uses to tell editions apart; Picard users usually set it from `%_releasecomment%` with a script), the album title becomes `Album (Version)`, for example `Abbey Road (2019 Remix)`. The version is part of the title everywhere (lists, Now Playing, Cover Flow, sorting) and of the album key, so two editions of one album are two albums, each with its own cover and favorite. Albums without a version keep their key, so favorites and stored covers of those survive. A version without an album tag is ignored (the folder name stays the album). Navidrome also reads `MUSICBRAINZ_ALBUMCOMMENT` as the version; Rippl doesn't.
 
 An MP3 without ID3v2 uses its ID3v1 tag. The duration is the container's length rounded to the nearest millisecond (FLAC and DSF sample counts, Ogg's last granule (for Opus minus the header's pre-skip, at 48 kHz), an MP3's Xing/Info frame count or its bitrate, MP4's track duration, WAV data length, APE frame counts, ASF play duration minus preroll, DFF DSD data length). `tools/tag_fixture.py` writes one small file per format to `tests/fixtures/tags`, and both the Python indexer and the device reader (`src/library/track_tags`) are tested against them.
 
@@ -83,7 +83,7 @@ On the device, `track_tags_read` reads through a `ByteSource` with small bounded
 
 ## Building on the device
 
-`library/library_builder` builds a database that means the same as the PC indexer's, from tracks given in scan order (the PC indexer's sorted path order), with a block of RAM and a scratch file on the card (`/.echo/build.tmp`, 24 MB, reserved with the other player files). It handles up to 65,535 tracks; 20,000 are tested inside 360 KB of RAM. RAM only ever holds what one step needs: buffers, small caches and a few 16-bit columns.
+`library/library_builder` builds a database that means the same as the PC indexer's, from tracks given in scan order (the PC indexer's sorted path order), with a block of RAM and a scratch file on the card (`/.rippl/build.tmp`, 24 MB, reserved with the other player files). It handles up to 65,535 tracks; 20,000 are tested inside 360 KB of RAM. RAM only ever holds what one step needs: buffers, small caches and a few 16-bit columns.
 - During the scan each track becomes a 48-byte row on the card (text offsets and lengths, folder, year, disc, number, duration) and its texts go to a heap on the card (a text equal to the previous track's same field is stored once). Folders become 8-byte rows; a hash of (parent, name) in RAM finds a folder seen before.
 - Before ranking, tracks marked as having no album-artist tag (a spare row byte) get their shared album artist: one record per such track (folder, track, artist text, album and artist sort keys) is sorted by folder, album key, artist key and track; one pass picks each group's winner, a second writes (track, artist text) pairs, which are sorted by track and merged back into the rows in one sequential rewrite. Nothing runs when no track is marked.
 - Each field is then ranked: one record per run of equal text (its sort key, its bytes and its first track) goes through a stable external merge sort on the card (sorted chunks in RAM, then up to 32-way merges), giving a dense key rank per track, a spelling rank for genres, and each group's first spelling. Folder names are ranked by key, then bytes.
@@ -123,11 +123,11 @@ On the device, the scanner notes each `.m3u`/`.m3u8` path during the walk (the P
 
 ## Album keys and favorites
 
-Favorites outlive a re-index, so they don't store album indices. An album's key is the FNV-1a hash of its album artist, a `0x1F` separator and its title (`library_album_key`). `/.echo/favorites.bin` holds the magic `EMFV`, `u16` version 1, a `u16` count, the `u32` keys and an FNV-1a checksum. At most 256 albums can be favorites. An album that leaves the library just stops showing up.
+Favorites outlive a re-index, so they don't store album indices. An album's key is the FNV-1a hash of its album artist, a `0x1F` separator and its title (`library_album_key`). `/.rippl/favorites.bin` holds the magic `EMFV`, `u16` version 1, a `u16` count, the `u32` keys and an FNV-1a checksum. At most 256 albums can be favorites. An album that leaves the library just stops showing up.
 
 ## Bookmarks file
 
-`/.echo/bookmarks.bin` (4 KB, reserved by the player) remembers where each audiobook and podcast episode stopped (`playback/bookmarks`). Like favorites, it is keyed by path hashes, so it outlives a re-index.
+`/.rippl/bookmarks.bin` (4 KB, reserved by the player) remembers where each audiobook and podcast episode stopped (`playback/bookmarks`). Like favorites, it is keyed by path hashes, so it outlives a re-index.
 
 | Offset | Type | Field |
 |---|---|---|
@@ -142,7 +142,7 @@ Each bookmark is `u32 key`, `u32 track key`, `u32 position_ms`, `u16 chapter`, `
 
 ## Update record
 
-`/.echo/update.bin` (4 KB, reserved by the player) keeps what the firmware installer last did, so Diagnostics → Last update can show it after the player has been switched off (`app/update_record`, written by `board/update.c` at the end of a USB session that found a `HIFIECnn.IMG`). Every value is little-endian.
+`/.rippl/update.bin` (4 KB, reserved by the player) keeps what the firmware installer last did, so Diagnostics → Last update can show it after the player has been switched off (`app/update_record`, written by `board/update.c` at the end of a USB session that found a `HIFIECnn.IMG`). Every value is little-endian.
 
 | Offset | Type | Field |
 |---|---|---|
@@ -158,7 +158,7 @@ A zero-filled or damaged file reads as no record.
 
 ## Listen history file
 
-`/.echo/history.bin` (1 MiB, reserved by the player) logs the songs the player played. The player turns it into `/.scrobbler.log` itself whenever it connects to a computer, and `tools/echo_history.py` can do the same on a PC (see `docs/user-guide.md`, Listen history, and below). It's a ring of 2,048 slots of 512 bytes; the player works out the slot count from the file's size, so a smaller or larger file works too. A record with sequence number `n` always sits in slot `(n − 1) mod slots`, so when the ring is full the newest record overwrites the oldest. Every value is little-endian.
+`/.rippl/history.bin` (1 MiB, reserved by the player) logs the songs the player played. The player turns it into `/.scrobbler.log` itself whenever it connects to a computer, and `tools/rippl_history.py` can do the same on a PC (see `docs/user-guide.md`, Listen history, and below). It's a ring of 2,048 slots of 512 bytes; the player works out the slot count from the file's size, so a smaller or larger file works too. A record with sequence number `n` always sits in slot `(n − 1) mod slots`, so when the ring is full the newest record overwrites the oldest. Every value is little-endian.
 
 | Offset | Type | Field |
 |---|---|---|
@@ -186,13 +186,13 @@ Dating the records. The Unix-time field holds the UTC time the record was writte
 
 ## Scrobbler log and export marker
 
-`/.scrobbler.log` at the card's root is the AudioScrobbler 1.1 log Rockbox writes and Last.fm/ListenBrainz uploaders read: UTF-8 with LF line ends, three header lines (`#AUDIOSCROBBLER/1.1`, `#TZ/UTC`, `#CLIENT/EchoPod <version>`), then one line per play: artist, album, title, track number (empty when 0), length in seconds, `L` (listened) or `S` (skipped), the Unix time (UTC) the play started, and an empty MusicBrainz ID, separated by tabs and ending with a tab and a newline. Tabs and line breaks inside names become spaces. A play is `L` when the track is over 30 s and it was listened to for half its length or 4 minutes (parts joined across a power-off or USB session count together, see above); otherwise its last part is `S`. The player writes both, like Rockbox; `echo_history.py` writes only `L` unless asked (`--include-skipped`). The player adds lines at the end of an existing log (after a newline if the last line has none), writes the header into a missing or empty one, and keeps the file exactly as long as its text.
+`/.scrobbler.log` at the card's root is the AudioScrobbler 1.1 log Rockbox writes and Last.fm/ListenBrainz uploaders read: UTF-8 with LF line ends, three header lines (`#AUDIOSCROBBLER/1.1`, `#TZ/UTC`, `#CLIENT/Rippl <version>`), then one line per play: artist, album, title, track number (empty when 0), length in seconds, `L` (listened) or `S` (skipped), the Unix time (UTC) the play started, and an empty MusicBrainz ID, separated by tabs and ending with a tab and a newline. Tabs and line breaks inside names become spaces. A play is `L` when the track is over 30 s and it was listened to for half its length or 4 minutes (parts joined across a power-off or USB session count together, see above); otherwise its last part is `S`. The player writes both, like Rockbox; `rippl_history.py` writes only `L` unless asked (`--include-skipped`). The player adds lines at the end of an existing log (after a newline if the last line has none), writes the header into a missing or empty one, and keeps the file exactly as long as its text.
 
-`/.echo/history-exported.txt` is the sequence number of the newest record already exported, as ten digits and a newline (`0000000042`), shared by the player and `echo_history.py`; both export only records with a higher number, so a log the uploader deleted comes back with just the new plays. Either reads the leading number (older versions of the tool wrote it without the zeros) and treats a number above the ring's newest record (a new history file) as 0. The player only writes it after the lines are on the card; when it can't write them all (the card is full) it marks the last record it did write. Plays in sessions it can't date (no timed record in that session or any later one) are left unmarked for a later connection or the PC tool.
+`/.rippl/history-exported.txt` is the sequence number of the newest record already exported, as ten digits and a newline (`0000000042`), shared by the player and `rippl_history.py`; both export only records with a higher number, so a log the uploader deleted comes back with just the new plays. Either reads the leading number (older versions of the tool wrote it without the zeros) and treats a number above the ring's newest record (a new history file) as 0. The player only writes it after the lines are on the card; when it can't write them all (the card is full) it marks the last record it did write. Plays in sessions it can't date (no timed record in that session or any later one) are left unmarked for a later connection or the PC tool.
 
 ## Music folders file
 
-`/.echo/folders.bin` (reserved at 4 KB by `card_files`; 140 bytes used, little-endian) lists the top-level folders Settings → Music folders leaves out of the library. A missing, zeroed or damaged file leaves nothing out.
+`/.rippl/folders.bin` (reserved at 4 KB by `card_files`; 140 bytes used, little-endian) lists the top-level folders Settings → Music folders leaves out of the library. A missing, zeroed or damaged file leaves nothing out.
 
 | Offset | Size | Field |
 |---|---|---|
@@ -203,11 +203,11 @@ Dating the records. The Unix-time field holds the UTC time the record was writte
 | 8 | 128 | 32 folder keys (`u32`), the first `count` used, the rest 0 |
 | 136 | 4 | FNV-1a of bytes 0–135 |
 
-A folder key is the FNV-1a hash of the folder's library path: its name as the file system lists it (UTF-8, case kept) for a folder in the card's root, `:internal/` followed by the name for a folder in the internal storage's root. Keys name folders rather than positions, so new folders are included and a folder that is gone keeps its choice. Both the player's scan and fingerprint and `library_index.py --folders` / echo-sync skip a top-level folder (never a file, never a deeper folder) whose key is listed; `library_index.encode_excluded_folders` writes the file. `tests/fixtures/scan_music_folders.bin` leaves `Artist B` and `Lists` out of `scan_music`, and `scan_music_folders.db` is the PC indexer's library for it (`scan_music_folders_up_to_date`); `test_library_scan` scans the same folder with the same file and must mean the same.
+A folder key is the FNV-1a hash of the folder's library path: its name as the file system lists it (UTF-8, case kept) for a folder in the card's root, `:internal/` followed by the name for a folder in the internal storage's root. Keys name folders rather than positions, so new folders are included and a folder that is gone keeps its choice. Both the player's scan and fingerprint and `library_index.py --folders` / rippl-sync skip a top-level folder (never a file, never a deeper folder) whose key is listed; `library_index.encode_excluded_folders` writes the file. `tests/fixtures/scan_music_folders.bin` leaves `Artist B` and `Lists` out of `scan_music`, and `scan_music_folders.db` is the PC indexer's library for it (`scan_music_folders_up_to_date`); `test_library_scan` scans the same folder with the same file and must mean the same.
 
 ## Clock record
 
-`/.echo/clock.bin` (20 bytes, little-endian) is written by echo-sync as the last step of a sync, so the player can set its clock chip from the computer's when the USB session ends (see `docs/architecture.md`, Clock). The player never writes it.
+`/.rippl/clock.bin` (20 bytes, little-endian) is written by rippl-sync as the last step of a sync, so the player can set its clock chip from the computer's when the USB session ends (see `docs/architecture.md`, Clock). The player never writes it.
 
 | Offset | Size | Field |
 |---|---|---|
@@ -224,7 +224,7 @@ The player accepts a record whose magic, version and checksum agree and whose ti
 
 ## Covers file
 
-The player builds `/.echo/covers.bin` after every rescan (see `docs/architecture.md`, Covers on the device); `tools/cover_export.py` writes the same format on a PC. It's separate from the database, keyed by album key, so either file can be rebuilt on its own.
+The player builds `/.rippl/covers.bin` after every rescan (see `docs/architecture.md`, Covers on the device); `tools/cover_export.py` writes the same format on a PC. It's separate from the database, keyed by album key, so either file can be rebuilt on its own.
 
 | Offset | Type | Field |
 |---|---|---|
@@ -240,7 +240,7 @@ Each record is the full cover (112 × 112 pixels) followed by the half cover (56
 
 The player also keeps a stamp per cover so a rescan can reuse it (see `docs/architecture.md`, Covers on the device). For a file of `capacity` bytes it has room for `slots = (capacity − 16) / (8 + 4 + 31,360)` covers: the index area holds `slots` entries, the stamp table follows at `16 + slots × 8` with a `u32` stamp for each index entry in the same order, and record `n` starts at `16 + slots × 12 + n × 31,360`. Readers that don't use stamps ignore the table. A stamp of 0 means unknown: the player decodes that album again. `docs/architecture.md` (Covers on the device) defines the stamp.
 
-echo-sync (`encode_stamped`) writes this layout for the card's `covers.bin` size, with the stamps the player would compute: for embedded art from the track's size and the picture's length (the same bytes mutagen returns; for Ogg, the image inside the decoded `METADATA_BLOCK_PICTURE` block), for a cover file from its size and the card's modification stamp (`card_stamp`, as for the music fingerprint). It writes 0 for a cover file when the card isn't FAT or exFAT, since the time can't be matched. `tools/cover_export.py` on its own (`--output`) still writes the packed layout, with 0 at offset 12 and records right after the index; the player reads such a file normally and rebuilds every cover on its next rescan.
+rippl-sync (`encode_stamped`) writes this layout for the card's `covers.bin` size, with the stamps the player would compute: for embedded art from the track's size and the picture's length (the same bytes mutagen returns; for Ogg, the image inside the decoded `METADATA_BLOCK_PICTURE` block), for a cover file from its size and the card's modification stamp (`card_stamp`, as for the music fingerprint). It writes 0 for a cover file when the card isn't FAT or exFAT, since the time can't be matched. `tools/cover_export.py` on its own (`--output`) still writes the packed layout, with 0 at offset 12 and records right after the index; the player reads such a file normally and rebuilds every cover on its next rescan.
 
 The exporter takes, for each album:
 1. the embedded picture of the first of its first four tracks (in track order) that has one: the track's first front cover (picture type 3), otherwise its first picture of any type. For Ogg Vorbis and Opus files these are the `METADATA_BLOCK_PICTURE` comments; a value that isn't valid base64 or a valid picture block is skipped

@@ -5,7 +5,7 @@
 #include "hal/system.h"
 #include "hal/time.h"
 
-const char CLOCK_RECORD_PATH[] = "/.echo/clock.bin";
+const char CLOCK_RECORD_PATH[] = "/.rippl/clock.bin";
 
 _Static_assert((int)TIME_ZONE_OPTION_COUNT == (int)WALL_CLOCK_ZONE_COUNT,
                "the time zone setting counts every zone step and unset");

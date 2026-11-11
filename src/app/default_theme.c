@@ -100,7 +100,7 @@ void default_theme_enlarge_status(Theme *theme)
     theme->fonts.status = &FONT_INTER_REGULAR_16;
 }
 
-ECHO_RESIDENT static const ThemePalette
+RIPPL_RESIDENT static const ThemePalette
     PALETTES[THEME_COUNT - 1] =
         {
             {.colors =

@@ -4,18 +4,15 @@
 
 enum {
     VERSION_FIELD = 4,
-    BRIGHTNESS_FIELD = 6,
-    AUTO_OFF_FIELD = 14,
-    USB_MODE_FIELD = 15,
-    DAC_VOLUME_FIELD = 16,
-    ORIENTATION_FIELD = 17,
-    LANGUAGE_FIELD = 18,
-    CHECKSUM_FIELD = 20,
-    OPTIONS_FIELD = 20,
-    V8_CHECKSUM_FIELD = 28,
-    OPTIONS_CHECKSUM_FIELD = 44,
-    V8_OPTION_COUNT = 8,
-    NOW_PLAYING_FACE_FIELD = 41,
+    BRIGHTNESS_FIELD = 5,
+    USB_MODE_FIELD = 14,
+    DAC_VOLUME_FIELD = 15,
+    ORIENTATION_FIELD = 16,
+    LANGUAGE_FIELD = 17,
+    DAC_FIELD = 18,
+    OPTIONS_FIELD = 19,
+    CHECKSUM_FIELD = OPTIONS_FIELD + SETTINGS_OPTION_COUNT,
+    NOW_PLAYING_FACE_FIELD = OPTIONS_FIELD + OPTION_NOW_PLAYING_FACE,
     NEVER_OPTION = 6
 };
 
@@ -71,46 +68,17 @@ static void auto_off_options_are_stocks(void)
     CHECK_EQUAL(10, settings_auto_off_option_minutes(AUTO_OFF_OPTION_COUNT - 1));
 }
 
-static void a_version_one_file_keeps_its_values_and_gets_the_default_auto_off(void)
+static void the_usb_mode_and_dac_volume_are_saved_at_bytes_fourteen_and_fifteen(void)
 {
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 1;
-    bytes[AUTO_OFF_FIELD] = 0;
-    rewrite_checksum(bytes);
-    Settings decoded;
-    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(42, decoded.volume);
-    CHECK_EQUAL(settings_defaults().auto_off, decoded.auto_off);
-    CHECK_EQUAL(USB_MODE_STORAGE, decoded.usb_mode);
-}
-
-static void a_version_two_file_keeps_its_auto_off_and_uses_usb_storage(void)
-{
-    Settings settings = custom_settings();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 2;
-    bytes[USB_MODE_FIELD] = 0;
-    rewrite_checksum(bytes);
-    Settings decoded;
-    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(3, decoded.auto_off);
-    CHECK_EQUAL(USB_MODE_STORAGE, decoded.usb_mode);
-}
-
-static void the_usb_mode_and_dac_volume_are_saved_at_bytes_fifteen_and_sixteen(void)
-{
-    Settings settings = custom_settings();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    settings_encode(&settings, bytes);
-    CHECK_EQUAL(9, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(1, bytes[VERSION_FIELD]);
     CHECK_EQUAL(USB_MODE_DAC, bytes[USB_MODE_FIELD]);
     CHECK_EQUAL(37, bytes[DAC_VOLUME_FIELD]);
 }
 
-static void the_orientation_is_saved_at_byte_seventeen(void)
+static void the_orientation_is_saved_at_byte_sixteen(void)
 {
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
@@ -118,55 +86,12 @@ static void the_orientation_is_saved_at_byte_seventeen(void)
     CHECK_EQUAL(ORIENTATION_PORTRAIT_FLIPPED, bytes[ORIENTATION_FIELD]);
 }
 
-static void a_version_four_file_keeps_its_values_and_loads_in_landscape(void)
-{
-    Settings settings = custom_settings();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 4;
-    bytes[ORIENTATION_FIELD] = 0;
-    rewrite_checksum(bytes);
-    Settings decoded;
-    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(ORIENTATION_LANDSCAPE, decoded.orientation);
-    CHECK_EQUAL(3, decoded.brightness);
-    CHECK_EQUAL(USB_MODE_DAC, decoded.usb_mode);
-    CHECK_EQUAL(37, decoded.dac_volume);
-}
-
-static void a_version_four_file_ignores_whatever_sits_in_the_orientation_byte(void)
-{
-    Settings settings = custom_settings();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 4;
-    bytes[ORIENTATION_FIELD] = ORIENTATION_PORTRAIT;
-    rewrite_checksum(bytes);
-    Settings decoded;
-    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(ORIENTATION_LANDSCAPE, decoded.orientation);
-}
-
-static void the_language_is_saved_at_byte_eighteen(void)
+static void the_language_is_saved_at_byte_seventeen(void)
 {
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
     CHECK_EQUAL(LANGUAGE_KOREAN, bytes[LANGUAGE_FIELD]);
-}
-
-static void a_version_five_file_loads_in_english(void)
-{
-    Settings settings = custom_settings();
-    Settings decoded;
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 5;
-    bytes[LANGUAGE_FIELD] = LANGUAGE_COUNT;
-    rewrite_checksum(bytes);
-    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(LANGUAGE_ENGLISH, decoded.language);
-    CHECK_EQUAL(settings.orientation, decoded.orientation);
 }
 
 static void an_unknown_language_is_rejected(void)
@@ -189,20 +114,6 @@ static void an_unknown_orientation_is_rejected(void)
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
 
-static void a_version_three_file_keeps_its_usb_mode_and_gets_the_default_dac_volume(void)
-{
-    Settings settings = custom_settings();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 3;
-    bytes[DAC_VOLUME_FIELD] = 0;
-    rewrite_checksum(bytes);
-    Settings decoded;
-    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(USB_MODE_DAC, decoded.usb_mode);
-    CHECK_EQUAL(SETTINGS_DEFAULT_DAC_VOLUME, decoded.dac_volume);
-}
-
 static void a_dac_volume_above_the_top_is_rejected(void)
 {
     Settings settings = custom_settings();
@@ -223,7 +134,7 @@ static void an_unknown_usb_mode_is_rejected(void)
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
 
-static void a_newer_version_is_rejected(void)
+static void any_other_version_is_rejected(void)
 {
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
@@ -233,33 +144,18 @@ static void a_newer_version_is_rejected(void)
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
 
-static void the_filter_and_balance_share_byte_nineteen(void)
+static void the_filter_and_balance_share_byte_eighteen(void)
 {
     Settings settings = custom_settings();
     settings.filter = 3;
     settings.balance = 20;
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(3 << 5 | 20, bytes[19]);
+    CHECK_EQUAL(3 << 5 | 20, bytes[DAC_FIELD]);
     Settings decoded;
     CHECK(settings_decode(bytes, sizeof bytes, &decoded));
     CHECK_EQUAL(3, decoded.filter);
     CHECK_EQUAL(20, decoded.balance);
-}
-
-static void a_version_six_file_loads_with_the_first_filter_and_centred_balance(void)
-{
-    Settings settings = custom_settings();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 6;
-    bytes[19] = 0;
-    rewrite_checksum(bytes);
-    Settings decoded;
-    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(0, decoded.filter);
-    CHECK_EQUAL(SETTINGS_BALANCE_CENTER, decoded.balance);
-    CHECK_EQUAL(LANGUAGE_KOREAN, decoded.language);
 }
 
 static void an_unknown_filter_or_balance_is_rejected(void)
@@ -267,10 +163,10 @@ static void an_unknown_filter_or_balance_is_rejected(void)
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    bytes[19] = DAC_FILTER_COUNT << 5;
+    bytes[DAC_FIELD] = DAC_FILTER_COUNT << 5;
     rewrite_checksum(bytes);
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
-    bytes[19] = SETTINGS_BALANCE_STEPS;
+    bytes[DAC_FIELD] = SETTINGS_BALANCE_STEPS;
     rewrite_checksum(bytes);
     CHECK(!settings_decode(bytes, sizeof bytes, &settings));
 }
@@ -356,38 +252,9 @@ static void an_option_out_of_range_is_rejected(void)
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
     bytes[OPTIONS_FIELD + OPTION_ROCKER] = ROCKER_MODE_COUNT;
-    uint32_t checksum = hash_update(HASH_START, bytes, OPTIONS_CHECKSUM_FIELD);
-    for (int index = 0; index < 4; index++) {
-        bytes[OPTIONS_CHECKSUM_FIELD + index] = (uint8_t)(checksum >> (8 * index));
-    }
-    Settings decoded;
-    CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
-}
-
-static void a_version_7_file_loads_with_the_options_off(void)
-{
-    Settings settings = custom_settings();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    settings_encode(&settings, bytes);
-    bytes[VERSION_FIELD] = 7;
-    for (int index = OPTIONS_FIELD; index < SETTINGS_FILE_SIZE; index++) {
-        bytes[index] = 0xEE;
-    }
     rewrite_checksum(bytes);
     Settings decoded;
-    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(LANGUAGE_KOREAN, decoded.language);
-    for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
-        CHECK_EQUAL(0, decoded.options[option]);
-    }
-}
-
-static void put_checksum(uint8_t *bytes, int field)
-{
-    uint32_t checksum = hash_update(HASH_START, bytes, (size_t)field);
-    for (int index = 0; index < 4; index++) {
-        bytes[field + index] = (uint8_t)(checksum >> (8 * index));
-    }
+    CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
 }
 
 static Settings settings_with_every_option_at_its_top(void)
@@ -399,13 +266,6 @@ static Settings settings_with_every_option_at_its_top(void)
         settings.options[option] = (uint8_t)(settings_option_count((SettingOption)option) - 1);
     }
     return settings;
-}
-
-static void version_8_bytes(const Settings *settings, uint8_t *bytes)
-{
-    settings_encode(settings, bytes);
-    bytes[VERSION_FIELD] = 8;
-    put_checksum(bytes, V8_CHECKSUM_FIELD);
 }
 
 static void check_same_values(const Settings *expected, const Settings *actual)
@@ -462,22 +322,25 @@ static void the_animation_speed_scales_animation_times(void)
     CHECK_EQUAL(70u, settings_animation_ms(NULL, 70));
 }
 
-static void a_version_9_file_is_48_bytes_with_the_checksum_at_the_end(void)
+static void a_file_is_44_bytes_with_every_byte_in_use(void)
 {
     Settings settings = settings_with_every_option_at_its_top();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(48, SETTINGS_FILE_SIZE);
-    CHECK_EQUAL(9, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(44, SETTINGS_FILE_SIZE);
+    CHECK_EQUAL(1, bytes[VERSION_FIELD]);
+    CHECK_EQUAL(3, bytes[BRIGHTNESS_FIELD]);
     CHECK_EQUAL(ANIMATION_FASTER, bytes[OPTIONS_FIELD + OPTION_ANIMATION_SPEED]);
-    CHECK_EQUAL(1, bytes[OPTIONS_FIELD + OPTION_LISTEN_HISTORY]);
-    CHECK_EQUAL(NP_FACE_OPTION_SLOTS - 1, bytes[NOW_PLAYING_FACE_FIELD]);
-    uint32_t checksum = hash_update(HASH_START, bytes, OPTIONS_CHECKSUM_FIELD);
-    CHECK_EQUAL(checksum, (uint32_t)bytes[44] | (uint32_t)bytes[45] << 8 |
-                              (uint32_t)bytes[46] << 16 | (uint32_t)bytes[47] << 24);
+    CHECK_EQUAL(SETTINGS_FILE_SIZE - 4, CHECKSUM_FIELD);
+    CHECK_EQUAL(settings_option_count((SettingOption)(SETTINGS_OPTION_COUNT - 1)) - 1,
+                bytes[CHECKSUM_FIELD - 1]);
+    uint32_t checksum = hash_update(HASH_START, bytes, CHECKSUM_FIELD);
+    CHECK_EQUAL(checksum, (uint32_t)bytes[CHECKSUM_FIELD] |
+                              (uint32_t)bytes[CHECKSUM_FIELD + 1] << 8 |
+                              (uint32_t)bytes[CHECKSUM_FIELD + 2] << 16 |
+                              (uint32_t)bytes[CHECKSUM_FIELD + 3] << 24);
     Settings decoded;
     CHECK(!settings_decode(bytes, SETTINGS_FILE_SIZE - 1, &decoded));
-    CHECK(!settings_decode(bytes, SETTINGS_V8_FILE_SIZE, &decoded));
     CHECK(settings_decode(bytes, sizeof bytes, &decoded));
     check_same_values(&settings, &decoded);
     for (int option = 0; option < SETTINGS_OPTION_COUNT; option++) {
@@ -485,97 +348,16 @@ static void a_version_9_file_is_48_bytes_with_the_checksum_at_the_end(void)
     }
 }
 
-static void a_file_from_the_internal_storage_switch_still_loads(void)
+static void the_now_playing_face_is_saved_in_its_option_byte(void)
 {
-    Settings settings = settings_defaults();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    CHECK_EQUAL(38, OPTIONS_FIELD + OPTION_RETIRED_INTERNAL_STORAGE);
-    CHECK_EQUAL(39, OPTIONS_FIELD + OPTION_STATUS_BAR);
-    CHECK_EQUAL(40, OPTIONS_FIELD + OPTION_POWER_ON);
-    settings.options[OPTION_RETIRED_INTERNAL_STORAGE] = 1;
-    settings.options[OPTION_POWER_ON] = POWER_ON_HOLD;
-    settings_encode(&settings, bytes);
-    CHECK_EQUAL(1, bytes[38]);
-    Settings decoded;
-    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(POWER_ON_HOLD, decoded.options[OPTION_POWER_ON]);
-}
-
-static void a_version_8_file_keeps_every_value_and_gets_the_new_defaults(void)
-{
-    Settings settings = settings_with_every_option_at_its_top();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    version_8_bytes(&settings, bytes);
-    Settings decoded;
-    CHECK(settings_decode(bytes, SETTINGS_V8_FILE_SIZE, &decoded));
-    check_same_values(&settings, &decoded);
-    for (int option = 0; option < V8_OPTION_COUNT; option++) {
-        CHECK_EQUAL(settings.options[option], decoded.options[option]);
-    }
-    for (int option = V8_OPTION_COUNT; option < SETTINGS_OPTION_COUNT; option++) {
-        CHECK_EQUAL(0, decoded.options[option]);
-    }
-    Settings from_a_longer_file;
-    CHECK(settings_decode(bytes, sizeof bytes, &from_a_longer_file));
-    CHECK_EQUAL(ACCENT_COUNT - 1, from_a_longer_file.options[OPTION_ACCENT]);
-    CHECK_EQUAL(0, from_a_longer_file.options[OPTION_LISTEN_HISTORY]);
-}
-
-static void a_version_8_file_is_saved_again_as_version_9(void)
-{
-    Settings settings = settings_with_every_option_at_its_top();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    version_8_bytes(&settings, bytes);
-    Settings decoded;
-    CHECK(settings_decode(bytes, SETTINGS_V8_FILE_SIZE, &decoded));
-    uint8_t again[SETTINGS_FILE_SIZE];
-    settings_encode(&decoded, again);
-    Settings reloaded;
-    CHECK_EQUAL(9, again[VERSION_FIELD]);
-    CHECK(settings_decode(again, sizeof again, &reloaded));
-    check_same_values(&settings, &reloaded);
-    CHECK_EQUAL(ROCKER_MODE_COUNT - 1, reloaded.options[OPTION_ROCKER]);
-    CHECK_EQUAL(1, reloaded.options[OPTION_ARTIST_VIEW]);
-}
-
-static void a_short_or_corrupted_version_8_file_is_rejected(void)
-{
-    Settings settings = settings_with_every_option_at_its_top();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    version_8_bytes(&settings, bytes);
-    Settings decoded;
-    CHECK(!settings_decode(bytes, SETTINGS_V8_FILE_SIZE - 1, &decoded));
-    bytes[OPTIONS_FIELD + OPTION_ACCENT] ^= 0x01;
-    CHECK(!settings_decode(bytes, SETTINGS_V8_FILE_SIZE, &decoded));
-    bytes[OPTIONS_FIELD + OPTION_ACCENT] = ACCENT_COUNT;
-    put_checksum(bytes, V8_CHECKSUM_FIELD);
-    CHECK(!settings_decode(bytes, SETTINGS_V8_FILE_SIZE, &decoded));
-}
-
-static void the_now_playing_face_is_saved_at_byte_41_in_a_version_9_file(void)
-{
-    CHECK_EQUAL(NOW_PLAYING_FACE_FIELD, OPTIONS_FIELD + OPTION_NOW_PLAYING_FACE);
     Settings settings = custom_settings();
     settings.options[OPTION_NOW_PLAYING_FACE] = NP_FACE_TURNTABLE;
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    CHECK_EQUAL(9, bytes[VERSION_FIELD]);
     CHECK_EQUAL(NP_FACE_TURNTABLE, bytes[NOW_PLAYING_FACE_FIELD]);
     Settings decoded;
     CHECK(settings_decode(bytes, sizeof bytes, &decoded));
     CHECK_EQUAL(NP_FACE_TURNTABLE, decoded.options[OPTION_NOW_PLAYING_FACE]);
-}
-
-static void a_file_with_nothing_in_byte_41_reads_the_standard_face(void)
-{
-    Settings settings = custom_settings();
-    uint8_t bytes[SETTINGS_FILE_SIZE];
-    settings_encode(&settings, bytes);
-    bytes[NOW_PLAYING_FACE_FIELD] = 0;
-    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
-    Settings decoded;
-    CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(NP_FACE_STANDARD, decoded.options[OPTION_NOW_PLAYING_FACE]);
     CHECK_EQUAL(NP_FACE_STANDARD, settings_defaults().options[OPTION_NOW_PLAYING_FACE]);
 }
 
@@ -587,12 +369,12 @@ static void a_face_from_a_newer_firmware_is_accepted_up_to_the_eighth_slot(void)
     for (uint8_t face = NP_FACE_COUNT; face < NP_FACE_OPTION_SLOTS; face++) {
         settings_encode(&settings, bytes);
         bytes[NOW_PLAYING_FACE_FIELD] = face;
-        put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+        rewrite_checksum(bytes);
         CHECK(settings_decode(bytes, sizeof bytes, &decoded));
         CHECK_EQUAL(LANGUAGE_KOREAN, decoded.language);
     }
     bytes[NOW_PLAYING_FACE_FIELD] = NP_FACE_OPTION_SLOTS;
-    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+    rewrite_checksum(bytes);
     CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
 }
 
@@ -604,17 +386,17 @@ static void the_checksum_covers_the_now_playing_face_byte(void)
     bytes[NOW_PLAYING_FACE_FIELD] = NP_FACE_LCD;
     Settings decoded;
     CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
-    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+    rewrite_checksum(bytes);
     CHECK(settings_decode(bytes, sizeof bytes, &decoded));
+    CHECK_EQUAL(NP_FACE_LCD, decoded.options[OPTION_NOW_PLAYING_FACE]);
 }
-
 static void a_new_option_out_of_range_is_rejected(void)
 {
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
     bytes[OPTIONS_FIELD + OPTION_ANIMATION_SPEED] = ANIMATION_SPEED_COUNT;
-    put_checksum(bytes, OPTIONS_CHECKSUM_FIELD);
+    rewrite_checksum(bytes);
     Settings decoded;
     CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
 }
@@ -646,20 +428,14 @@ int main(void)
         TEST_CASE(the_new_options_are_saved_and_read_back),
         TEST_CASE(the_new_options_default_to_their_first_choice),
         TEST_CASE(the_animation_speed_scales_animation_times),
-        TEST_CASE(a_version_9_file_is_48_bytes_with_the_checksum_at_the_end),
-        TEST_CASE(a_file_from_the_internal_storage_switch_still_loads),
-        TEST_CASE(a_version_8_file_keeps_every_value_and_gets_the_new_defaults),
-        TEST_CASE(a_version_8_file_is_saved_again_as_version_9),
-        TEST_CASE(a_short_or_corrupted_version_8_file_is_rejected),
-        TEST_CASE(the_now_playing_face_is_saved_at_byte_41_in_a_version_9_file),
-        TEST_CASE(a_file_with_nothing_in_byte_41_reads_the_standard_face),
-        TEST_CASE(a_face_from_a_newer_firmware_is_accepted_up_to_the_eighth_slot),
-        TEST_CASE(the_checksum_covers_the_now_playing_face_byte),
+        TEST_CASE(a_file_is_44_bytes_with_every_byte_in_use),
         TEST_CASE(a_new_option_out_of_range_is_rejected),
         TEST_CASE(an_option_out_of_range_is_rejected),
+        TEST_CASE(the_now_playing_face_is_saved_in_its_option_byte),
+        TEST_CASE(a_face_from_a_newer_firmware_is_accepted_up_to_the_eighth_slot),
+        TEST_CASE(the_checksum_covers_the_now_playing_face_byte),
         TEST_CASE(a_settings_file_with_the_last_theme_round_trips),
         TEST_CASE(a_theme_past_the_last_one_rejects_the_file),
-        TEST_CASE(a_version_7_file_loads_with_the_options_off),
         TEST_CASE(defaults_are_comfortable),
         TEST_CASE(timeout_options_end_with_never),
         TEST_CASE(sleep_options_start_with_off),
@@ -667,22 +443,15 @@ int main(void)
         TEST_CASE(a_corrupted_file_is_rejected),
         TEST_CASE(out_of_range_values_are_rejected),
         TEST_CASE(auto_off_options_are_stocks),
-        TEST_CASE(a_version_one_file_keeps_its_values_and_gets_the_default_auto_off),
-        TEST_CASE(a_version_two_file_keeps_its_auto_off_and_uses_usb_storage),
-        TEST_CASE(the_usb_mode_and_dac_volume_are_saved_at_bytes_fifteen_and_sixteen),
-        TEST_CASE(a_version_three_file_keeps_its_usb_mode_and_gets_the_default_dac_volume),
+        TEST_CASE(the_usb_mode_and_dac_volume_are_saved_at_bytes_fourteen_and_fifteen),
         TEST_CASE(a_dac_volume_above_the_top_is_rejected),
         TEST_CASE(an_unknown_usb_mode_is_rejected),
-        TEST_CASE(the_orientation_is_saved_at_byte_seventeen),
-        TEST_CASE(a_version_four_file_keeps_its_values_and_loads_in_landscape),
-        TEST_CASE(a_version_four_file_ignores_whatever_sits_in_the_orientation_byte),
-        TEST_CASE(the_language_is_saved_at_byte_eighteen),
-        TEST_CASE(a_version_five_file_loads_in_english),
+        TEST_CASE(the_orientation_is_saved_at_byte_sixteen),
+        TEST_CASE(the_language_is_saved_at_byte_seventeen),
         TEST_CASE(an_unknown_language_is_rejected),
         TEST_CASE(an_unknown_orientation_is_rejected),
-        TEST_CASE(a_newer_version_is_rejected),
-        TEST_CASE(the_filter_and_balance_share_byte_nineteen),
-        TEST_CASE(a_version_six_file_loads_with_the_first_filter_and_centred_balance),
+        TEST_CASE(any_other_version_is_rejected),
+        TEST_CASE(the_filter_and_balance_share_byte_eighteen),
         TEST_CASE(an_unknown_filter_or_balance_is_rejected),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

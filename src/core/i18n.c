@@ -13,7 +13,7 @@ enum {
 
 static const uint8_t MAGIC[MAGIC_SIZE] = {'E', 'L', 'N', 'G'};
 
-#ifdef ECHO_BUILTIN_ENGLISH
+#ifdef RIPPL_BUILTIN_ENGLISH
 typedef struct EnglishBlob {
 #define STRING(id, text) char id[sizeof(text)];
 #include "core/strings_all.def"
@@ -98,7 +98,7 @@ void i18n_detach(void)
 
 const char *i18n_english(StringId id)
 {
-#ifdef ECHO_BUILTIN_ENGLISH
+#ifdef RIPPL_BUILTIN_ENGLISH
     return (uint32_t)id < STRING_COUNT ? (const char *)&ENGLISH_BLOB + ENGLISH_OFFSETS[id] : "";
 #else
     (void)id;

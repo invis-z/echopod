@@ -19,7 +19,7 @@ enum {
     PATH_CAPACITY = 1024
 };
 
-static const char SYSTEM_PREFIX[] = "/.echo/";
+static const char SYSTEM_PREFIX[] = "/.rippl/";
 
 typedef struct SimStorage {
     const char *card_directory;

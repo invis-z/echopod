@@ -120,11 +120,11 @@ def font_source(font):
     glyph_lines, bitmap = glyph_table(font.glyphs)
     bitmap_lines = list(byte_lines(bitmap)) or ["    0x00,"]
     return "\n".join([
-        f"ECHO_RESIDENT static const uint8_t {prefix}_BITMAP[] = {{",
+        f"RIPPL_RESIDENT static const uint8_t {prefix}_BITMAP[] = {{",
         *bitmap_lines,
         "};",
         "",
-        f"ECHO_RESIDENT static const Glyph {prefix}_GLYPHS[] = {{",
+        f"RIPPL_RESIDENT static const Glyph {prefix}_GLYPHS[] = {{",
         *glyph_lines,
         "};",
         "",

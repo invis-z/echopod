@@ -1,6 +1,6 @@
 """Checks that everything defined in src/np_faces lands in the lazily loaded .np_faces section.
 
-A function without ECHO_NP_FACES_CODE, or a table without ECHO_NP_FACES_DATA (or the entry
+A function without RIPPL_NP_FACES_CODE, or a table without RIPPL_NP_FACES_DATA (or the entry
 macro), is linked into the code window instead, where nothing can see it. A `static const` inside
 a function body is a table too.
 """
@@ -8,8 +8,8 @@ import re
 import sys
 from pathlib import Path
 
-CODE_MACRO = "ECHO_NP_FACES_CODE"
-DATA_MACROS = ("ECHO_NP_FACES_DATA", "ECHO_NP_FACES_ENTRY")
+CODE_MACRO = "RIPPL_NP_FACES_CODE"
+DATA_MACROS = ("RIPPL_NP_FACES_DATA", "RIPPL_NP_FACES_ENTRY")
 LOCAL_TABLE = re.compile(r"\bstatic\s+const\b")
 TYPE_START = re.compile(r"^\s*(typedef|struct|union|enum|extern)\b")
 

@@ -15,15 +15,15 @@ GOOD = """#include "core/resident.h"
 typedef struct Layout { int x; } Layout;
 enum { COUNT = 3 };
 extern const int OTHER;
-ECHO_NP_FACES_DATA static const Layout LAYOUT = {1};
-ECHO_NP_FACES_DATA static const char NAME[] = "a;{b";
-ECHO_NP_FACES_ENTRY const Layout ENTRY = {2};
-ECHO_NP_FACES_CODE static int twice(int value)
+RIPPL_NP_FACES_DATA static const Layout LAYOUT = {1};
+RIPPL_NP_FACES_DATA static const char NAME[] = "a;{b";
+RIPPL_NP_FACES_ENTRY const Layout ENTRY = {2};
+RIPPL_NP_FACES_CODE static int twice(int value)
 {
     int local = value * 2;
     return local;
 }
-ECHO_NP_FACES_CODE void draw(const Layout *layout, int (*hook)(int));
+RIPPL_NP_FACES_CODE void draw(const Layout *layout, int (*hook)(int));
 static int counter;
 """
 
@@ -33,18 +33,18 @@ class SectionMacroTest(unittest.TestCase):
         self.assertEqual([], check.violations(GOOD))
 
     def test_an_unmarked_table_is_found_with_its_line(self):
-        text = GOOD.replace("ECHO_NP_FACES_DATA static const Layout LAYOUT",
+        text = GOOD.replace("RIPPL_NP_FACES_DATA static const Layout LAYOUT",
                             "static const Layout LAYOUT")
         found = check.violations(text)
         self.assertEqual(1, len(found))
         self.assertEqual("static const Layout LAYOUT = {1};", text.splitlines()[found[0][0] - 1])
-        self.assertIn("ECHO_NP_FACES_DATA", found[0][1])
+        self.assertIn("RIPPL_NP_FACES_DATA", found[0][1])
 
     def test_an_unmarked_function_is_found(self):
-        text = GOOD.replace("ECHO_NP_FACES_CODE static int twice", "static int twice")
+        text = GOOD.replace("RIPPL_NP_FACES_CODE static int twice", "static int twice")
         found = check.violations(text)
         self.assertEqual(1, len(found))
-        self.assertIn("ECHO_NP_FACES_CODE", found[0][1])
+        self.assertIn("RIPPL_NP_FACES_CODE", found[0][1])
 
     def test_an_unmarked_scalar_constant_is_found(self):
         self.assertEqual(1, len(check.violations("static const int LIMIT = 4;\n")))

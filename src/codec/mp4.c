@@ -77,7 +77,7 @@ enum {
     MORE_BIT = 0x80
 };
 
-ECHO_RESIDENT static const uint32_t AAC_RATES[RATE_INDEXES] = {
+RIPPL_RESIDENT static const uint32_t AAC_RATES[RATE_INDEXES] = {
     96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350};
 
 typedef struct Atom {

@@ -87,14 +87,14 @@ def clock(milliseconds):
 
 def main(arguments=None):
     parser = argparse.ArgumentParser(
-        description="List the audiobook and podcast bookmarks EchoPod keeps on a card.")
+        description="List the audiobook and podcast bookmarks Rippl keeps on a card.")
     parser.add_argument("card", help="the card's root folder, for example E:\\ or /media/card")
     parser.add_argument("--finished", action="store_true",
                         help="print only the paths of finished episodes and books, one per line")
     parser.add_argument("--json", action="store_true", help="print every bookmark as JSON")
     options = parser.parse_args(arguments)
     root = Path(options.card)
-    source = root / ".echo" / "bookmarks.bin"
+    source = root / ".rippl" / "bookmarks.bin"
     if not source.is_file():
         print(f"no bookmarks file at {source}", file=sys.stderr)
         return 1

@@ -11,20 +11,20 @@
      .success = COLOR_RGB(120, 200, 96),                                                           \
      .danger = COLOR_RGB(248, 96, 72)}
 
-ECHO_NP_FACES_DATA static const ThemeColors CASSETTE_CHROME =
+RIPPL_NP_FACES_DATA static const ThemeColors CASSETTE_CHROME =
     CHROME(COLOR_RGB(72, 68, 72), COLOR_RGB(24, 20, 24), COLOR_RGB(96, 96, 104),
            COLOR_RGB(240, 228, 200), COLOR_RGB(184, 168, 136), COLOR_RGB(24, 20, 24));
-ECHO_NP_FACES_DATA static const ThemeColors VU_CHROME =
+RIPPL_NP_FACES_DATA static const ThemeColors VU_CHROME =
     CHROME(COLOR_RGB(56, 52, 48), COLOR_RGB(24, 20, 16), COLOR_RGB(72, 64, 56),
            COLOR_RGB(240, 232, 216), COLOR_RGB(168, 152, 128), COLOR_RGB(32, 28, 24));
-ECHO_NP_FACES_DATA static const ThemeColors TURNTABLE_CHROME =
+RIPPL_NP_FACES_DATA static const ThemeColors TURNTABLE_CHROME =
     CHROME(COLOR_RGB(40, 20, 16), COLOR_RGB(24, 12, 16), COLOR_RGB(104, 104, 96),
            COLOR_RGB(248, 236, 208), COLOR_RGB(192, 160, 120), COLOR_RGB(72, 44, 24));
-ECHO_NP_FACES_DATA static const ThemeColors LCD_CHROME =
+RIPPL_NP_FACES_DATA static const ThemeColors LCD_CHROME =
     CHROME(COLOR_RGB(64, 64, 72), COLOR_RGB(24, 24, 32), COLOR_RGB(72, 72, 80),
            COLOR_RGB(176, 196, 104), COLOR_RGB(144, 168, 80), COLOR_RGB(32, 32, 40));
 
-ECHO_NP_FACES_CODE static void draw(const NowPlayingFrame *frame, Canvas *canvas)
+RIPPL_NP_FACES_CODE static void draw(const NowPlayingFrame *frame, Canvas *canvas)
 {
     switch (frame->face) {
     case NP_FACE_CASSETTE:
@@ -44,7 +44,7 @@ ECHO_NP_FACES_CODE static void draw(const NowPlayingFrame *frame, Canvas *canvas
     }
 }
 
-ECHO_NP_FACES_ENTRY const NowPlayingFaces NOW_PLAYING_FACES = {
+RIPPL_NP_FACES_ENTRY const NowPlayingFaces NOW_PLAYING_FACES = {
     .magic = NP_FACES_MAGIC,
     .draw = draw,
     .chrome = {[NP_FACE_CASSETTE] = &CASSETTE_CHROME,

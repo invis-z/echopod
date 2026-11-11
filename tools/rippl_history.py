@@ -1,13 +1,13 @@
-"""Turns the listen history EchoPod keeps on a card into a .scrobbler.log for Last.fm uploaders.
+"""Turns the listen history Rippl keeps on a card into a .scrobbler.log for Last.fm uploaders.
 
 The player writes /.scrobbler.log itself whenever it connects to a computer, so this tool is
 optional: it dates the plays the player couldn't (its clock wasn't set), writes the log somewhere
 else, or exports everything again.
 
-The player writes /.echo/history.bin, a ring of 512-byte records (see docs/library-format.md).
+The player writes /.rippl/history.bin, a ring of 512-byte records (see docs/library-format.md).
 A record says when a play started and ended in milliseconds since the player was switched on,
 plus a session number that goes up once per start, and, when the player's clock was set (by
-echo-sync, or by hand in Settings with a time zone), the Unix time the record was written. The
+rippl-sync, or by hand in Settings with a time zone), the Unix time the record was written. The
 player also writes a "computer" mark whenever it connects to a computer over USB. A session with
 a timed record is dated from it exactly. The rest is dated by counting back from now: the newest
 record is taken to have happened at the moment the tool runs (or at --now), which is right when
@@ -16,7 +16,7 @@ power-off the gap is unknown, so earlier sessions are placed back to back, endin
 one started.
 
 The output is the Rockbox/iPod AudioScrobbler 1.1 log that existing uploaders read. The player and
-this tool share /.echo/history-exported.txt, the sequence number of the newest record already
+this tool share /.rippl/history-exported.txt, the sequence number of the newest record already
 exported (ten digits and a newline), so neither writes a play the other already wrote.
 """
 import argparse
@@ -42,8 +42,8 @@ CONTINUE_SLACK_MS = 5000
 HISTORY_NAME = "history.bin"
 EXPORTED_NAME = "history-exported.txt"
 LOG_NAME = ".scrobbler.log"
-CLIENT = "EchoPod"
-VERSION_LINE = re.compile(r'set\(ECHO_FIRMWARE_VERSION\s+"([^"]+)"')
+CLIENT = "Rippl"
+VERSION_LINE = re.compile(r'set\(RIPPL_FIRMWARE_VERSION\s+"([^"]+)"')
 
 
 def fnv1a(data):
@@ -237,11 +237,11 @@ class Export:
 def export(card, output=None, now_ms=None, include_skipped=False, everything=False,
            dry_run=False, version=None):
     root = Path(card)
-    echo = root / ".echo"
-    records = read_history((echo / HISTORY_NAME).read_bytes())
+    rippl = root / ".rippl"
+    records = read_history((rippl / HISTORY_NAME).read_bytes())
     now_ms = int(time.time() * 1000) if now_ms is None else now_ms
     newest = records[-1].sequence if records else 0
-    marker = echo / EXPORTED_NAME
+    marker = rippl / EXPORTED_NAME
     exported = 0 if everything else read_exported(marker, newest)
     oldest = records[0].sequence if records else 1
     lost = max(0, oldest - exported - 1) if exported else 0
@@ -263,7 +263,7 @@ def clock_text(timestamp):
 
 def main(arguments=None):
     parser = argparse.ArgumentParser(
-        description="Write the songs EchoPod played to a .scrobbler.log for Last.fm or "
+        description="Write the songs Rippl played to a .scrobbler.log for Last.fm or "
                     "ListenBrainz uploaders. Run it while the player is connected over USB.")
     parser.add_argument("card", help="the card's root folder, for example E:\\ or /media/card")
     parser.add_argument("--output", help="where to write the log (default: .scrobbler.log at "
@@ -278,7 +278,7 @@ def main(arguments=None):
                         help="print the new plays as JSON and write nothing")
     options = parser.parse_args(arguments)
     root = Path(options.card)
-    source = root / ".echo" / HISTORY_NAME
+    source = root / ".rippl" / HISTORY_NAME
     if not source.is_file():
         print(f"no listen history at {source}", file=sys.stderr)
         return 1

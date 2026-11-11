@@ -5,16 +5,13 @@
 
 #include "hal/storage.h"
 
-const char BLUETOOTH_STORE_PATH[] = "/.echo/bluetooth.bin";
+const char BLUETOOTH_STORE_PATH[] = "/.rippl/bluetooth.bin";
 
 enum {
     HEADER_SIZE = 3,
     VERSION_AT = 2,
     DEVICE_SIZE = HAL_BLUETOOTH_ADDRESS_SIZE + HAL_BLUETOOTH_NAME_CAPACITY,
-    OLD_VERSION = 1,
-    OLD_ENABLED_AT = HEADER_SIZE + DEVICE_SIZE,
-    OLD_SIZE = OLD_ENABLED_AT + 1,
-    VERSION = 2,
+    VERSION = 1,
     ENABLED_AT = HEADER_SIZE,
     COUNT_AT = ENABLED_AT + 1,
     DEVICES_AT = COUNT_AT + 1,
@@ -67,16 +64,6 @@ static uint32_t read_record(uint8_t *record)
     return size;
 }
 
-static void load_old(const uint8_t *record, uint32_t size, BluetoothSaved *saved)
-{
-    if (size < OLD_SIZE) {
-        return;
-    }
-    read_device(record + HEADER_SIZE, &saved->devices[0]);
-    saved->count = has_address(&saved->devices[0]) ? 1 : 0;
-    saved->enabled = record[OLD_ENABLED_AT] == 1;
-}
-
 static void load_list(const uint8_t *record, uint32_t size, BluetoothSaved *saved)
 {
     if (size < RECORD_SIZE) {
@@ -101,9 +88,7 @@ void bluetooth_store_load(BluetoothSaved *saved)
     if (size == 0) {
         return;
     }
-    if (record[VERSION_AT] == OLD_VERSION) {
-        load_old(record, size, saved);
-    } else if (record[VERSION_AT] == VERSION) {
+    if (record[VERSION_AT] == VERSION) {
         load_list(record, size, saved);
     }
 }

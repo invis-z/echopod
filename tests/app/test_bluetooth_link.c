@@ -791,17 +791,15 @@ static void searching_disconnects_and_scans_without_reconnecting(void)
     CHECK_EQUAL(0, fake_hal_bluetooth_connect_count());
 }
 
-static void an_old_single_device_store_still_loads(void)
+static void an_echopod_single_device_store_is_ignored(void)
 {
     fresh();
     uint8_t old[42] = {'B', 'T', 1, 1, 2, 3, 4, 5, 6, 'B', 'u', 'd', 's'};
     old[41] = 1;
     fake_hal_add_file(BLUETOOTH_STORE_PATH, old, sizeof old);
     BluetoothSaved saved = stored();
-    CHECK(saved.enabled);
-    CHECK_EQUAL(1, saved.count);
-    CHECK(strcmp("Buds", saved.devices[0].name) == 0);
-    CHECK_EQUAL(6, saved.devices[0].address[5]);
+    CHECK(!saved.enabled);
+    CHECK_EQUAL(0, saved.count);
 }
 
 static void forgetting_disconnects_and_clears_the_device(void)
@@ -867,7 +865,7 @@ int main(void)
         TEST_CASE(choosing_the_connected_device_disconnects_and_stays_off),
         TEST_CASE(choosing_another_device_switches_to_it),
         TEST_CASE(searching_disconnects_and_scans_without_reconnecting),
-        TEST_CASE(an_old_single_device_store_still_loads),
+        TEST_CASE(an_echopod_single_device_store_is_ignored),
         TEST_CASE(forgetting_disconnects_and_clears_the_device),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));

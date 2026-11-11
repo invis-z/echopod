@@ -52,7 +52,7 @@ void equalizer_files_name(const EqualizerFileList *list, int index, char *name)
 void equalizer_files_scan(EqualizerFileList *list)
 {
     list->count = 0;
-#ifdef ECHO_EQ_FILES_HIDDEN
+#ifdef RIPPL_EQ_FILES_HIDDEN
     return;
 #endif
     HalDir dir;

@@ -1,4 +1,4 @@
-add_library(echo_library STATIC
+add_library(rippl_library STATIC
     block_cache.c
     covers.c
     favorites.c
@@ -10,16 +10,16 @@ add_library(echo_library STATIC
     sort_initial.c
     spoken_path.c
 )
-target_include_directories(echo_library PUBLIC include)
+target_include_directories(rippl_library PUBLIC include)
 if(CMAKE_CROSSCOMPILING)
-    target_compile_definitions(echo_library PRIVATE ECHO_RESIDENT_TABLES)
+    target_compile_definitions(rippl_library PRIVATE RIPPL_RESIDENT_TABLES)
 endif()
-target_link_libraries(echo_library
-    PUBLIC echo_core
-    PRIVATE echo_options echo_compact
+target_link_libraries(rippl_library
+    PUBLIC rippl_core
+    PRIVATE rippl_options rippl_compact
 )
 
-add_library(echo_library_scan STATIC
+add_library(rippl_library_scan STATIC
     builder_sort.c
     builder_store.c
     cover_build.c
@@ -46,9 +46,9 @@ add_library(echo_library_scan STATIC
     track_fields.c
     track_tags.c
 )
-target_include_directories(echo_library_scan PUBLIC include)
-target_link_libraries(echo_library_scan
-    PUBLIC echo_core echo_image echo_library
-    PRIVATE echo_options
+target_include_directories(rippl_library_scan PUBLIC include)
+target_link_libraries(rippl_library_scan
+    PUBLIC rippl_core rippl_image rippl_library
+    PRIVATE rippl_options
 )
-target_link_libraries(echo_library PRIVATE echo_lto)
+target_link_libraries(rippl_library PRIVATE rippl_lto)

@@ -97,9 +97,9 @@ static void string_descriptors_are_utf16(void)
     CHECK_EQUAL('D', serial.data[16]);
     UsbReply product = usb_device_setup(&device, setup(0x80, 6, 0x0302, 0x0409, 255));
     CHECK_EQUAL(USB_REPLY_DATA, product.kind);
-    CHECK(utf16_is("EchoPod", product));
+    CHECK(utf16_is("Rippl", product));
     UsbReply maker = usb_device_setup(&device, setup(0x80, 6, 0x0301, 0x0409, 255));
-    CHECK(utf16_is("EchoPod", maker));
+    CHECK(utf16_is("Rippl", maker));
 }
 
 static void unknown_descriptors_stall(void)
