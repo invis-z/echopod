@@ -332,9 +332,7 @@ RIPPL_NP_FACES_CODE static void portrait_text(Canvas *canvas, const NowPlayingFr
     FaceLine artist = text_line(frame, &PORT.text[ROW_ARTIST]);
     face_line(canvas, frame, &artist, frame->artist);
     FaceLine album = text_line(frame, &PORT.text[ROW_ALBUM]);
-    bool lyric = frame->lyric != NULL && frame->lyric[0] != '\0';
-    album.color = lyric ? album.emphasis : album.color;
-    face_line(canvas, frame, &album, lyric ? frame->lyric : frame->album);
+    face_line(canvas, frame, &album, frame->album);
     portrait_format(canvas, frame);
     FaceLine modes = text_line(frame, &PORT.text[ROW_MODES]);
     still_text(canvas, &modes, frame->modes, modes.color);

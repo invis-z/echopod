@@ -41,7 +41,6 @@ static Color blank_pixels[NP_TEST_PIXELS];
 static const Spot CASSETTE_LANDSCAPE[] = {
     {"title", NP_TEST_PLAYING, ABSOLUTE, {33, 33, 253, 20}},
     {"artist", NP_TEST_PLAYING, ABSOLUTE, {33, 56, 253, 20}},
-    {"lyric", NP_TEST_LYRIC, ABSOLUTE, {33, 56, 253, 20}},
     {"feedback", NP_TEST_VOLUME, ABSOLUTE, {33, 56, 253, 20}},
     {"elapsed", NP_TEST_PLAYING, ABSOLUTE, {17, 129, 62, 16}},
     {"remaining", NP_TEST_PLAYING, ABSOLUTE, {241, 129, 62, 16}},
@@ -53,7 +52,6 @@ static const Spot CASSETTE_PORTRAIT[] = {
     {"title", NP_TEST_PLAYING, FROM_CARD, {16, 111, 137, 20}},
     {"artist", NP_TEST_PLAYING, FROM_CARD, {16, 134, 137, 20}},
     {"album", NP_TEST_PLAYING, FROM_CARD, {16, 157, 137, 20}},
-    {"lyric", NP_TEST_LYRIC, FROM_CARD, {16, 157, 137, 20}},
     {"stream", NP_TEST_PLAYING, FROM_CARD, {16, 181, 137, 16}},
     {"feedback", NP_TEST_VOLUME, FROM_CARD, {16, 181, 137, 16}},
     {"elapsed", NP_TEST_PLAYING, FROM_CARD, {16, 198, 60, 16}},
@@ -65,7 +63,6 @@ static const Spot CASSETTE_PORTRAIT[] = {
 static const Spot VU_LANDSCAPE[] = {
     {"title", NP_TEST_PLAYING, ABSOLUTE, {10, 102, 300, 20}},
     {"artist", NP_TEST_PLAYING, ABSOLUTE, {10, 121, 300, 20}},
-    {"lyric", NP_TEST_LYRIC, ABSOLUTE, {10, 121, 300, 20}},
     {"feedback", NP_TEST_VOLUME, ABSOLUTE, {10, 121, 300, 20}},
     {"elapsed", NP_TEST_PLAYING, ABSOLUTE, {10, 147, 52, 16}},
     {"remaining", NP_TEST_PLAYING, ABSOLUTE, {262, 147, 48, 16}},
@@ -75,7 +72,6 @@ static const Spot VU_PORTRAIT[] = {
     {"title", NP_TEST_PLAYING, ABSOLUTE, {10, 174, 150, 22}},
     {"artist", NP_TEST_PLAYING, ABSOLUTE, {10, 196, 150, 22}},
     {"album", NP_TEST_PLAYING, ABSOLUTE, {10, 218, 150, 22}},
-    {"lyric", NP_TEST_LYRIC, ABSOLUTE, {10, 218, 150, 22}},
     {"format", NP_TEST_PLAYING, ABSOLUTE, {10, 244, 150, 16}},
     {"feedback", NP_TEST_VOLUME, ABSOLUTE, {10, 244, 150, 16}},
     {"modes", NP_TEST_PLAYING, ABSOLUTE, {10, 278, 150, 16}},
@@ -87,7 +83,6 @@ static const Spot TURNTABLE_LANDSCAPE[] = {
     {"title", NP_TEST_PLAYING, ABSOLUTE, {170, 28, 140, 22}},
     {"artist", NP_TEST_PLAYING, ABSOLUTE, {170, 50, 140, 22}},
     {"album", NP_TEST_PLAYING, ABSOLUTE, {170, 70, 140, 22}},
-    {"lyric", NP_TEST_LYRIC, ABSOLUTE, {170, 70, 140, 22}},
     {"format", NP_TEST_PLAYING, ABSOLUTE, {170, 97, 140, 16}},
     {"detail", NP_TEST_PLAYING, ABSOLUTE, {170, 116, 140, 16}},
     {"modes", NP_TEST_PLAYING, ABSOLUTE, {170, 131, 140, 16}},
@@ -100,7 +95,6 @@ static const Spot TURNTABLE_PORTRAIT[] = {
     {"title", NP_TEST_PLAYING, FROM_AREA, {10, 144, 150, 22}},
     {"artist", NP_TEST_PLAYING, FROM_AREA, {10, 166, 150, 22}},
     {"album", NP_TEST_PLAYING, FROM_AREA, {10, 188, 150, 22}},
-    {"lyric", NP_TEST_LYRIC, FROM_AREA, {10, 188, 150, 22}},
     {"format", NP_TEST_PLAYING, FROM_AREA, {10, 212, 150, 16}},
     {"modes", NP_TEST_PLAYING, ABSOLUTE, {10, 278, 150, 16}},
     {"feedback", NP_TEST_VOLUME, ABSOLUTE, {10, 278, 150, 16}},
@@ -111,7 +105,6 @@ static const Spot TURNTABLE_PORTRAIT[] = {
 static const Spot LCD_LANDSCAPE[] = {
     {"title", NP_TEST_PLAYING, ABSOLUTE, {12, 95, 296, 20}},
     {"artist", NP_TEST_PLAYING, ABSOLUTE, {12, 117, 296, 20}},
-    {"lyric", NP_TEST_LYRIC, ABSOLUTE, {12, 117, 296, 20}},
     {"info", NP_TEST_PLAYING, ABSOLUTE, {12, 149, 296, 15}},
     {"feedback", NP_TEST_VOLUME, ABSOLUTE, {12, 149, 296, 15}},
     {"codec", NP_TEST_PLAYING, ABSOLUTE, {250, 31, 58, 15}},
@@ -121,7 +114,6 @@ static const Spot LCD_PORTRAIT[] = {
     {"title", NP_TEST_PLAYING, FROM_AREA, {10, 174, 150, 20}},
     {"artist", NP_TEST_PLAYING, FROM_AREA, {10, 197, 150, 20}},
     {"album", NP_TEST_PLAYING, FROM_AREA, {10, 217, 150, 20}},
-    {"lyric", NP_TEST_LYRIC, FROM_AREA, {10, 217, 150, 20}},
     {"info", NP_TEST_PLAYING, FROM_AREA, {10, 251, 150, 15}},
     {"feedback", NP_TEST_VOLUME, FROM_AREA, {10, 251, 150, 15}},
     {"codec", NP_TEST_PLAYING, FROM_AREA, {120, 24, 40, 15}},
@@ -162,7 +154,6 @@ static void set_words(NpTestScene *scene)
     frame->stream = WORD;
     frame->detail = WORD;
     frame->modes = WORD;
-    frame->lyric = frame->lyric != NULL ? WORD : NULL;
 }
 
 static void set_fonts(NpTestScene *scene, bool real)

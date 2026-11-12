@@ -67,9 +67,6 @@ static void apply_state(NpTestScene *scene, NpTestState state)
     if (state == NP_TEST_BADGE) {
         frame->feedback = NOW_PLAYING_FEEDBACK_NEXT;
     }
-    if (state == NP_TEST_LYRIC) {
-        frame->lyric = "AB";
-    }
     if (state == NP_TEST_NO_COVER) {
         frame->cover = (Image){0};
     }

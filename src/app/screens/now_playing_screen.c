@@ -938,7 +938,6 @@ static void frame_state(const NowPlayingScreen *now_playing, NowPlayingFrame *fr
 {
     frame->now_ms = now_playing->now_ms;
     frame->text_ms = now_playing->text_changed_ms;
-    frame->lyric_ms = now_playing->lyrics.current_ms;
     frame->shown_ms = shown_position(now_playing);
     frame->tick = now_playing->status.position_ms / NP_FACE_TICK_MS;
     frame->feedback = badge_of(now_playing);
@@ -956,7 +955,6 @@ static void frame_of(const NowPlayingScreen *now_playing, NowPlayingFrame *frame
     frame->song = now_playing->title;
     frame->artist = now_playing->artist;
     frame->album = now_playing->album;
-    frame->lyric = now_playing->lyrics.lyrics.synced ? now_playing_lyric(now_playing) : NULL;
     frame->codec = now_playing_codec_name(now_playing->status.format.codec);
     frame->area = theme_content_area(theme);
     frame_state(now_playing, frame);

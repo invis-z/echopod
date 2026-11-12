@@ -34,8 +34,7 @@ enum {
     VOLUME_OVER = 200,
     POSITION_STEP_MS = 20000,
     BAND_ROW_FIRST = 35,
-    LYRIC_LAND_Y = 90,
-    LYRIC_PORT_Y = 214,
+    ALBUM_PORT_Y = 214,
     TEXT_HEIGHT = 20,
     ARTIST_PORT_Y = 194,
     COLON_DOT_WIDTH = 4,
@@ -70,7 +69,6 @@ typedef struct Spot {
     int info_width;
     int play_x;
     int pause_x;
-    int lyric_y;
     Point blank;
     Point legends[LEGEND_COUNT];
 } Spot;
@@ -103,7 +101,6 @@ static const Spot SPOTS[2] = {
      296,
      12,
      25,
-     LYRIC_LAND_Y,
      {200, 65},
      {{41, 4}, {101, 4}, {156, 4}, {208, 4}, {219, 4}}},
     {4,
@@ -121,7 +118,6 @@ static const Spot SPOTS[2] = {
      150,
      10,
      23,
-     LYRIC_PORT_Y,
      {80, 166},
      {{40, 4}, {100, 4}, {10, 21}, {62, 21}, {73, 21}}},
 };
@@ -698,19 +694,6 @@ static void the_codec_box_hugs_its_text_and_hides_when_unknown(void)
     }
 }
 
-static void a_lyric_replaces_only_the_artist_or_album_row(void)
-{
-    for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
-        NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
-        draw_into(&scene, pixels);
-        scene.frame.lyric = "AB";
-        draw_into(&scene, other);
-        int row = spot_of(layout)->lyric_y;
-        CHECK(differing_rows(layout) > 0);
-        CHECK(rows_within(layout, row, row + TEXT_HEIGHT - 1));
-    }
-}
-
 typedef struct Span {
     int first;
     int last;
@@ -839,7 +822,7 @@ static void the_portrait_artist_and_album_rows_show_their_own_text(void)
         scene.frame.album = "ZZZZ";
         draw_into(&scene, other);
         CHECK(differing_rows(layout) > 0);
-        CHECK(rows_within(layout, LYRIC_PORT_Y, LYRIC_PORT_Y + TEXT_HEIGHT - 1));
+        CHECK(rows_within(layout, ALBUM_PORT_Y, ALBUM_PORT_Y + TEXT_HEIGHT - 1));
         NpTestScene fresh = scene_of(layout, NP_TEST_PLAYING);
         draw_into(&fresh, pixels);
         fresh.frame.artist = "ZZZZ";
@@ -919,7 +902,6 @@ int main(void)
         TEST_CASE(the_info_row_has_the_stream_left_and_the_remaining_time_right),
         TEST_CASE(volume_and_scrubbing_replace_the_whole_info_row),
         TEST_CASE(the_codec_box_hugs_its_text_and_hides_when_unknown),
-        TEST_CASE(a_lyric_replaces_only_the_artist_or_album_row),
         TEST_CASE(both_colons_sit_on_their_exact_columns),
         TEST_CASE(the_big_digits_fill_their_exact_box),
         TEST_CASE(each_legend_starts_and_ends_on_its_exact_columns),

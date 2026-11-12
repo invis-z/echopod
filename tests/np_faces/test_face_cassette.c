@@ -79,7 +79,6 @@ static const TextProbe LANDSCAPE_TEXT[] = {
     {NP_TEST_PLAYING, {33, 33, 253, 20}, INK, INK_SOFT},
     {NP_TEST_PLAYING, {33, 56, 253, 20}, INK_SOFT, INK},
     {NP_TEST_PLAYING, {254, 84, 40, 31}, LABEL, INK},
-    {NP_TEST_LYRIC, {33, 56, 253, 20}, INK, INK_SOFT},
 };
 
 static const TextProbe PORTRAIT_TEXT[] = {
@@ -88,7 +87,6 @@ static const TextProbe PORTRAIT_TEXT[] = {
     {NP_TEST_PLAYING, {16, 157, 137, 20}, INK_SOFT, INK},
     {NP_TEST_PLAYING, {16, 181, 137, 16}, INK_SOFT, INK},
     {NP_TEST_PLAYING, {100, 10, 44, 16}, INK_SOFT, INK},
-    {NP_TEST_LYRIC, {16, 157, 137, 20}, INK, INK_SOFT},
 };
 
 static void draw(NpTestScene scene, Color *target)
@@ -168,7 +166,6 @@ static NpTestScene worded(int layout, NpTestState state, const char *word)
     scene.frame.album = word;
     scene.frame.codec = word;
     scene.frame.stream = word;
-    scene.frame.lyric = scene.frame.lyric != NULL ? word : NULL;
     return scene;
 }
 

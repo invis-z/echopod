@@ -24,7 +24,6 @@ typedef enum NpTestState {
     NP_TEST_SCRUBBING,
     NP_TEST_VOLUME,
     NP_TEST_BADGE,
-    NP_TEST_LYRIC,
     NP_TEST_NO_COVER
 } NpTestState;
 

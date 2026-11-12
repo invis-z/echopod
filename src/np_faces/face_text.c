@@ -71,8 +71,8 @@ RIPPL_NP_FACES_CODE static void scroll_draw(Canvas *canvas, const NowPlayingFram
 {
     MarqueeTiming timing = frame->theme->marquee;
     int width = text_width(style.font, label.text);
-    uint32_t since = label.text == frame->lyric ? frame->lyric_ms : frame->text_ms;
-    int offset = face_scroll_offset(timing, width, label.area.width, frame->now_ms - since);
+    int offset =
+        face_scroll_offset(timing, width, label.area.width, frame->now_ms - frame->text_ms);
     label_draw_scrolling(canvas, style, label, (Marquee){offset, timing.gap_px});
 }
 
@@ -114,13 +114,9 @@ RIPPL_NP_FACES_CODE void face_feedback_line(Canvas *canvas, const NowPlayingFram
 {
     char buffer[FACE_FEEDBACK_CAPACITY];
     const char *feedback = face_feedback_text(frame, buffer, sizeof buffer);
-    FaceLine emphasised = *line;
-    emphasised.color = line->emphasis;
     if (feedback != NULL) {
         Rect fitted = face_fitted_area(line->font, line->area, feedback, line->align);
         label_draw(canvas, (TextStyle){line->font, line->emphasis}, (Label){fitted, feedback});
-    } else if (has_text(frame->lyric)) {
-        face_line(canvas, frame, &emphasised, frame->lyric);
     } else {
         face_line(canvas, frame, line, text);
     }

@@ -97,11 +97,6 @@ static Rect title_row(const NpTestScene *scene)
     return text_row(scene, is_portrait(scene) ? 144 : 4, 0, 22);
 }
 
-static Rect album_row(const NpTestScene *scene)
-{
-    return text_row(scene, is_portrait(scene) ? 188 : 46, 0, 22);
-}
-
 static Rect modes_row(const NpTestScene *scene)
 {
     return text_row(scene, 0, is_portrait(scene) ? -42 : -39, 16);
@@ -165,7 +160,6 @@ static NpTestScene blank(NpTestScene scene)
     scene.frame.modes = NULL;
     scene.frame.codec = NULL;
     scene.frame.stream = NULL;
-    scene.frame.lyric = NULL;
     scene.frame.feedback = NOW_PLAYING_FEEDBACK_NONE;
     scene.frame.volume_shown = false;
     scene.frame.scrubbing = false;
@@ -472,18 +466,6 @@ static void the_hint_and_the_volume_replace_the_modes_with_different_text(void)
     CHECK(rect_differs(pixels, other, scrubbing.layout, modes_row(&scrubbing)));
 }
 
-static void a_lyric_line_replaces_the_album_in_cream(void)
-{
-    for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
-        NpTestScene album = plain(scene_of(layout, NP_TEST_PLAYING));
-        NpTestScene lyric = plain(scene_of(layout, NP_TEST_LYRIC));
-        Rect row = album_row(&album);
-        lyric.frame.lyric = "A";
-        CHECK(ink_is(&album, row, TAN_DIM, FALLBACK_LEVEL));
-        CHECK(ink_is(&lyric, row, CREAM, FULL_LEVEL));
-    }
-}
-
 static void the_landscape_detail_row_shows_the_detail_text(void)
 {
     NpTestScene landscape = plain(scene_of(0, NP_TEST_PLAYING));
@@ -564,7 +546,6 @@ int main(void)
         TEST_CASE(the_times_follow_the_scrub_target),
         TEST_CASE(the_modes_row_shows_the_modes_then_the_hint_and_the_volume_in_cream),
         TEST_CASE(the_hint_and_the_volume_replace_the_modes_with_different_text),
-        TEST_CASE(a_lyric_line_replaces_the_album_in_cream),
         TEST_CASE(the_landscape_detail_row_shows_the_detail_text),
         TEST_CASE(an_empty_title_draws_no_title_pixels),
         TEST_CASE(a_badge_puts_a_vinyl_disc_and_a_cream_icon_over_the_label),

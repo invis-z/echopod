@@ -342,11 +342,6 @@ RIPPL_NP_FACES_CODE static FaceLine ink_line(const LcdPane *pane, const Font *fo
     return (FaceLine){font, lowered(pane, area), INK, INK, pane->layout->align};
 }
 
-RIPPL_NP_FACES_CODE static const char *lyric_or(const NowPlayingFrame *frame, const char *text)
-{
-    return has_text(frame->lyric) ? frame->lyric : text;
-}
-
 RIPPL_NP_FACES_CODE static void title_draw(const LcdPane *pane)
 {
     FaceLine line = ink_line(pane, pane->frame->theme->fonts.title, pane->layout->title);
@@ -361,12 +356,12 @@ RIPPL_NP_FACES_CODE static void credits_draw(const LcdPane *pane)
     const Font *font = frame->theme->fonts.body;
     FaceLine artist = ink_line(pane, font, pane->layout->artist);
     if (pane->layout->album.width == 0) {
-        face_line(pane->canvas, frame, &artist, lyric_or(frame, frame->artist));
+        face_line(pane->canvas, frame, &artist, frame->artist);
         return;
     }
     FaceLine album = ink_line(pane, font, pane->layout->album);
     face_line(pane->canvas, frame, &artist, frame->artist);
-    face_line(pane->canvas, frame, &album, lyric_or(frame, frame->album));
+    face_line(pane->canvas, frame, &album, frame->album);
 }
 
 RIPPL_NP_FACES_CODE static void progress_draw(const LcdPane *pane)

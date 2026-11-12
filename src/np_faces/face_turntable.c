@@ -277,16 +277,14 @@ RIPPL_NP_FACES_CODE static void heading(const Deck *deck)
 {
     const NowPlayingFrame *frame = deck->frame;
     const Rows *rows = rows_of(frame);
-    const char *lyric = frame->lyric;
-    bool sung = lyric != NULL && lyric[0] != '\0';
     FaceLine title =
         line_of(frame, (Slot){frame->theme->fonts.title, rows->title, LINE_BIG, CREAM});
     FaceLine artist = line_of(frame, (Slot){frame->theme->fonts.body, rows->artist, LINE_BIG, TAN});
-    FaceLine album = line_of(
-        frame, (Slot){frame->theme->fonts.body, rows->album, LINE_BIG, sung ? CREAM : TAN_DIM});
+    FaceLine album =
+        line_of(frame, (Slot){frame->theme->fonts.body, rows->album, LINE_BIG, TAN_DIM});
     face_line(deck->canvas, frame, &title, frame->song);
     face_line(deck->canvas, frame, &artist, frame->artist);
-    face_line(deck->canvas, frame, &album, sung ? lyric : frame->album);
+    face_line(deck->canvas, frame, &album, frame->album);
 }
 
 RIPPL_NP_FACES_CODE static void modes(const Deck *deck)

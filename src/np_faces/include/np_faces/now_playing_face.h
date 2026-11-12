@@ -30,7 +30,6 @@ typedef struct NowPlayingFrame {
     const char *song;
     const char *artist;
     const char *album;
-    const char *lyric;
     const char *codec;
     const char *stream;
     const char *detail;
@@ -39,7 +38,6 @@ typedef struct NowPlayingFrame {
     Rect area;
     uint32_t now_ms;
     uint32_t text_ms;
-    uint32_t lyric_ms;
     uint32_t shown_ms;
     uint32_t tick;
     NowPlayingFeedback feedback;

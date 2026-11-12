@@ -543,15 +543,12 @@ static void the_landscape_has_two_dials_and_the_portrait_one(void)
     CHECK_EQUAL(PLATE, at(&portrait, pixels, 5, 71 + 68));
 }
 
-static void the_second_line_shows_the_feedback_before_the_lyric_before_the_artist(void)
+static void the_second_line_shows_the_feedback_before_the_artist(void)
 {
     Rect row = {10, 121, 300, 20};
     NpTestScene scene = scene_of(LANDSCAPE, NP_TEST_PLAYING);
     np_test_draw(&scene, pixels);
     CHECK(row_shows(&scene, row, "The Long Way Home", MUTED));
-    scene = scene_of(LANDSCAPE, NP_TEST_LYRIC);
-    np_test_draw(&scene, pixels);
-    CHECK(row_shows(&scene, row, "AB", CREAM));
     scene = scene_of(LANDSCAPE, NP_TEST_VOLUME);
     np_test_draw(&scene, pixels);
     CHECK(row_shows(&scene, row, volume_text(), CREAM));
@@ -559,16 +556,6 @@ static void the_second_line_shows_the_feedback_before_the_lyric_before_the_artis
     np_test_draw(&scene, pixels);
     CHECK(row_shows(&scene, row, i18n_text(STR_MENU_SEEKING_HINT), CREAM));
 }
-static void feedback_outranks_a_lyric_on_the_second_line(void)
-{
-    NpTestScene scene = scene_of(LANDSCAPE, NP_TEST_VOLUME);
-    np_test_draw(&scene, pixels);
-    NpTestScene lyric = scene;
-    lyric.frame.lyric = "AB";
-    np_test_draw(&lyric, other);
-    CHECK(np_test_same(pixels, other, scene.layout));
-}
-
 static void the_portrait_rows_use_their_own_colours(void)
 {
     NpTestScene scene = scene_of(PORTRAIT, NP_TEST_PAUSED);
@@ -580,12 +567,6 @@ static void the_portrait_rows_use_their_own_colours(void)
     CHECK(count_in(&scene, pixels, (Rect){10, 244, 150, 16}, MUTED) > 0);
     CHECK_EQUAL(0, count_in(&scene, pixels, (Rect){10, 244, 150, 16}, CREAM));
 }
-static void the_portrait_lyric_replaces_the_album_in_cream(void)
-{
-    NpTestScene scene = scene_of(PORTRAIT, NP_TEST_LYRIC);
-    np_test_draw(&scene, pixels);
-    CHECK(row_shows(&scene, (Rect){10, 218, 150, 22}, "AB", CREAM));
-}
 static void the_portrait_feedback_replaces_the_format_row_in_cream(void)
 {
     Rect row = {10, 244, 150, 16};
@@ -596,14 +577,6 @@ static void the_portrait_feedback_replaces_the_format_row_in_cream(void)
     np_test_draw(&scene, pixels);
     CHECK(row_shows(&scene, row, volume_text(), CREAM));
     CHECK_EQUAL(0, count_in(&scene, pixels, row, MUTED));
-}
-static void a_portrait_lyric_never_hides_the_feedback(void)
-{
-    NpTestScene scene = scene_of(PORTRAIT, NP_TEST_VOLUME);
-    scene.frame.lyric = "AB";
-    np_test_draw(&scene, pixels);
-    CHECK(row_shows(&scene, (Rect){10, 244, 150, 16}, volume_text(), CREAM));
-    CHECK(row_shows(&scene, (Rect){10, 218, 150, 22}, "AB", CREAM));
 }
 static void the_landscape_ignores_the_album_the_format_and_the_modes(void)
 {
@@ -751,12 +724,9 @@ int main(void)
         TEST_CASE(the_dials_are_black_housings_with_cream_faces),
         TEST_CASE(the_scale_is_ink_up_to_zero_and_red_beyond),
         TEST_CASE(the_landscape_has_two_dials_and_the_portrait_one),
-        TEST_CASE(the_second_line_shows_the_feedback_before_the_lyric_before_the_artist),
-        TEST_CASE(feedback_outranks_a_lyric_on_the_second_line),
+        TEST_CASE(the_second_line_shows_the_feedback_before_the_artist),
         TEST_CASE(the_portrait_rows_use_their_own_colours),
-        TEST_CASE(the_portrait_lyric_replaces_the_album_in_cream),
         TEST_CASE(the_portrait_feedback_replaces_the_format_row_in_cream),
-        TEST_CASE(a_portrait_lyric_never_hides_the_feedback),
         TEST_CASE(the_landscape_ignores_the_album_the_format_and_the_modes),
         TEST_CASE(the_portrait_shows_the_modes_and_the_format),
         TEST_CASE(the_cover_is_never_drawn),

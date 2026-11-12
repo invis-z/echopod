@@ -134,23 +134,6 @@ static void a_playing_long_line_scrolls_between_ticks(void)
     CHECK(!same());
 }
 
-static void a_new_long_lyric_scrolls_from_its_own_start_not_the_tracks(void)
-{
-    NpTestScene scene = scene_of(NP_TEST_PLAYING);
-    scene.frame.now_ms = 60000;
-    scene.frame.lyric_ms = 60000;
-    scene.frame.text_ms = 60000 - 47300;
-    scene.frame.lyric = LONG_TEXT;
-    NowPlayingFrame frame = np_test_frame(&scene);
-    FaceLine line = line_of(FACE_ALIGN_LEFT);
-    Canvas first = fresh(grid);
-    face_line(&first, &frame, &line, frame.lyric);
-    Canvas offset_zero = fresh(other);
-    label_draw_scrolling(&offset_zero, (TextStyle){&TINY_FONT, NORMAL},
-                         (Label){line.area, LONG_TEXT}, (Marquee){0, 32});
-    CHECK(same());
-}
-
 static void a_paused_long_line_is_static_and_matches_a_plain_label(void)
 {
     NpTestScene scene = scene_of(NP_TEST_PAUSED);
@@ -359,33 +342,9 @@ static void the_normal_text_shows_in_the_secondary_colour_when_nothing_overrides
     CHECK_EQUAL(0, count_of(grid, EMPHASIS));
 }
 
-static void a_lyric_replaces_the_text_in_the_emphasis_colour(void)
-{
-    NpTestScene scene = scene_of(NP_TEST_LYRIC);
-    draw_feedback_line(&scene, grid);
-    NowPlayingFrame frame = np_test_frame(&scene);
-    FaceLine line = line_of(FACE_ALIGN_LEFT);
-    line.color = EMPHASIS;
-    Canvas expected = fresh(other);
-    face_line(&expected, &frame, &line, "AB");
-    CHECK(same());
-    CHECK_EQUAL(0, count_of(grid, NORMAL));
-}
-
-static void an_empty_lyric_falls_back_to_the_text(void)
-{
-    NpTestScene scene = scene_of(NP_TEST_LYRIC);
-    scene.frame.lyric = NULL;
-    draw_feedback_line(&scene, grid);
-    NpTestScene plain = scene_of(NP_TEST_PLAYING);
-    draw_feedback_line(&plain, other);
-    CHECK(same());
-}
-
-static void the_volume_feedback_replaces_the_lyric_as_a_static_label(void)
+static void the_volume_feedback_replaces_the_text_as_a_static_label(void)
 {
     NpTestScene scene = scene_of(NP_TEST_VOLUME);
-    scene.frame.lyric = "AB";
     draw_feedback_line(&scene, grid);
     FaceLine line = line_of(FACE_ALIGN_LEFT);
     Canvas expected = fresh(other);
@@ -396,7 +355,6 @@ static void the_volume_feedback_replaces_the_lyric_as_a_static_label(void)
 static void scrubbing_replaces_everything_with_the_hint(void)
 {
     NpTestScene scene = scene_of(NP_TEST_SCRUBBING);
-    scene.frame.lyric = "AB";
     scene.frame.volume_shown = true;
     draw_feedback_line(&scene, grid);
     FaceLine line = line_of(FACE_ALIGN_LEFT);
@@ -632,7 +590,6 @@ int main(void)
         TEST_CASE(text_that_fits_or_a_zero_speed_never_scrolls),
         TEST_CASE(the_scroll_uses_the_time_since_the_text_changed),
         TEST_CASE(a_playing_long_line_scrolls_between_ticks),
-        TEST_CASE(a_new_long_lyric_scrolls_from_its_own_start_not_the_tracks),
         TEST_CASE(a_paused_long_line_is_static_and_matches_a_plain_label),
         TEST_CASE(a_scrubbing_long_line_is_static_even_while_playing),
         TEST_CASE(a_null_line_draws_nothing),
@@ -649,9 +606,7 @@ int main(void)
         TEST_CASE(scrubbing_beats_the_volume_feedback),
         TEST_CASE(a_small_buffer_cuts_the_feedback_text_short_without_overflowing),
         TEST_CASE(the_normal_text_shows_in_the_secondary_colour_when_nothing_overrides_it),
-        TEST_CASE(a_lyric_replaces_the_text_in_the_emphasis_colour),
-        TEST_CASE(an_empty_lyric_falls_back_to_the_text),
-        TEST_CASE(the_volume_feedback_replaces_the_lyric_as_a_static_label),
+        TEST_CASE(the_volume_feedback_replaces_the_text_as_a_static_label),
         TEST_CASE(scrubbing_replaces_everything_with_the_hint),
         TEST_CASE(the_progress_width_is_proportional_and_clamped),
         TEST_CASE(the_volume_width_scales_to_eighty_five_and_clamps),

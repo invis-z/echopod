@@ -321,14 +321,12 @@ RIPPL_NP_FACES_CODE static void draw_format(Canvas *canvas, const NowPlayingFram
 RIPPL_NP_FACES_CODE static void draw_card_text(Canvas *canvas, const NowPlayingFrame *frame, int c)
 {
     const ThemeFonts *fonts = &frame->theme->fonts;
-    bool lyric = present(frame->lyric);
     FaceLine title = {fonts->title, {16, c + 3, 137, 20}, INK, INK, FACE_ALIGN_CENTRE};
     face_line(canvas, frame, &title, frame->song);
     FaceLine artist = {fonts->body, {16, c + 26, 137, 20}, INK, INK_SOFT, FACE_ALIGN_CENTRE};
     face_line(canvas, frame, &artist, frame->artist);
-    FaceLine album = {
-        fonts->body, {16, c + 49, 137, 20}, INK, lyric ? INK : INK_SOFT, FACE_ALIGN_CENTRE};
-    face_line(canvas, frame, &album, lyric ? frame->lyric : frame->album);
+    FaceLine album = {fonts->body, {16, c + 49, 137, 20}, INK, INK_SOFT, FACE_ALIGN_CENTRE};
+    face_line(canvas, frame, &album, frame->album);
     draw_format(canvas, frame, c + 73);
     FaceLine times = {fonts->small, {16, c + 90, 137, 16}, INK, INK, FACE_ALIGN_LEFT};
     face_times_draw(canvas, frame, &times);

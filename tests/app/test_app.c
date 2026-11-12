@@ -3200,10 +3200,10 @@ static const uint8_t SHOT_FACES[2] = {NP_FACE_CASSETTE, NP_FACE_TURNTABLE};
 static const ShotLayout SHOT_LAYOUTS[2] = {SHOT_LANDSCAPE, SHOT_PORTRAIT};
 
 static const uint32_t FACE_SHOT_HASHES[2][2][SHOT_STATE_COUNT] = {
-    {{0x396A393BU, 0x597D1834U, 0x43849A9FU, 0xA371FF18U, 0x597D1834U, 0x6D9C1AABU, 0x8012DFC1U},
-     {0xA645C254U, 0x3F3621E0U, 0xE0A0EB67U, 0xFAAB936CU, 0x3F3621E0U, 0xA1865489U, 0x5F7ED099U}},
-    {{0xB6D2A166U, 0x0E1892D1U, 0x11D485EFU, 0xE20F0AD6U, 0xCC992E3CU, 0x3B32B9E2U, 0x78F2DE35U},
-     {0xD0701AABU, 0x73EEBD28U, 0xADCABC6EU, 0x14BE16DBU, 0x511529E1U, 0xD20E3488U, 0xAAA3CCF0U}},
+    {{0x396A393BU, 0x597D1834U, 0x43849A9FU, 0xA371FF18U, 0x597D1834U, 0x3A32007FU, 0x8012DFC1U},
+     {0xA645C254U, 0x3F3621E0U, 0xE0A0EB67U, 0xFAAB936CU, 0x3F3621E0U, 0x78B20E5EU, 0x5F7ED099U}},
+    {{0xB6D2A166U, 0x0E1892D1U, 0x11D485EFU, 0xE20F0AD6U, 0xCC992E3CU, 0x7158D5C1U, 0x78F2DE35U},
+     {0xD0701AABU, 0x73EEBD28U, 0xADCABC6EU, 0x14BE16DBU, 0x511529E1U, 0x6F491A7DU, 0xAAA3CCF0U}},
 };
 
 static void the_cassette_and_turntable_frames_keep_their_pixels_in_every_state(void)
@@ -3228,16 +3228,23 @@ static void a_playing_face_changes_pixels_a_tick_later_and_a_paused_one_does_not
     CHECK(fake_hal_pixels_written() > pixels);
 }
 
+static const uint8_t TIMED_LYRICS[] = "[00:00.00]first line\n[00:30.00]second line\n";
 static const uint8_t UNTIMED_LYRICS[] = "first line\nsecond line\n";
 
-static void untimed_lyrics_do_not_replace_the_artist_on_a_face(void)
+static void lyrics_never_show_on_a_face(void)
 {
-    ShotSetup setup = {SHOT_LANDSCAPE, SHOT_PLAYING, NP_FACE_CASSETTE, true};
-    start_app_for_shot(setup);
-    fake_hal_add_file("/AC DC/Back In Black/1-01 - Hells Bells.lrc", UNTIMED_LYRICS,
-                      sizeof UNTIMED_LYRICS - 1);
-    play_for_shot(SHOT_PLAYING);
-    CHECK_EQUAL(FACE_SHOT_HASHES[0][0][SHOT_PLAYING], screen_hash());
+    static const uint8_t *const FILES[] = {TIMED_LYRICS, UNTIMED_LYRICS};
+    static const uint32_t SIZES[] = {sizeof TIMED_LYRICS - 1, sizeof UNTIMED_LYRICS - 1};
+    for (int face = 0; face < 2; face++) {
+        for (int file = 0; file < 2; file++) {
+            ShotSetup setup = {SHOT_LANDSCAPE, SHOT_PLAYING, SHOT_FACES[face], true};
+            start_app_for_shot(setup);
+            fake_hal_add_file("/AC DC/Back In Black/1-01 - Hells Bells.lrc", FILES[file],
+                              SIZES[file]);
+            play_for_shot(SHOT_PLAYING);
+            CHECK_EQUAL(FACE_SHOT_HASHES[face][0][SHOT_PLAYING], screen_hash());
+        }
+    }
 }
 
 static void the_standard_face_is_drawn_when_the_face_code_is_missing_or_unknown(void)
@@ -3755,7 +3762,7 @@ int main(void)
         TEST_CASE(the_standard_now_playing_keeps_its_pixels),
         TEST_CASE(the_cassette_and_turntable_frames_keep_their_pixels_in_every_state),
         TEST_CASE(a_playing_face_changes_pixels_a_tick_later_and_a_paused_one_does_not),
-        TEST_CASE(untimed_lyrics_do_not_replace_the_artist_on_a_face),
+        TEST_CASE(lyrics_never_show_on_a_face),
         TEST_CASE(the_standard_face_is_drawn_when_the_face_code_is_missing_or_unknown),
         TEST_CASE(the_header_and_status_bar_take_the_face_colours_until_home),
         TEST_CASE(leaving_a_face_flips_the_header_and_status_bar_at_the_midpoint),
