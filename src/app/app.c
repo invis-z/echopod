@@ -44,6 +44,7 @@
 #include "ui/label.h"
 #include "ui/marquee.h"
 #include "ui/message_screen.h"
+#include "ui/rippl_logo.h"
 #include "ui/screen_stack.h"
 #include "ui/slide.h"
 #include "ui/status_bar.h"
@@ -179,7 +180,6 @@ static const FadeTiming SPLASH_TIMING = {.fade_ms = 300, .hold_ms = 200, .rising
 static const uint32_t SCREEN_ON_CLOCK_MHZ = 200;
 static const uint32_t IDLE_CLOCK_MHZ = 96;
 static const FadeTiming GOODBYE_TIMING = {.fade_ms = 600, .hold_ms = 400, .rising = false};
-static const char SPLASH_TEXT[] = "Rippl";
 static const char GOODBYE_TEXT[] = "Goodbye";
 static Color strip_pixels[HAL_DISPLAY_WIDTH * STRIP_HEIGHT];
 static uint32_t row_hashes[HAL_DISPLAY_LONG_SIDE];
@@ -602,6 +602,16 @@ static void draw_fade(Canvas *canvas, const Fade *fade, const char *text)
                (Label){.area = label_centered_area(style.font, screen, text), .text = text});
 }
 
+static void draw_splash(Canvas *canvas)
+{
+    Rect screen = whole_screen();
+    const RipplLogo *logo = &RIPPL_LOGO_SPLASH;
+    Point origin = {screen.x + (screen.width - logo->side) / 2,
+                    screen.y + (screen.height - logo->side) / 2};
+    rippl_logo_draw(canvas, logo, origin, current_theme()->colors.text,
+                    fade_alpha(&app.splash, app.now_ms));
+}
+
 static bool draw_running_fade(Canvas *canvas)
 {
     if (app.saying_goodbye) {
@@ -609,7 +619,7 @@ static bool draw_running_fade(Canvas *canvas)
         return true;
     }
     if (!fade_finished(&app.splash, app.now_ms)) {
-        draw_fade(canvas, &app.splash, SPLASH_TEXT);
+        draw_splash(canvas);
         return true;
     }
     return false;

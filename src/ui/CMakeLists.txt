@@ -12,6 +12,8 @@ add_library(rippl_ui STATIC
     menu_screen.c
     message_screen.c
     navigation.c
+    rippl_logo.c
+    rippl_logo_data.c
     screen.c
     screen_stack.c
     status_bar.c

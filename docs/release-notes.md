@@ -30,6 +30,10 @@ The first Rippl release, forked from EchoPod 0.12.0.
 - A preset's OFF filters are skipped without checking their fields, so a preset with 10 active filters and OFF lines after them loads instead of saying a line is out of range.
 - 32-bit WAV goes to the DAC with all 32 bits instead of being rounded to 24, and 32-bit FLAC and ALAC, which were refused, play the same way up to 96 kHz. The equalizer is off for 32-bit tracks, as for 176.4 and 192 kHz.
 
+### Look
+
+- The start-up screen shows the Rippl logo fading in, instead of the word Rippl.
+
 ### Buttons
 
 - In both portraits the volume buttons turn the volume the other way, while holding them still skips and seeks as in landscape. **Swap volume buttons** now reverses only the volume, not lists, skips or seeking.

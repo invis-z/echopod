@@ -132,6 +132,7 @@ rippl_add_unit_test(NAME test_screen_stack SOURCES ui/test_screen_stack.c LIBRAR
 rippl_add_unit_test(NAME test_navigation SOURCES ui/test_navigation.c LIBRARIES rippl_ui)
 rippl_add_unit_test(NAME test_marquee SOURCES ui/test_marquee.c LIBRARIES rippl_ui)
 rippl_add_unit_test(NAME test_fade SOURCES ui/test_fade.c LIBRARIES rippl_ui)
+rippl_add_unit_test(NAME test_rippl_logo SOURCES ui/test_rippl_logo.c LIBRARIES rippl_ui)
 rippl_add_unit_test(NAME test_slide SOURCES ui/test_slide.c LIBRARIES rippl_ui)
 rippl_add_unit_test(NAME test_cover_flow SOURCES ui/test_cover_flow.c LIBRARIES rippl_ui)
 rippl_add_unit_test(NAME test_label
@@ -585,6 +586,13 @@ if(EXISTS ${RIPPL_TOOLS_PYTHON})
     add_test(NAME upsampler_table_up_to_date
         COMMAND ${RIPPL_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/upsampler_table.py
             --output ${PROJECT_SOURCE_DIR}/src/dsp
+            --style ${PROJECT_SOURCE_DIR}/.clang-format
+            --check
+    )
+    add_test(NAME rippl_logo_up_to_date
+        COMMAND ${RIPPL_TOOLS_PYTHON} ${PROJECT_SOURCE_DIR}/tools/logo_mask.py
+            --svg ${PROJECT_SOURCE_DIR}/assets/rippl.svg
+            --output ${PROJECT_SOURCE_DIR}/src/ui
             --style ${PROJECT_SOURCE_DIR}/.clang-format
             --check
     )
