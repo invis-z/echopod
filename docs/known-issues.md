@@ -48,12 +48,10 @@ Rippl is early firmware made by one person and tested on one player. It comes wi
 ## Now Playing faces
 
 - **The battery cost of the faces' animation hasn't been measured.** A face redraws while a track plays, about ten frames a second; Standard redraws far less.
-- **The VU needles and the LCD spectrum are decorative.** The player has no audio-level data, so they move in a fixed pattern that doesn't follow the music.
-- **VU meters in landscape leave out the album, the format and the modes row.** Portrait shows them.
 - **Standard shows if the face code can't be loaded.** The faces are read from internal storage when first needed. If that fails (internal storage doesn't answer, or the copy is damaged twice), Now Playing draws Standard and keeps doing so until you restart the player.
 - **Going back to an older Rippl resets the face to Standard.** Older firmware ignores the setting and writes 0 in its place the next time it saves. No other setting is lost.
-- **The faces' region is nearly full:** it has 536 of 13,824 bytes free, so a fifth face needs a smaller one or a bigger region. `.high_ram` keeps 31,140 bytes free (44,964 before the faces).
-- **"Standard" isn't translated** in any language; the Portrait status bar setting shares the word. The LCD deck's legends stay English on purpose.
+- **The faces' region has 5,528 of 13,824 bytes free**, so a bigger new face needs something else in the region made smaller, or a bigger region. `.high_ram` keeps 31,140 bytes free (44,964 before the faces).
+- **"Standard" isn't translated** in any language; the Portrait status bar setting shares the word.
 
 ## Languages
 

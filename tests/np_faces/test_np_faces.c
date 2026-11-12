@@ -57,14 +57,6 @@ static void the_faces_carry_their_magic_and_a_draw(void)
     CHECK(NOW_PLAYING_FACES.draw != NULL);
 }
 
-static void every_face_has_chrome_and_standard_has_none(void)
-{
-    CHECK(NOW_PLAYING_FACES.chrome[NP_FACE_STANDARD] == NULL);
-    for (int face = NP_FACE_CASSETTE; face < NP_FACE_COUNT; face++) {
-        CHECK(NOW_PLAYING_FACES.chrome[face] != NULL);
-    }
-}
-
 static void every_face_paints_every_pixel_of_its_area(void)
 {
     CHECK(np_test_for_each_scene(paints_every_area_pixel));
@@ -114,7 +106,6 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(the_faces_carry_their_magic_and_a_draw),
-        TEST_CASE(every_face_has_chrome_and_standard_has_none),
         TEST_CASE(every_face_paints_every_pixel_of_its_area),
         TEST_CASE(no_face_writes_outside_its_area),
         TEST_CASE(strip_by_strip_drawing_matches_one_full_draw),

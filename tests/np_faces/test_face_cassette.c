@@ -15,12 +15,14 @@ enum {
     COVER_RED = 0xF800,
     LANDSCAPE = 0,
     PORTRAIT = 1,
-    LARGE = 2,
-    BAND_TOP = 91,
-    BAND_BOTTOM = 107,
-    BAND_ROWS = 16,
-    CARD_OFFSET = 108,
-    CARD_HEIGHT = 217,
+    BAND_TOP = 76,
+    BAND_BOTTOM = 98,
+    BAND_ROWS = 22,
+    CARD_OFFSET = 148,
+    COUNTER_OFFSET = 108,
+    PORTRAIT_TOP = 31,
+    COUNTER_GAP_MS = 1700,
+    TEN_MINUTES_MS = 600000,
     TURN_TICKS = 32,
     STEPS = 5,
     STEP_MS = 100
@@ -39,20 +41,20 @@ static Color other[NP_TEST_PIXELS];
 
 static const Probe LANDSCAPE_PROBES[] = {
     {NP_TEST_PLAYING, 5, 100, DEEP},      {NP_TEST_PLAYING, 12, 100, SHELL},
-    {NP_TEST_PLAYING, 18, 33, RULE},      {NP_TEST_PLAYING, 18, 34, DEEP},
-    {NP_TEST_PLAYING, 30, 70, LABEL},     {NP_TEST_PLAYING, 30, 81, AMBER},
-    {NP_TEST_PLAYING, 28, 100, RED},      {NP_TEST_PLAYING, 160, 84, DEEP},
-    {NP_TEST_PLAYING, 152, 99, DEEP},     {NP_TEST_PLAYING, 99, 99, DEEP},
-    {NP_TEST_PLAYING, 108, 99, LABEL},    {NP_TEST_PLAYING, 114, 99, TAPE},
-    {NP_TEST_PLAYING, 234, 99, TAPE},     {NP_TEST_PLAYING, 160, 135, SHELL_HI},
+    {NP_TEST_PLAYING, 18, 8, RULE},       {NP_TEST_PLAYING, 18, 9, DEEP},
+    {NP_TEST_PLAYING, 30, 40, LABEL},     {NP_TEST_PLAYING, 30, 56, AMBER},
+    {NP_TEST_PLAYING, 28, 90, RED},       {NP_TEST_PLAYING, 160, 59, DEEP},
+    {NP_TEST_PLAYING, 152, 87, DEEP},     {NP_TEST_PLAYING, 99, 87, DEEP},
+    {NP_TEST_PLAYING, 110, 87, LABEL},    {NP_TEST_PLAYING, 115, 87, TAPE},
+    {NP_TEST_PLAYING, 235, 87, TAPE},     {NP_TEST_PLAYING, 160, 135, SHELL_HI},
     {NP_TEST_PLAYING, 103, 143, DEEP},    {NP_TEST_PLAYING, 90, 154, DEEP},
     {NP_TEST_PLAYING, 90, 158, AMBER},    {NP_TEST_PLAYING, 200, 158, TAPE},
-    {NP_TEST_PAUSED, 152, 99, LABEL},     {NP_TEST_PAUSED, 160, 99, DEEP},
+    {NP_TEST_PAUSED, 152, 87, LABEL},     {NP_TEST_PAUSED, 160, 87, DEEP},
     {NP_TEST_SCRUBBING, 90, 158, LABEL},  {NP_TEST_SCRUBBING, 200, 158, LABEL},
     {NP_TEST_SCRUBBING, 230, 158, TAPE},  {NP_TEST_VOLUME, 140, 158, LABEL},
-    {NP_TEST_VOLUME, 141, 158, TAPE},     {NP_TEST_BADGE, 167, 99, LABEL},
-    {NP_TEST_NO_COVER, 90, 158, AMBER},   {NP_TEST_PLAYING, 65, 81, AMBER},
-    {NP_TEST_PLAYING, 66, 80, AMBER},     {NP_TEST_PLAYING, 80, 129, SHELL},
+    {NP_TEST_VOLUME, 141, 158, TAPE},     {NP_TEST_BADGE, 167, 87, LABEL},
+    {NP_TEST_NO_COVER, 90, 158, AMBER},   {NP_TEST_PLAYING, 65, 56, AMBER},
+    {NP_TEST_PLAYING, 66, 55, AMBER},     {NP_TEST_PLAYING, 80, 129, SHELL},
     {NP_TEST_PLAYING, 90, 129, SHELL_HI},
 };
 
@@ -76,16 +78,16 @@ typedef struct TextProbe {
 } TextProbe;
 
 static const TextProbe LANDSCAPE_TEXT[] = {
-    {NP_TEST_PLAYING, {33, 33, 253, 20}, INK, INK_SOFT},
-    {NP_TEST_PLAYING, {33, 56, 253, 20}, INK_SOFT, INK},
-    {NP_TEST_PLAYING, {254, 84, 40, 31}, LABEL, INK},
+    {NP_TEST_PLAYING, {33, 8, 253, 20}, INK, INK_SOFT},
+    {NP_TEST_PLAYING, {33, 31, 253, 20}, INK_SOFT, INK},
+    {NP_TEST_PLAYING, {254, 59, 40, 56}, LABEL, INK},
 };
 
 static const TextProbe PORTRAIT_TEXT[] = {
-    {NP_TEST_PLAYING, {16, 111, 137, 20}, INK, INK_SOFT},
-    {NP_TEST_PLAYING, {16, 134, 137, 20}, INK_SOFT, INK},
-    {NP_TEST_PLAYING, {16, 157, 137, 20}, INK_SOFT, INK},
-    {NP_TEST_PLAYING, {16, 181, 137, 16}, INK_SOFT, INK},
+    {NP_TEST_PLAYING, {16, 151, 137, 20}, INK, INK_SOFT},
+    {NP_TEST_PLAYING, {16, 174, 137, 20}, INK_SOFT, INK},
+    {NP_TEST_PLAYING, {16, 197, 137, 20}, INK_SOFT, INK},
+    {NP_TEST_PLAYING, {16, 221, 137, 16}, INK_SOFT, INK},
     {NP_TEST_PLAYING, {100, 10, 44, 16}, INK_SOFT, INK},
 };
 
@@ -108,7 +110,7 @@ static int count_in(const Color *target, NpTestLayout layout, Rect box, Color co
 
 static int top_of(NpTestLayout layout)
 {
-    return layout.area.y + (layout.area.height - CARD_HEIGHT) / 2;
+    return layout.area.y + PORTRAIT_TOP;
 }
 
 static void the_reels_turn_counter_clockwise(void)
@@ -117,11 +119,11 @@ static void the_reels_turn_counter_clockwise(void)
         np_test_scene(NP_FACE_CASSETTE, NP_TEST_LAYOUTS[LANDSCAPE], NP_TEST_PLAYING);
     scene.frame.tick = 0;
     draw(scene, pixels);
-    CHECK_EQUAL(DEEP, np_test_pixel(pixels, scene.layout, 93, 99));
+    CHECK_EQUAL(DEEP, np_test_pixel(pixels, scene.layout, 91, 87));
     scene.frame.tick = 8;
     draw(scene, pixels);
-    CHECK_EQUAL(LABEL, np_test_pixel(pixels, scene.layout, 93, 99));
-    CHECK_EQUAL(DEEP, np_test_pixel(pixels, scene.layout, 105, 99));
+    CHECK_EQUAL(LABEL, np_test_pixel(pixels, scene.layout, 91, 87));
+    CHECK_EQUAL(DEEP, np_test_pixel(pixels, scene.layout, 107, 87));
 }
 
 static void the_backdrop_colour_is_at_the_corner_of_the_area(void)
@@ -153,7 +155,7 @@ static void landscape_pixels_show_every_state(void)
 
 static void portrait_pixels_show_every_state_at_both_status_bar_heights(void)
 {
-    for (int layout = PORTRAIT; layout <= LARGE; layout++) {
+    for (int layout = PORTRAIT; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         check_probes(PORTRAIT_PROBES, sizeof PORTRAIT_PROBES / sizeof PORTRAIT_PROBES[0], layout);
     }
 }
@@ -217,7 +219,7 @@ static int brighter_than(const Color *target, NpTestLayout layout, Rect box, Col
 static void feedback_is_set_in_the_strong_ink(void)
 {
     static const NpTestState FEEDBACK[] = {NP_TEST_VOLUME, NP_TEST_SCRUBBING};
-    static const Rect LINES[] = {{33, 56, 253, 20}, {16, 181, 137, 16}};
+    static const Rect LINES[] = {{33, 31, 253, 20}, {16, 221, 137, 16}};
     for (int layout = LANDSCAPE; layout <= PORTRAIT; layout++) {
         NpTestLayout shape = NP_TEST_LAYOUTS[layout];
         Rect box = LINES[layout];
@@ -233,8 +235,8 @@ static void feedback_is_set_in_the_strong_ink(void)
 static void portrait_times_are_set_in_the_strong_ink(void)
 {
     NpTestLayout shape = NP_TEST_LAYOUTS[PORTRAIT];
-    Rect artist = {16, top_for(PORTRAIT) + 134, 137, 20};
-    Rect times = {16, top_for(PORTRAIT) + 198, 137, 16};
+    Rect artist = {16, top_for(PORTRAIT) + 174, 137, 20};
+    Rect times = {16, top_for(PORTRAIT) + 238, 137, 16};
     draw(worded(PORTRAIT, NP_TEST_PLAYING, "?"), pixels);
     CHECK(darkest_in(pixels, shape, times) < darkest_in(pixels, shape, artist));
 }
@@ -255,14 +257,14 @@ static void landscape_text_uses_the_ink_paired_with_its_background(void)
 
 static void portrait_text_uses_the_ink_paired_with_its_background(void)
 {
-    for (int layout = PORTRAIT; layout <= LARGE; layout++) {
+    for (int layout = PORTRAIT; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         check_text(PORTRAIT_TEXT, sizeof PORTRAIT_TEXT / sizeof PORTRAIT_TEXT[0], layout);
     }
 }
 
-static void portrait_cards_follow_the_status_bar_height(void)
+static void the_portrait_card_hangs_below_the_cassette(void)
 {
-    for (int layout = PORTRAIT; layout <= LARGE; layout++) {
+    for (int layout = PORTRAIT; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestLayout shape = NP_TEST_LAYOUTS[layout];
         int top = top_of(shape);
         int card = top + CARD_OFFSET;
@@ -276,16 +278,6 @@ static void portrait_cards_follow_the_status_bar_height(void)
         CHECK_EQUAL(AMBER, np_test_pixel(pixels, shape, 30, top + 32));
         CHECK_EQUAL(TAPE, np_test_pixel(pixels, shape, 100, top + 93));
     }
-}
-
-static void the_large_status_bar_moves_the_cassette_down_three_rows(void)
-{
-    draw(np_test_scene(NP_FACE_CASSETTE, NP_TEST_LAYOUTS[PORTRAIT], NP_TEST_PLAYING), pixels);
-    draw(np_test_scene(NP_FACE_CASSETTE, NP_TEST_LAYOUTS[LARGE], NP_TEST_PLAYING), other);
-    CHECK_EQUAL(71, top_of(NP_TEST_LAYOUTS[PORTRAIT]));
-    CHECK_EQUAL(74, top_of(NP_TEST_LAYOUTS[LARGE]));
-    CHECK_EQUAL(np_test_pixel(pixels, NP_TEST_LAYOUTS[PORTRAIT], 80, 71),
-                np_test_pixel(other, NP_TEST_LAYOUTS[LARGE], 80, 74));
 }
 
 static void paused_portrait_shows_the_pause_icon_between_the_reels(void)
@@ -304,7 +296,7 @@ static void a_badge_replaces_the_pause_icon_while_paused(void)
     NpTestScene scene = np_test_scene(NP_FACE_CASSETTE, shape, NP_TEST_PAUSED);
     scene.frame.feedback = NOW_PLAYING_FEEDBACK_PLAY;
     draw(scene, pixels);
-    CHECK_EQUAL(LABEL, np_test_pixel(pixels, shape, 160, 99));
+    CHECK_EQUAL(LABEL, np_test_pixel(pixels, shape, 160, 87));
 }
 
 static int differing_rows(NpTestLayout layout, int *first, int *last)
@@ -327,9 +319,9 @@ static int differing_rows(NpTestLayout layout, int *first, int *last)
 
 static void the_teeth_are_the_only_thing_that_moves_between_ticks(void)
 {
-    for (int layout = LANDSCAPE; layout <= LARGE; layout++) {
+    for (int layout = LANDSCAPE; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestLayout shape = NP_TEST_LAYOUTS[layout];
-        int centre = layout == LANDSCAPE ? 99 : top_of(shape) + 47;
+        int centre = layout == LANDSCAPE ? 87 : top_of(shape) + 47;
         for (int step = 0; step < STEPS; step++) {
             NpTestScene scene = np_test_scene(NP_FACE_CASSETTE, shape, NP_TEST_PLAYING);
             scene.frame.tick += (uint32_t)step;
@@ -359,7 +351,7 @@ static void the_teeth_come_back_after_a_whole_turn(void)
 
 static void a_playing_frame_ignores_the_clock_when_the_title_fits(void)
 {
-    for (int layout = LANDSCAPE; layout <= LARGE; layout++) {
+    for (int layout = LANDSCAPE; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestScene scene =
             np_test_scene(NP_FACE_CASSETTE, NP_TEST_LAYOUTS[layout], NP_TEST_PLAYING);
         scene.frame.song = "AB";
@@ -378,8 +370,8 @@ static int tape_in(Rect half)
 
 static void the_packs_move_from_the_left_reel_to_the_right_one(void)
 {
-    static const Rect LEFT = {67, 82, 90, 35};
-    static const Rect RIGHT = {163, 82, 90, 35};
+    static const Rect LEFT = {67, 57, 90, 60};
+    static const Rect RIGHT = {163, 57, 90, 60};
     int left = 1 << 20;
     int right = 0;
     for (int step = 0; step <= STEPS; step++) {
@@ -392,6 +384,43 @@ static void the_packs_move_from_the_left_reel_to_the_right_one(void)
         left = tape_in(LEFT);
         right = tape_in(RIGHT);
     }
+}
+
+static void the_packs_move_across_the_whole_queue_with_each_track_an_equal_share(void)
+{
+    static const Rect LEFT = {67, 57, 90, 60};
+    static const Rect RIGHT = {163, 57, 90, 60};
+    NpTestScene scene =
+        np_test_scene(NP_FACE_CASSETTE, NP_TEST_LAYOUTS[LANDSCAPE], NP_TEST_PLAYING);
+    scene.frame.shown_ms = scene.status.duration_ms;
+    scene.status.place = (PlayQueuePlace){1, 4};
+    draw(scene, pixels);
+    int first_left = tape_in(LEFT);
+    int first_right = tape_in(RIGHT);
+    scene.frame.shown_ms = 0;
+    scene.status.place = (PlayQueuePlace){2, 4};
+    draw(scene, pixels);
+    CHECK_EQUAL(first_left, tape_in(LEFT));
+    CHECK_EQUAL(first_right, tape_in(RIGHT));
+    scene.status.place = (PlayQueuePlace){4, 4};
+    draw(scene, pixels);
+    CHECK(tape_in(LEFT) < first_left);
+    CHECK(tape_in(RIGHT) > first_right);
+}
+
+static void shuffled_songs_keep_the_tape_on_the_left_reel(void)
+{
+    NpTestScene scene =
+        np_test_scene(NP_FACE_CASSETTE, NP_TEST_LAYOUTS[LANDSCAPE], NP_TEST_PLAYING);
+    scene.status.place = (PlayQueuePlace){1, 4};
+    scene.frame.shown_ms = 0;
+    draw(scene, pixels);
+    int left = tape_in((Rect){67, 57, 90, 60});
+    scene.status.shuffle = SHUFFLE_SONGS;
+    scene.status.place = (PlayQueuePlace){4, 4};
+    scene.frame.shown_ms = scene.status.duration_ms;
+    draw(scene, pixels);
+    CHECK_EQUAL(left, tape_in((Rect){67, 57, 90, 60}));
 }
 
 static void the_tape_fill_grows_with_progress(void)
@@ -416,14 +445,14 @@ static void an_unknown_duration_keeps_the_left_pack_full_and_the_tape_empty(void
     NpTestScene scene = np_test_scene(NP_FACE_CASSETTE, shape, NP_TEST_PLAYING);
     scene.status.duration_ms = 0;
     draw(scene, pixels);
-    CHECK_EQUAL(TAPE, np_test_pixel(pixels, shape, 99 + 24, 99));
-    CHECK_EQUAL(DEEP, np_test_pixel(pixels, shape, 219 + 14, 99));
+    CHECK_EQUAL(TAPE, np_test_pixel(pixels, shape, 99 + 30, 87));
+    CHECK_EQUAL(DEEP, np_test_pixel(pixels, shape, 219 + 20, 87));
     CHECK_EQUAL(TAPE, np_test_pixel(pixels, shape, 90, 158));
 }
 
 static void the_pack_edges_stay_on_whole_pixels_for_seconds(void)
 {
-    static const Rect WINDOW = {67, 82, 185, 35};
+    static const Rect WINDOW = {67, 57, 185, 60};
     NpTestScene scene =
         np_test_scene(NP_FACE_CASSETTE, NP_TEST_LAYOUTS[LANDSCAPE], NP_TEST_PLAYING);
     draw(scene, pixels);
@@ -441,7 +470,7 @@ static void the_pack_edges_stay_on_whole_pixels_for_seconds(void)
 
 static void the_cover_is_never_drawn(void)
 {
-    for (int layout = LANDSCAPE; layout <= LARGE; layout++) {
+    for (int layout = LANDSCAPE; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestScene scene =
             np_test_scene(NP_FACE_CASSETTE, NP_TEST_LAYOUTS[layout], NP_TEST_PLAYING);
         draw(scene, pixels);
@@ -456,7 +485,7 @@ static void the_letter_a_is_drawn_in_the_face_colours(void)
 {
     NpTestLayout land = NP_TEST_LAYOUTS[LANDSCAPE];
     draw(np_test_scene(NP_FACE_CASSETTE, land, NP_TEST_PLAYING), pixels);
-    CHECK(count_in(pixels, land, (Rect){25, 84, 40, 31}, LABEL) > 0);
+    CHECK(count_in(pixels, land, (Rect){25, 59, 40, 56}, LABEL) > 0);
     NpTestLayout port = NP_TEST_LAYOUTS[PORTRAIT];
     draw(np_test_scene(NP_FACE_CASSETTE, port, NP_TEST_PLAYING), pixels);
     CHECK(count_in(pixels, port, (Rect){25, top_of(port) + 6, 14, 20}, RED) > 0);
@@ -466,7 +495,7 @@ static void the_title_changes_only_the_pixels_inside_its_line(void)
 {
     for (int layout = LANDSCAPE; layout <= PORTRAIT; layout++) {
         NpTestLayout shape = NP_TEST_LAYOUTS[layout];
-        Rect line = layout == LANDSCAPE ? (Rect){33, 33, 253, 20}
+        Rect line = layout == LANDSCAPE ? (Rect){33, 8, 253, 20}
                                         : (Rect){16, top_of(shape) + CARD_OFFSET + 3, 137, 20};
         NpTestScene scene = np_test_scene(NP_FACE_CASSETTE, shape, NP_TEST_PLAYING);
         scene.frame.song = "";
@@ -484,6 +513,50 @@ static void the_title_changes_only_the_pixels_inside_its_line(void)
     }
 }
 
+static bool counter_same(NpTestLayout shape)
+{
+    int top = top_of(shape) + COUNTER_OFFSET;
+    for (int y = top; y < top + 32; y++) {
+        for (int x = 0; x < shape.width; x++) {
+            if (np_test_pixel(pixels, shape, x, y) != np_test_pixel(other, shape, x, y)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static void the_counter_holds_still_then_turns_its_last_drum(void)
+{
+    NpTestLayout shape = NP_TEST_LAYOUTS[PORTRAIT];
+    NpTestScene scene = np_test_scene(NP_FACE_CASSETTE, shape, NP_TEST_PLAYING);
+    scene.frame.shown_ms = 0;
+    draw(scene, pixels);
+    CHECK_EQUAL(SHELL, np_test_pixel(pixels, shape, 85, top_of(shape) + COUNTER_OFFSET + 2));
+    scene.frame.shown_ms = 1000;
+    draw(scene, other);
+    CHECK(counter_same(shape));
+    scene.frame.shown_ms = COUNTER_GAP_MS;
+    draw(scene, other);
+    CHECK(!counter_same(shape));
+}
+
+static void the_counter_slows_down_as_the_tape_builds_up(void)
+{
+    NpTestLayout shape = NP_TEST_LAYOUTS[PORTRAIT];
+    NpTestScene scene = np_test_scene(NP_FACE_CASSETTE, shape, NP_TEST_PLAYING);
+    scene.frame.shown_ms = 0;
+    draw(scene, pixels);
+    scene.frame.shown_ms = COUNTER_GAP_MS;
+    draw(scene, other);
+    CHECK(!counter_same(shape));
+    scene.frame.shown_ms = TEN_MINUTES_MS;
+    draw(scene, pixels);
+    scene.frame.shown_ms = TEN_MINUTES_MS + COUNTER_GAP_MS;
+    draw(scene, other);
+    CHECK(counter_same(shape));
+}
+
 int main(void)
 {
     static const TestCase cases[] = {
@@ -496,20 +569,23 @@ int main(void)
         TEST_CASE(feedback_is_set_in_the_strong_ink),
         TEST_CASE(portrait_times_are_set_in_the_strong_ink),
         TEST_CASE(landscape_times_are_set_in_the_light_ink_on_the_shell),
-        TEST_CASE(portrait_cards_follow_the_status_bar_height),
-        TEST_CASE(the_large_status_bar_moves_the_cassette_down_three_rows),
+        TEST_CASE(the_portrait_card_hangs_below_the_cassette),
         TEST_CASE(paused_portrait_shows_the_pause_icon_between_the_reels),
         TEST_CASE(a_badge_replaces_the_pause_icon_while_paused),
         TEST_CASE(the_teeth_are_the_only_thing_that_moves_between_ticks),
         TEST_CASE(the_teeth_come_back_after_a_whole_turn),
         TEST_CASE(a_playing_frame_ignores_the_clock_when_the_title_fits),
         TEST_CASE(the_packs_move_from_the_left_reel_to_the_right_one),
+        TEST_CASE(the_packs_move_across_the_whole_queue_with_each_track_an_equal_share),
+        TEST_CASE(shuffled_songs_keep_the_tape_on_the_left_reel),
         TEST_CASE(the_tape_fill_grows_with_progress),
         TEST_CASE(an_unknown_duration_keeps_the_left_pack_full_and_the_tape_empty),
         TEST_CASE(the_pack_edges_stay_on_whole_pixels_for_seconds),
         TEST_CASE(the_cover_is_never_drawn),
         TEST_CASE(the_letter_a_is_drawn_in_the_face_colours),
         TEST_CASE(the_title_changes_only_the_pixels_inside_its_line),
+        TEST_CASE(the_counter_holds_still_then_turns_its_last_drum),
+        TEST_CASE(the_counter_slows_down_as_the_tape_builds_up),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

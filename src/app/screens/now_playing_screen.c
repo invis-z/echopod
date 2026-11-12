@@ -510,13 +510,33 @@ static ScreenAction handle_key(void *context, KeyEvent event, uint32_t now_ms)
     return action;
 }
 
+static uint8_t face_of(const NowPlayingScreen *now_playing)
+{
+    return now_playing->config.options[OPTION_NOW_PLAYING_FACE];
+}
+
+static const NowPlayingFaces *face_code(const NowPlayingScreen *now_playing)
+{
+    if (now_playing->config.options == NULL || !now_playing->status.has_track ||
+        face_of(now_playing) == NP_FACE_STANDARD || face_of(now_playing) >= NP_FACE_COUNT) {
+        return NULL;
+    }
+    return hal_system_load_faces();
+}
+
+static void refresh_face(NowPlayingScreen *now_playing, uint32_t now_ms)
+{
+    refresh(now_playing, now_ms);
+    now_playing->screen.full_screen = face_code(now_playing) != NULL;
+}
+
 static void enter(void *context, uint32_t now_ms)
 {
     NowPlayingScreen *now_playing = context;
     now_playing->has_text = false;
     now_playing->scrubbing = false;
     now_playing->feedback = NOW_PLAYING_FEEDBACK_NONE;
-    refresh(now_playing, now_ms);
+    refresh_face(now_playing, now_ms);
 }
 
 static bool showing(const NowPlayingScreen *now_playing, NowPlayingFeedback feedback)
@@ -553,7 +573,7 @@ const char *now_playing_lyric(const NowPlayingScreen *now_playing)
 static void update(void *context, uint32_t now_ms)
 {
     NowPlayingScreen *now_playing = context;
-    refresh(now_playing, now_ms);
+    refresh_face(now_playing, now_ms);
     follow_lyrics(now_playing, now_ms);
     if (now_playing->config.covers != NULL && now_playing->status.has_track) {
         cover_cache_load_full(now_playing->config.covers, now_playing->album_index);
@@ -895,26 +915,6 @@ static void draw_nothing_playing(const Theme *theme, Canvas *canvas)
     label_draw(canvas, style, (Label){.area = area, .text = message});
 }
 
-static uint8_t face_of(const NowPlayingScreen *now_playing)
-{
-    return now_playing->config.options[OPTION_NOW_PLAYING_FACE];
-}
-
-static const NowPlayingFaces *face_code(const NowPlayingScreen *now_playing)
-{
-    if (now_playing->config.options == NULL || !now_playing->status.has_track ||
-        face_of(now_playing) == NP_FACE_STANDARD || face_of(now_playing) >= NP_FACE_COUNT) {
-        return NULL;
-    }
-    return hal_system_load_faces();
-}
-
-const ThemeColors *now_playing_face_colors(const NowPlayingScreen *now_playing)
-{
-    const NowPlayingFaces *faces = face_code(now_playing);
-    return faces != NULL ? faces->chrome[face_of(now_playing)] : NULL;
-}
-
 static NowPlayingFeedback badge_of(const NowPlayingScreen *now_playing)
 {
     NowPlayingFeedback feedback = now_playing->feedback;
@@ -956,7 +956,7 @@ static void frame_of(const NowPlayingScreen *now_playing, NowPlayingFrame *frame
     frame->artist = now_playing->artist;
     frame->album = now_playing->album;
     frame->codec = now_playing_codec_name(now_playing->status.format.codec);
-    frame->area = theme_content_area(theme);
+    frame->area = (Rect){0, 0, theme->metrics.screen_width, theme->metrics.screen_height};
     frame_state(now_playing, frame);
     frame->cover = (Image){0};
     current_cover(now_playing, &frame->cover);
@@ -967,7 +967,9 @@ static void request_tick(const NowPlayingScreen *now_playing)
 {
     const PlayerStatus *status = &now_playing->status;
     if (status->state == PLAYER_PLAYING) {
-        marquee_frame_request(NP_FACE_TICK_MS - status->position_ms % NP_FACE_TICK_MS);
+        uint32_t period =
+            face_of(now_playing) == NP_FACE_TURNTABLE ? NP_FACE_SMOOTH_TICK_MS : NP_FACE_TICK_MS;
+        marquee_frame_request(period - status->position_ms % period);
     }
 }
 
@@ -975,9 +977,6 @@ static void draw_face(const NowPlayingScreen *now_playing, const NowPlayingFaces
                       Canvas *canvas)
 {
     char texts[FACE_TEXTS_CAPACITY];
-    Theme dressed = *now_playing->config.theme;
-    dressed.colors = *faces->chrome[face_of(now_playing)];
-    header_draw(canvas, &dressed, now_playing->screen.title);
     NowPlayingFrame frame;
     frame_of(now_playing, &frame, texts);
     request_tick(now_playing);

@@ -9,7 +9,7 @@
 enum {
 
     LANDSCAPE = 0,
-    PORTRAIT_CARD_HEIGHT = 217,
+    PORTRAIT_CASSETTE_TOP = 31,
     LONG_SIDE = 320
 };
 
@@ -39,84 +39,48 @@ static Color text_pixels[NP_TEST_PIXELS];
 static Color blank_pixels[NP_TEST_PIXELS];
 
 static const Spot CASSETTE_LANDSCAPE[] = {
-    {"title", NP_TEST_PLAYING, ABSOLUTE, {33, 33, 253, 20}},
-    {"artist", NP_TEST_PLAYING, ABSOLUTE, {33, 56, 253, 20}},
-    {"feedback", NP_TEST_VOLUME, ABSOLUTE, {33, 56, 253, 20}},
+    {"title", NP_TEST_PLAYING, ABSOLUTE, {33, 8, 253, 20}},
+    {"artist", NP_TEST_PLAYING, ABSOLUTE, {33, 31, 253, 20}},
+    {"feedback", NP_TEST_VOLUME, ABSOLUTE, {33, 31, 253, 20}},
     {"elapsed", NP_TEST_PLAYING, ABSOLUTE, {17, 129, 62, 16}},
     {"remaining", NP_TEST_PLAYING, ABSOLUTE, {241, 129, 62, 16}},
-    {"codec", NP_TEST_PLAYING, ABSOLUTE, {254, 84, 40, 31}},
-    {"letter", NP_TEST_PLAYING, ABSOLUTE, {25, 84, 40, 31}},
+    {"codec", NP_TEST_PLAYING, ABSOLUTE, {254, 59, 40, 56}},
+    {"letter", NP_TEST_PLAYING, ABSOLUTE, {25, 59, 40, 56}},
 };
 
 static const Spot CASSETTE_PORTRAIT[] = {
-    {"title", NP_TEST_PLAYING, FROM_CARD, {16, 111, 137, 20}},
-    {"artist", NP_TEST_PLAYING, FROM_CARD, {16, 134, 137, 20}},
-    {"album", NP_TEST_PLAYING, FROM_CARD, {16, 157, 137, 20}},
-    {"stream", NP_TEST_PLAYING, FROM_CARD, {16, 181, 137, 16}},
-    {"feedback", NP_TEST_VOLUME, FROM_CARD, {16, 181, 137, 16}},
-    {"elapsed", NP_TEST_PLAYING, FROM_CARD, {16, 198, 60, 16}},
-    {"remaining", NP_TEST_PLAYING, FROM_CARD, {93, 198, 60, 16}},
+    {"title", NP_TEST_PLAYING, FROM_CARD, {16, 151, 137, 20}},
+    {"artist", NP_TEST_PLAYING, FROM_CARD, {16, 174, 137, 20}},
+    {"album", NP_TEST_PLAYING, FROM_CARD, {16, 197, 137, 20}},
+    {"stream", NP_TEST_PLAYING, FROM_CARD, {16, 221, 137, 16}},
+    {"feedback", NP_TEST_VOLUME, FROM_CARD, {16, 221, 137, 16}},
+    {"elapsed", NP_TEST_PLAYING, FROM_CARD, {16, 238, 60, 16}},
+    {"remaining", NP_TEST_PLAYING, FROM_CARD, {93, 238, 60, 16}},
     {"codec", NP_TEST_PLAYING, FROM_CARD, {100, 10, 44, 16}},
     {"letter", NP_TEST_PLAYING, FROM_CARD, {25, 6, 14, 20}},
 };
 
-static const Spot VU_LANDSCAPE[] = {
-    {"title", NP_TEST_PLAYING, ABSOLUTE, {10, 102, 300, 20}},
-    {"artist", NP_TEST_PLAYING, ABSOLUTE, {10, 121, 300, 20}},
-    {"feedback", NP_TEST_VOLUME, ABSOLUTE, {10, 121, 300, 20}},
-    {"elapsed", NP_TEST_PLAYING, ABSOLUTE, {10, 147, 52, 16}},
-    {"remaining", NP_TEST_PLAYING, ABSOLUTE, {262, 147, 48, 16}},
-};
-
-static const Spot VU_PORTRAIT[] = {
-    {"title", NP_TEST_PLAYING, ABSOLUTE, {10, 174, 150, 22}},
-    {"artist", NP_TEST_PLAYING, ABSOLUTE, {10, 196, 150, 22}},
-    {"album", NP_TEST_PLAYING, ABSOLUTE, {10, 218, 150, 22}},
-    {"format", NP_TEST_PLAYING, ABSOLUTE, {10, 244, 150, 16}},
-    {"feedback", NP_TEST_VOLUME, ABSOLUTE, {10, 244, 150, 16}},
-    {"modes", NP_TEST_PLAYING, ABSOLUTE, {10, 278, 150, 16}},
-    {"elapsed", NP_TEST_PLAYING, ABSOLUTE, {10, 302, 70, 16}},
-    {"remaining", NP_TEST_PLAYING, ABSOLUTE, {90, 302, 70, 16}},
-};
-
 static const Spot TURNTABLE_LANDSCAPE[] = {
-    {"title", NP_TEST_PLAYING, ABSOLUTE, {170, 28, 140, 22}},
-    {"artist", NP_TEST_PLAYING, ABSOLUTE, {170, 50, 140, 22}},
-    {"album", NP_TEST_PLAYING, ABSOLUTE, {170, 70, 140, 22}},
-    {"format", NP_TEST_PLAYING, ABSOLUTE, {170, 97, 140, 16}},
-    {"detail", NP_TEST_PLAYING, ABSOLUTE, {170, 116, 140, 16}},
-    {"modes", NP_TEST_PLAYING, ABSOLUTE, {170, 131, 140, 16}},
-    {"feedback", NP_TEST_VOLUME, ABSOLUTE, {170, 131, 140, 16}},
-    {"times", NP_TEST_PLAYING, ABSOLUTE, {170, 153, 70, 16}},
-    {"remaining", NP_TEST_PLAYING, ABSOLUTE, {240, 153, 70, 16}},
+    {"title", NP_TEST_PLAYING, ABSOLUTE, {192, 6, 120, 22}},
+    {"artist", NP_TEST_PLAYING, ABSOLUTE, {192, 28, 120, 22}},
+    {"album", NP_TEST_PLAYING, ABSOLUTE, {192, 48, 120, 22}},
+    {"format", NP_TEST_PLAYING, ABSOLUTE, {192, 97, 120, 16}},
+    {"detail", NP_TEST_PLAYING, ABSOLUTE, {192, 116, 120, 16}},
+    {"modes", NP_TEST_PLAYING, ABSOLUTE, {192, 131, 120, 16}},
+    {"feedback", NP_TEST_VOLUME, ABSOLUTE, {192, 131, 120, 16}},
+    {"times", NP_TEST_PLAYING, ABSOLUTE, {192, 153, 60, 16}},
+    {"remaining", NP_TEST_PLAYING, ABSOLUTE, {252, 153, 60, 16}},
 };
 
 static const Spot TURNTABLE_PORTRAIT[] = {
-    {"title", NP_TEST_PLAYING, FROM_AREA, {10, 144, 150, 22}},
-    {"artist", NP_TEST_PLAYING, FROM_AREA, {10, 166, 150, 22}},
-    {"album", NP_TEST_PLAYING, FROM_AREA, {10, 188, 150, 22}},
-    {"format", NP_TEST_PLAYING, FROM_AREA, {10, 212, 150, 16}},
+    {"title", NP_TEST_PLAYING, FROM_AREA, {10, 184, 150, 22}},
+    {"artist", NP_TEST_PLAYING, FROM_AREA, {10, 206, 150, 22}},
+    {"album", NP_TEST_PLAYING, FROM_AREA, {10, 228, 150, 22}},
+    {"format", NP_TEST_PLAYING, FROM_AREA, {10, 252, 150, 16}},
     {"modes", NP_TEST_PLAYING, ABSOLUTE, {10, 278, 150, 16}},
     {"feedback", NP_TEST_VOLUME, ABSOLUTE, {10, 278, 150, 16}},
     {"elapsed", NP_TEST_PLAYING, ABSOLUTE, {10, 302, 70, 16}},
     {"remaining", NP_TEST_PLAYING, ABSOLUTE, {90, 302, 70, 16}},
-};
-
-static const Spot LCD_LANDSCAPE[] = {
-    {"title", NP_TEST_PLAYING, ABSOLUTE, {12, 95, 296, 20}},
-    {"artist", NP_TEST_PLAYING, ABSOLUTE, {12, 117, 296, 20}},
-    {"info", NP_TEST_PLAYING, ABSOLUTE, {12, 149, 296, 15}},
-    {"feedback", NP_TEST_VOLUME, ABSOLUTE, {12, 149, 296, 15}},
-    {"codec", NP_TEST_PLAYING, ABSOLUTE, {250, 31, 58, 15}},
-};
-
-static const Spot LCD_PORTRAIT[] = {
-    {"title", NP_TEST_PLAYING, FROM_AREA, {10, 174, 150, 20}},
-    {"artist", NP_TEST_PLAYING, FROM_AREA, {10, 197, 150, 20}},
-    {"album", NP_TEST_PLAYING, FROM_AREA, {10, 217, 150, 20}},
-    {"info", NP_TEST_PLAYING, FROM_AREA, {10, 251, 150, 15}},
-    {"feedback", NP_TEST_VOLUME, FROM_AREA, {10, 251, 150, 15}},
-    {"codec", NP_TEST_PLAYING, FROM_AREA, {120, 24, 40, 15}},
 };
 
 #define COUNT(table) (sizeof(table) / sizeof((table)[0]))
@@ -171,7 +135,7 @@ static Rect placed(const Spot *spot, NpTestLayout layout)
     if (spot->base == FROM_AREA) {
         box.y += layout.area.y;
     } else if (spot->base == FROM_CARD) {
-        box.y += layout.area.y + (layout.area.height - PORTRAIT_CARD_HEIGHT) / 2;
+        box.y += layout.area.y + PORTRAIT_CASSETTE_TOP;
     }
     return box;
 }
@@ -245,22 +209,10 @@ static void cassette_text_reads_at_least_four_and_a_half_to_one(void)
                      CASSETTE_PORTRAIT, COUNT(CASSETTE_PORTRAIT)));
 }
 
-static void vu_text_reads_at_least_four_and_a_half_to_one(void)
-{
-    CHECK(face_reads(NP_FACE_VU_METERS, VU_LANDSCAPE, COUNT(VU_LANDSCAPE), VU_PORTRAIT,
-                     COUNT(VU_PORTRAIT)));
-}
-
 static void turntable_text_reads_at_least_four_and_a_half_to_one(void)
 {
     CHECK(face_reads(NP_FACE_TURNTABLE, TURNTABLE_LANDSCAPE, COUNT(TURNTABLE_LANDSCAPE),
                      TURNTABLE_PORTRAIT, COUNT(TURNTABLE_PORTRAIT)));
-}
-
-static void lcd_text_reads_at_least_four_and_a_half_to_one(void)
-{
-    CHECK(face_reads(NP_FACE_LCD, LCD_LANDSCAPE, COUNT(LCD_LANDSCAPE), LCD_PORTRAIT,
-                     COUNT(LCD_PORTRAIT)));
 }
 
 static void the_contrast_measure_follows_wcag(void)
@@ -275,9 +227,7 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(the_contrast_measure_follows_wcag),
         TEST_CASE(cassette_text_reads_at_least_four_and_a_half_to_one),
-        TEST_CASE(vu_text_reads_at_least_four_and_a_half_to_one),
         TEST_CASE(turntable_text_reads_at_least_four_and_a_half_to_one),
-        TEST_CASE(lcd_text_reads_at_least_four_and_a_half_to_one),
     };
     return test_run_all(cases, TEST_CASE_COUNT(cases));
 }

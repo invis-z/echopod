@@ -105,6 +105,19 @@ RIPPL_NP_FACES_CODE int shape_cosine(uint8_t angle)
     return shape_sine((uint8_t)(angle + QUARTER_TURN));
 }
 
+RIPPL_NP_FACES_CODE int shape_sine_fine(uint16_t fine)
+{
+    uint8_t angle = (uint8_t)(fine / SHAPE_FINE_STEPS);
+    int below = shape_sine(angle);
+    int above = shape_sine((uint8_t)(angle + 1));
+    return below + (above - below) * (fine % SHAPE_FINE_STEPS) / SHAPE_FINE_STEPS;
+}
+
+RIPPL_NP_FACES_CODE int shape_cosine_fine(uint16_t fine)
+{
+    return shape_sine_fine((uint16_t)(fine + QUARTER_TURN * SHAPE_FINE_STEPS));
+}
+
 RIPPL_NP_FACES_CODE uint32_t shape_isqrt(uint32_t value)
 {
     uint32_t root = 0;
@@ -127,6 +140,12 @@ RIPPL_NP_FACES_CODE Point shape_polar(Point centre, uint8_t angle, int radius)
 {
     return (Point){centre.x + round_div(radius * shape_sine(angle), SHAPE_UNIT),
                    centre.y - round_div(radius * shape_cosine(angle), SHAPE_UNIT)};
+}
+
+RIPPL_NP_FACES_CODE Point shape_polar_fine(Point centre, uint16_t fine, int radius)
+{
+    return (Point){centre.x + round_div(radius * shape_sine_fine(fine), SHAPE_UNIT),
+                   centre.y - round_div(radius * shape_cosine_fine(fine), SHAPE_UNIT)};
 }
 
 RIPPL_NP_FACES_CODE static void blend_at(Canvas *canvas, Point point, Color color, uint8_t alpha)
@@ -253,10 +272,8 @@ RIPPL_NP_FACES_CODE static Bounds axis_bounds(int factor, int low, int high, Bou
                     smaller(within.high, round_div(high, factor))};
 }
 
-RIPPL_NP_FACES_CODE static Bounds spoke_bounds(const ShapeSpoke *spoke, int y)
+RIPPL_NP_FACES_CODE static Bounds spoke_bounds(const ShapeSpoke *spoke, int sine, int cosine, int y)
 {
-    int sine = shape_sine(spoke->angle);
-    int cosine = shape_cosine(spoke->angle);
     int row = (y - spoke->pivot.y) * SHAPE_Q4;
     int half = spoke->width_q4 * SHAPE_UNIT / 2;
     Bounds along =
@@ -265,7 +282,8 @@ RIPPL_NP_FACES_CODE static Bounds spoke_bounds(const ShapeSpoke *spoke, int y)
     return axis_bounds(cosine, -half - row * sine, half - row * sine, along);
 }
 
-RIPPL_NP_FACES_CODE void shape_spoke(Canvas *canvas, const ShapeSpoke *spoke, Color color)
+RIPPL_NP_FACES_CODE static void spoke_draw(Canvas *canvas, const ShapeSpoke *spoke, int sine,
+                                           int cosine, Color color)
 {
     int reach =
         larger(magnitude(spoke->from), magnitude(spoke->to)) + spoke->width_q4 / SHAPE_Q4 + 1;
@@ -273,11 +291,22 @@ RIPPL_NP_FACES_CODE void shape_spoke(Canvas *canvas, const ShapeSpoke *spoke, Co
     int bottom = smaller(spoke->pivot.y + reach + 1, canvas->clip.y + canvas->clip.height);
     int origin = spoke->pivot.x * SHAPE_Q4 + HALF_PIXEL_Q4;
     for (int y = top; y < bottom; y++) {
-        Bounds row = spoke_bounds(spoke, y);
+        Bounds row = spoke_bounds(spoke, sine, cosine, y);
         if (row.high > row.low) {
             shape_span(canvas, span_of(y, origin + row.low, origin + row.high), color);
         }
     }
+}
+
+RIPPL_NP_FACES_CODE void shape_spoke(Canvas *canvas, const ShapeSpoke *spoke, Color color)
+{
+    spoke_draw(canvas, spoke, shape_sine(spoke->angle), shape_cosine(spoke->angle), color);
+}
+
+RIPPL_NP_FACES_CODE void shape_spoke_fine(Canvas *canvas, const ShapeSpoke *spoke, uint16_t fine,
+                                          Color color)
+{
+    spoke_draw(canvas, spoke, shape_sine_fine(fine), shape_cosine_fine(fine), color);
 }
 
 RIPPL_NP_FACES_CODE static void run_draw(const DigitPen *pen, Run run, Color color)

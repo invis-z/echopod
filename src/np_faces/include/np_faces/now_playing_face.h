@@ -12,6 +12,7 @@
 
 enum {
     NP_FACE_TICK_MS = 100,
+    NP_FACE_SMOOTH_TICK_MS = 50,
     NP_FACES_MAGIC = 0x46504E45u
 };
 
@@ -50,5 +51,4 @@ typedef struct NowPlayingFrame {
 typedef struct NowPlayingFaces {
     uint32_t magic;
     void (*draw)(const NowPlayingFrame *frame, Canvas *canvas);
-    const ThemeColors *chrome[NP_FACE_COUNT];
 } NowPlayingFaces;

@@ -18,8 +18,6 @@
 
 enum {
     Q4 = SHAPE_Q4,
-    CENTRE_X = 77,
-    CENTRE_DROP = 73,
     ARM_DX = 75,
     ARM_DY = -47,
     LAMP_DX = 80,
@@ -31,10 +29,10 @@ enum {
     FRACTION_BITS = 8,
     FRACTION_ONE = 1 << FRACTION_BITS,
     FRACTION_MASK = FRACTION_ONE - 1,
-    GROOVE_FIRST = 45,
+    GROOVE_FIRST = 38,
     GROOVE_STEP = 7,
-    GROOVE_COUNT = 3,
-    TURN_STEPS = 18,
+    GROOVE_COUNT = 4,
+    TURN_MS = 3600,
     SPINDLE = 48,
     BADGE_DISC = 320,
     BADGE_SIDE = 18,
@@ -45,6 +43,7 @@ enum {
     HALF_TURN = 128,
     LINE_BIG = 22,
     LINE_SMALL = 16,
+    CODEC_LIFT = 19,
     BAR_HEIGHT = 3,
     PIXEL_CENTRE = 8,
     LAMP_RADIUS = 48
@@ -54,7 +53,19 @@ typedef struct Deck {
     Canvas *canvas;
     const NowPlayingFrame *frame;
     Point centre;
+    int scale;
+    uint8_t turn;
+    Point lamp;
 } Deck;
+
+typedef struct Place {
+    int16_t x;
+    int16_t y;
+    int16_t scale;
+    uint8_t turn;
+    int8_t lamp_dx;
+    int8_t lamp_dy;
+} Place;
 
 typedef struct Rows {
     int x;
@@ -79,9 +90,26 @@ typedef struct Slot {
 } Slot;
 
 RIPPL_NP_FACES_DATA static const Rows LANDSCAPE_ROWS = {
-    170, 140, FACE_ALIGN_LEFT, 4, 26, 46, 73, 92, 107, 124, 129, true};
+    192, 120, FACE_ALIGN_LEFT, 6, 28, 48, 97, 116, 131, 148, 153, true};
 RIPPL_NP_FACES_DATA static const Rows PORTRAIT_ROWS = {
-    10, 150, FACE_ALIGN_CENTRE, 144, 166, 188, 212, 0, -42, -23, -18, false};
+    10, 150, FACE_ALIGN_CENTRE, 184, 206, 228, 252, 0, -42, -23, -18, false};
+RIPPL_NP_FACES_DATA static const Place LANDSCAPE_PLACE = {82, 85, 298, 0, LAMP_DX, LAMP_DY};
+RIPPL_NP_FACES_DATA static const Place PORTRAIT_PLACE = {85, 103, 298, 192, 61, 61};
+
+RIPPL_NP_FACES_CODE static int sized(const Deck *deck, int value)
+{
+    return (value * deck->scale + 128) >> 8;
+}
+
+RIPPL_NP_FACES_CODE static Point offset(const Deck *deck, int dx, int dy)
+{
+    int x = sized(deck, dx);
+    int y = sized(deck, dy);
+    if (deck->turn != 0) {
+        return (Point){deck->centre.x + y, deck->centre.y - x};
+    }
+    return (Point){deck->centre.x + x, deck->centre.y + y};
+}
 
 RIPPL_NP_FACES_CODE static ShapeRing ring_of(Point at, int outer, int inner)
 {
@@ -99,21 +127,16 @@ RIPPL_NP_FACES_CODE static void dot(Canvas *canvas, Point at, int radius, Color 
     shape_ring(canvas, ring_of(at, radius, 0), color);
 }
 
-RIPPL_NP_FACES_CODE static void spoke(Canvas *canvas, ShapeSpoke geometry, Color color)
-{
-    shape_spoke(canvas, &geometry, color);
-}
-
 RIPPL_NP_FACES_CODE static void plate(const Deck *deck)
 {
     canvas_fill_gradient(deck->canvas, deck->frame->area, WALNUT_TOP, WALNUT_BOTTOM);
-    ring(deck, RIM_OUTER * Q4, RIM_INNER * Q4, ALU);
-    ring(deck, RIM_INNER * Q4, 0, VINYL);
+    ring(deck, sized(deck, RIM_OUTER * Q4), sized(deck, RIM_INNER * Q4), ALU);
+    ring(deck, sized(deck, RIM_INNER * Q4), 0, VINYL);
 }
 
 RIPPL_NP_FACES_CODE static uint8_t label_angle(const Deck *deck)
 {
-    return (uint8_t)(deck->frame->tick % TURN_STEPS * SHAPE_TURN / TURN_STEPS);
+    return (uint8_t)(deck->frame->status->position_ms % TURN_MS * SHAPE_TURN / TURN_MS);
 }
 
 RIPPL_NP_FACES_CODE static int clamped(int value, int limit)
@@ -137,7 +160,8 @@ RIPPL_NP_FACES_CODE static void turned_cover(const Deck *deck, Image cover, uint
 {
     int sine = shape_sine(angle);
     int cosine = shape_cosine(angle);
-    int span = 2 * LABEL_RADIUS;
+    int radius = sized(deck, LABEL_RADIUS);
+    int span = 2 * radius;
     int reach = span * SHAPE_UNIT;
     for (int row = 0; row < span; row++) {
         int dy = 2 * row + 1 - span;
@@ -146,14 +170,14 @@ RIPPL_NP_FACES_CODE static void turned_cover(const Deck *deck, Image cover, uint
             if (dx * dx + dy * dy <= span * span) {
                 int u = dx * cosine + dy * sine + reach;
                 int v = dy * cosine - dx * sine + reach;
-                Point at = {deck->centre.x - LABEL_RADIUS + column,
-                            deck->centre.y - LABEL_RADIUS + row};
+                Point at = {deck->centre.x - radius + 1 + column,
+                            deck->centre.y - radius + 1 + row};
                 cover_pixel(deck->canvas, at, cover,
                             (Point){u * cover.width / (2 * reach), v * cover.height / (2 * reach)});
             }
         }
     }
-    ring(deck, LABEL_MASK * Q4, LABEL_RADIUS * Q4, VINYL);
+    ring(deck, sized(deck, LABEL_MASK * Q4), radius * Q4, VINYL);
 }
 
 RIPPL_NP_FACES_CODE static int logo_level(int x, int y)
@@ -178,16 +202,19 @@ RIPPL_NP_FACES_CODE static void turned_logo(const Deck *deck, uint8_t angle)
 {
     int sine = shape_sine(angle);
     int cosine = shape_cosine(angle);
-    int side = RIPPL_LOGO_LABEL.side;
-    int middle = side * FRACTION_ONE / 2 - FRACTION_ONE / 2;
+    int source = RIPPL_LOGO_LABEL.side;
+    int side = sized(deck, source) & ~1;
+    int middle = source * FRACTION_ONE / 2 - FRACTION_ONE / 2;
     for (int row = 0; row < side; row++) {
         int dy = 2 * row + 1 - side;
         for (int column = 0; column < side; column++) {
             int dx = 2 * column + 1 - side;
-            uint8_t alpha = logo_alpha(middle + (dx * cosine + dy * sine) / 2,
-                                       middle + (dy * cosine - dx * sine) / 2);
+            int across = (dx * cosine + dy * sine) / 2 * 256 / deck->scale;
+            int down = (dy * cosine - dx * sine) / 2 * 256 / deck->scale;
+            uint8_t alpha = logo_alpha(middle + across, middle + down);
             if (alpha != 0) {
-                Point at = {deck->centre.x - side / 2 + column, deck->centre.y - side / 2 + row};
+                Point at = {deck->centre.x - side / 2 + 1 + column,
+                            deck->centre.y - side / 2 + 1 + row};
                 canvas_blend_pixel(deck->canvas, at, CREAM, alpha);
             }
         }
@@ -199,7 +226,7 @@ RIPPL_NP_FACES_CODE static void label_art(const Deck *deck)
     Image cover = deck->frame->cover;
     uint8_t angle = label_angle(deck);
     if (cover.pixels == NULL) {
-        ring(deck, LABEL_RADIUS * Q4, 0, LABEL_RED);
+        ring(deck, sized(deck, LABEL_RADIUS * Q4), 0, LABEL_RED);
         turned_logo(deck, angle);
     } else {
         turned_cover(deck, cover, angle);
@@ -209,10 +236,10 @@ RIPPL_NP_FACES_CODE static void label_art(const Deck *deck)
 RIPPL_NP_FACES_CODE static void grooves(const Deck *deck)
 {
     for (int index = 0; index < GROOVE_COUNT; index++) {
-        int radius = GROOVE_FIRST + GROOVE_STEP * index;
-        ring(deck, (radius + 1) * Q4, radius * Q4, ALU_DARK);
+        int radius = sized(deck, (GROOVE_FIRST + GROOVE_STEP * index) * Q4);
+        ring(deck, radius + Q4, radius, ALU_DARK);
     }
-    ring(deck, SPINDLE, 0, ALU);
+    ring(deck, sized(deck, SPINDLE), 0, ALU);
 }
 
 RIPPL_NP_FACES_CODE static void badge(const Deck *deck)
@@ -221,33 +248,52 @@ RIPPL_NP_FACES_CODE static void badge(const Deck *deck)
         return;
     }
     Point at = deck->centre;
-    ring(deck, BADGE_DISC, 0, VINYL);
+    ring(deck, sized(deck, BADGE_DISC), 0, VINYL);
     face_badge_draw(deck->canvas, deck->frame,
                     (Rect){at.x - BADGE_SIDE / 2, at.y - BADGE_SIDE / 2, BADGE_SIDE, BADGE_SIDE},
                     CREAM);
 }
 
+RIPPL_NP_FACES_CODE static int arm_travel(const NowPlayingFrame *frame)
+{
+    return face_queue_progress(frame, ARM_STEPS * SHAPE_FINE_STEPS);
+}
+
+RIPPL_NP_FACES_CODE static void fine_spoke(Canvas *canvas, ShapeSpoke geometry, uint16_t fine,
+                                           Color color)
+{
+    shape_spoke_fine(canvas, &geometry, fine, color);
+}
+
 RIPPL_NP_FACES_CODE static void arm(const Deck *deck)
 {
     const NowPlayingFrame *frame = deck->frame;
-    int steps = face_progress_width(frame->shown_ms, frame->status->duration_ms, ARM_STEPS);
-    uint8_t angle = (uint8_t)(ARM_REST + steps);
-    uint8_t head = (uint8_t)(angle + ARM_HEAD_TURN);
-    Point pivot = {deck->centre.x + ARM_DX, deck->centre.y + ARM_DY};
-    Point stylus = shape_polar(pivot, angle, ARM_REACH);
+    uint16_t angle =
+        (uint16_t)(((ARM_REST + deck->turn) % SHAPE_TURN) * SHAPE_FINE_STEPS + arm_travel(frame));
+    uint16_t head = (uint16_t)(angle + ARM_HEAD_TURN * SHAPE_FINE_STEPS);
+    uint16_t back = (uint16_t)(angle + HALF_TURN * SHAPE_FINE_STEPS);
+    Point pivot = offset(deck, ARM_DX, ARM_DY);
+    Point stylus = shape_polar_fine(pivot, angle, sized(deck, ARM_REACH));
     Canvas *canvas = deck->canvas;
-    spoke(canvas, (ShapeSpoke){pivot, (uint8_t)(angle + HALF_TURN), 160, 7, 21}, ALU_DARK);
-    dot(canvas, pivot, 160, ALU_DARK);
-    dot(canvas, pivot, 112, ALU);
-    spoke(canvas, (ShapeSpoke){pivot, angle, 64, 0, 72}, ALU);
-    spoke(canvas, (ShapeSpoke){stylus, head, 112, -14, 3}, ALU);
-    spoke(canvas, (ShapeSpoke){stylus, head, 48, -11, 0}, VINYL);
-    dot(canvas, pivot, 48, ALU_DARK);
+    uint8_t weight = (uint8_t)sized(deck, 160);
+    uint8_t rod = (uint8_t)sized(deck, 64);
+    uint8_t shell = (uint8_t)sized(deck, 112);
+    uint8_t needle = (uint8_t)sized(deck, 48);
+    fine_spoke(canvas,
+               (ShapeSpoke){pivot, 0, weight, (int16_t)sized(deck, 7), (int16_t)sized(deck, 21)},
+               back, ALU_DARK);
+    dot(canvas, pivot, weight, ALU_DARK);
+    dot(canvas, pivot, shell, ALU);
+    fine_spoke(canvas, (ShapeSpoke){pivot, 0, rod, 0, (int16_t)sized(deck, 72)}, angle, ALU);
+    fine_spoke(canvas, (ShapeSpoke){stylus, 0, shell, (int16_t)sized(deck, -14), 3}, head, ALU);
+    fine_spoke(canvas, (ShapeSpoke){stylus, 0, needle, (int16_t)sized(deck, -11), 0}, head, VINYL);
+    dot(canvas, pivot, needle, ALU_DARK);
 }
 
 RIPPL_NP_FACES_CODE static void lamp(const Deck *deck)
 {
-    Point at = {deck->centre.x + LAMP_DX, deck->centre.y + LAMP_DY};
+    Point at = {deck->centre.x + sized(deck, deck->lamp.x),
+                deck->centre.y + sized(deck, deck->lamp.y)};
     dot(deck->canvas, at, LAMP_RADIUS, deck->frame->playing ? AMBER : ALU_DARK);
 }
 
@@ -303,9 +349,14 @@ RIPPL_NP_FACES_CODE static void details(const Deck *deck)
     const Rows *rows = rows_of(frame);
     const Font *small = frame->theme->fonts.small;
     FaceLine format = line_of(frame, (Slot){small, rows->format, LINE_SMALL, TAN});
-    face_format_row(deck->canvas, frame, &format);
     if (rows->has_detail) {
+        FaceLine codec = line_of(frame, (Slot){small, rows->format - CODEC_LIFT, LINE_SMALL, TAN});
+        codec.area.width = face_codec_width(small, frame->codec);
+        face_codec_draw(deck->canvas, &codec, frame->codec);
+        note(deck, format, frame->stream);
         note(deck, line_of(frame, (Slot){small, rows->detail, LINE_SMALL, TAN_DIM}), frame->detail);
+    } else {
+        face_format_row(deck->canvas, frame, &format);
     }
     modes(deck);
 }
@@ -323,7 +374,10 @@ RIPPL_NP_FACES_CODE static void progress(const Deck *deck)
 
 RIPPL_NP_FACES_CODE void face_turntable_draw(const NowPlayingFrame *frame, Canvas *canvas)
 {
-    Deck deck = {canvas, frame, {CENTRE_X, frame->area.y + CENTRE_DROP}};
+    const Place *place =
+        frame->area.height > frame->area.width ? &PORTRAIT_PLACE : &LANDSCAPE_PLACE;
+    Deck deck = {canvas,       frame,       {place->x, frame->area.y + place->y},
+                 place->scale, place->turn, {place->lamp_dx, place->lamp_dy}};
     plate(&deck);
     label_art(&deck);
     grooves(&deck);

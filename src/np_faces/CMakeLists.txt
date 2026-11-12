@@ -3,9 +3,7 @@ add_library(rippl_np_faces STATIC
     face_cassette.c
     face_shapes.c
     face_text.c
-    face_lcd.c
     face_turntable.c
-    face_vu.c
 )
 target_include_directories(rippl_np_faces PUBLIC include PRIVATE .)
 if(CMAKE_CROSSCOMPILING)

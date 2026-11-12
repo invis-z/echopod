@@ -9,7 +9,8 @@
 enum {
     SHAPE_TURN = 256,
     SHAPE_UNIT = 255,
-    SHAPE_Q4 = 16
+    SHAPE_Q4 = 16,
+    SHAPE_FINE_STEPS = 4
 };
 
 typedef struct ShapeSpan {
@@ -44,13 +45,17 @@ typedef struct SegmentStyle {
 
 int shape_sine(uint8_t angle);
 int shape_cosine(uint8_t angle);
+int shape_sine_fine(uint16_t fine);
+int shape_cosine_fine(uint16_t fine);
 uint32_t shape_isqrt(uint32_t value);
 Point shape_polar(Point centre, uint8_t angle, int radius);
+Point shape_polar_fine(Point centre, uint16_t fine, int radius);
 void shape_span(Canvas *canvas, ShapeSpan span, Color color);
 void shape_ring(Canvas *canvas, ShapeRing ring, Color color);
 void shape_rounded(Canvas *canvas, Rect area, int radius, Color color);
 void shape_trapezoid(Canvas *canvas, Rect area, int top_inset, Color color);
 void shape_spoke(Canvas *canvas, const ShapeSpoke *spoke, Color color);
+void shape_spoke_fine(Canvas *canvas, const ShapeSpoke *spoke, uint16_t fine, Color color);
 void shape_digit(Canvas *canvas, const SegmentStyle *style, Point origin, uint8_t mask);
 void shape_colon(Canvas *canvas, const SegmentStyle *style, Point origin, bool lit);
 uint8_t shape_digit_mask(unsigned digit);

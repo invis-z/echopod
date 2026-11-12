@@ -62,6 +62,7 @@ void face_feedback_line(Canvas *canvas, const NowPlayingFrame *frame, const Face
 void face_times_text(const NowPlayingFrame *frame, FaceTimes *times);
 void face_times_draw(Canvas *canvas, const NowPlayingFrame *frame, const FaceLine *line);
 int face_progress_width(uint32_t position_ms, uint32_t duration_ms, int width);
+int face_queue_progress(const NowPlayingFrame *frame, int whole);
 int face_volume_width(uint8_t volume, int width);
 FaceFill face_bar_fill(const NowPlayingFrame *frame, int width);
 void face_bar_draw(Canvas *canvas, const NowPlayingFrame *frame, const FaceBar *bar);

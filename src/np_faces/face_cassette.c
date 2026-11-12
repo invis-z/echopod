@@ -18,8 +18,18 @@ enum {
     SHELL_RADIUS = 6,
     FRAME_RADIUS = 5,
     INSIDE_RADIUS = 4,
-    CARD_HEIGHT = 217,
-    CARD_OFFSET = 108,
+    PORTRAIT_TOP = 31,
+    COUNTER_OFFSET = 108,
+    COUNTER_HUB_MS = 200000,
+    COUNTER_SCALE = 16,
+    COUNTER_PER_TURN = 8944,
+    COUNTER_DRUM = 16,
+    COUNTER_HEIGHT = 22,
+    COUNTER_GAP = 2,
+    COUNTER_DIGITS = 3,
+    CARD_OFFSET = 148,
+    CARD_BODY = 109,
+    CARD_TIMES = 90,
     TEETH = 3,
     HALF = 2,
     WHOLE_PIXEL = ~(SHAPE_Q4 - 1)
@@ -94,32 +104,32 @@ RIPPL_NP_FACES_DATA static const char LETTER[] = "A";
 RIPPL_NP_FACES_DATA static const uint8_t TOOTH_STEPS[TEETH] = {0, 85, 171};
 
 RIPPL_NP_FACES_DATA static const Layout LANDSCAPE = {
-    .shell = {11, 27, 297, 140},
-    .highlight = {17, 28, 285, 1},
-    .label = {25, 32, 269, 92},
-    .rules = {{33, 54, 253, 1}, {33, 77, 253, 1}},
-    .bands = {{25, 80, 269, 4}, {25, 84, 269, 31}, {25, 115, 269, 4}},
-    .letter = {25, 84, 40, 31},
-    .codec = {254, 84, 40, 31},
-    .frame = {65, 80, 189, 39},
-    .inside = {67, 82, 185, 35},
-    .icon = {151, 90, 18, 18},
+    .shell = {11, 2, 297, 165},
+    .highlight = {17, 3, 285, 1},
+    .label = {25, 7, 269, 117},
+    .rules = {{33, 29, 253, 1}, {33, 52, 253, 1}},
+    .bands = {{25, 55, 269, 4}, {25, 59, 269, 56}, {25, 115, 269, 4}},
+    .letter = {25, 59, 40, 56},
+    .codec = {254, 59, 40, 56},
+    .frame = {65, 55, 189, 64},
+    .inside = {67, 57, 185, 60},
+    .icon = {151, 78, 18, 18},
     .trap = {71, 129, 177, 38},
     .opening = {87, 153, 145, 14},
     .tape = {87, 157, 145, 3},
-    .screws = {{18, 34}, {300, 34}, {18, 159}, {300, 159}},
+    .screws = {{18, 9}, {300, 9}, {18, 159}, {300, 159}},
     .reels = {99, 219},
     .holes = {103, 215},
-    .reel_y = 99,
+    .reel_y = 87,
     .hole_y = 143,
     .screw = 56,
     .slot = 5,
-    .hub = 168,
-    .hole = 104,
-    .tooth_radius = 32,
-    .tooth_distance = 88,
-    .pack_min = 200,
-    .pack_max = 424,
+    .hub = 235,
+    .hole = 146,
+    .tooth_radius = 45,
+    .tooth_distance = 123,
+    .pack_min = 280,
+    .pack_max = 594,
     .hole_hub = 72,
     .inset = 12,
     .letter_color = LABEL,
@@ -257,8 +267,7 @@ RIPPL_NP_FACES_CODE static void draw_reels(const Pen *pen, const NowPlayingFrame
     const Layout *layout = pen->layout;
     int high = layout->pack_max;
     int low = layout->pack_min;
-    int played =
-        face_progress_width(frame->shown_ms, frame->status->duration_ms, high * high - low * low);
+    int played = face_queue_progress(frame, high * high - low * low);
     int packs[2] = {(int)shape_isqrt((uint32_t)(high * high - played)) & WHOLE_PIXEL,
                     (int)shape_isqrt((uint32_t)(low * low + played)) & WHOLE_PIXEL};
     Canvas window = canvas_clipped(pen->canvas, rect_at(layout->inside, pen->top));
@@ -299,9 +308,9 @@ RIPPL_NP_FACES_CODE static void draw_head(const Pen *pen, const NowPlayingFrame 
 RIPPL_NP_FACES_CODE static void draw_text(Canvas *canvas, const NowPlayingFrame *frame)
 {
     const ThemeFonts *fonts = &frame->theme->fonts;
-    FaceLine title = {fonts->title, {33, 33, 253, 20}, INK, INK, FACE_ALIGN_LEFT};
+    FaceLine title = {fonts->title, {33, 8, 253, 20}, INK, INK, FACE_ALIGN_LEFT};
     face_line(canvas, frame, &title, frame->song);
-    FaceLine info = {fonts->body, {33, 56, 253, 20}, INK, INK_SOFT, FACE_ALIGN_LEFT};
+    FaceLine info = {fonts->body, {33, 31, 253, 20}, INK, INK_SOFT, FACE_ALIGN_LEFT};
     face_feedback_line(canvas, frame, &info, frame->artist);
     FaceLine times = {fonts->small, {17, 129, 286, 16}, LABEL, LABEL, FACE_ALIGN_LEFT};
     face_times_draw(canvas, frame, &times);
@@ -328,13 +337,13 @@ RIPPL_NP_FACES_CODE static void draw_card_text(Canvas *canvas, const NowPlayingF
     FaceLine album = {fonts->body, {16, c + 49, 137, 20}, INK, INK_SOFT, FACE_ALIGN_CENTRE};
     face_line(canvas, frame, &album, frame->album);
     draw_format(canvas, frame, c + 73);
-    FaceLine times = {fonts->small, {16, c + 90, 137, 16}, INK, INK, FACE_ALIGN_LEFT};
+    FaceLine times = {fonts->small, {16, c + CARD_TIMES, 137, 16}, INK, INK, FACE_ALIGN_LEFT};
     face_times_draw(canvas, frame, &times);
 }
 
 RIPPL_NP_FACES_CODE static void draw_card(Canvas *canvas, const NowPlayingFrame *frame, int c)
 {
-    canvas_fill_rect(canvas, (Rect){8, c, 153, 109}, LABEL);
+    canvas_fill_rect(canvas, (Rect){8, c, 153, CARD_BODY}, LABEL);
     canvas_fill_rect(canvas, (Rect){8, c, 153, 2}, RED);
     for (int row = 24; row <= 70; row += 23) {
         canvas_fill_rect(canvas, (Rect){16, c + row, 137, 1}, RULE);
@@ -342,10 +351,48 @@ RIPPL_NP_FACES_CODE static void draw_card(Canvas *canvas, const NowPlayingFrame 
     draw_card_text(canvas, frame, c);
 }
 
+RIPPL_NP_FACES_CODE static void draw_drum(Canvas *canvas, const Font *font, Rect drum, int digit,
+                                          int roll)
+{
+    Canvas window = canvas_clipped(canvas, drum);
+    canvas_fill_rect(&window, drum, DEEP);
+    for (int step = 0; step < 2; step++) {
+        char text[2] = {(char)('0' + (digit + step) % 10), '\0'};
+        Rect cell = {drum.x, drum.y - roll + step * drum.height, drum.width, drum.height};
+        Rect fitted = face_fitted_area(font, cell, text, FACE_ALIGN_CENTRE);
+        label_draw(&window, (TextStyle){font, LABEL}, (Label){fitted, text});
+    }
+    canvas_fill_gradient(&window, (Rect){drum.x, drum.y, drum.width, 5}, COLOR_RGB(0, 0, 0), DEEP);
+    canvas_fill_gradient(&window, (Rect){drum.x, drum.y + drum.height - 5, drum.width, 5}, DEEP,
+                         COLOR_RGB(0, 0, 0));
+}
+
+RIPPL_NP_FACES_CODE static void draw_counter(Canvas *canvas, const NowPlayingFrame *frame, int top)
+{
+    int width = COUNTER_DIGITS * (COUNTER_DRUM + COUNTER_GAP) - COUNTER_GAP;
+    int left = (frame->area.width - width) / HALF;
+    shape_rounded(canvas, (Rect){left - 10, top, width + 20, COUNTER_HEIGHT + 10}, SHELL_RADIUS,
+                  SHELL);
+    canvas_fill_rect(canvas, (Rect){left - 6, top + 1, width + 12, 1}, SHELL_HI);
+    uint32_t start = shape_isqrt(COUNTER_HUB_MS * COUNTER_SCALE);
+    uint32_t radius = shape_isqrt((COUNTER_HUB_MS + frame->shown_ms) * COUNTER_SCALE);
+    uint32_t turns = (radius - start) * 1000;
+    unsigned count = turns / COUNTER_PER_TURN % 1000;
+    int rest = (int)(turns % COUNTER_PER_TURN) - COUNTER_PER_TURN * 3 / 4;
+    int roll = rest > 0 ? rest * COUNTER_HEIGHT / (COUNTER_PER_TURN / 4) : 0;
+    unsigned divisor = 100;
+    for (int index = 0; index < COUNTER_DIGITS; index++, divisor /= 10) {
+        Rect drum = {left + index * (COUNTER_DRUM + COUNTER_GAP), top + 5, COUNTER_DRUM,
+                     COUNTER_HEIGHT};
+        draw_drum(canvas, frame->theme->fonts.title, drum, (int)(count / divisor % 10),
+                  divisor == 1 ? roll : 0);
+    }
+}
+
 RIPPL_NP_FACES_CODE void face_cassette_draw(const NowPlayingFrame *frame, Canvas *canvas)
 {
     bool landscape = frame->area.width > frame->area.height;
-    int top = landscape ? 0 : frame->area.y + (frame->area.height - CARD_HEIGHT) / HALF;
+    int top = landscape ? 0 : frame->area.y + PORTRAIT_TOP;
     Pen pen = {canvas, landscape ? &LANDSCAPE : &PORTRAIT, top};
     canvas_fill_rect(canvas, frame->area, DEEP);
     draw_shell(&pen);
@@ -355,6 +402,7 @@ RIPPL_NP_FACES_CODE void face_cassette_draw(const NowPlayingFrame *frame, Canvas
     if (landscape) {
         draw_text(canvas, frame);
     } else {
+        draw_counter(canvas, frame, top + COUNTER_OFFSET);
         draw_card(canvas, frame, top + CARD_OFFSET);
     }
 }

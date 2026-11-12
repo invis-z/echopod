@@ -157,7 +157,7 @@ add_library(rippl_np_faces_fixtures STATIC np_faces/np_faces_test.c)
 target_include_directories(rippl_np_faces_fixtures PUBLIC np_faces)
 target_link_libraries(rippl_np_faces_fixtures PUBLIC rippl_np_faces rippl_ui_fixtures PRIVATE rippl_options)
 
-foreach(np_faces_test np_faces face_cassette face_vu face_turntable face_lcd)
+foreach(np_faces_test np_faces face_cassette face_turntable)
     rippl_add_unit_test(NAME test_${np_faces_test}
         SOURCES np_faces/test_${np_faces_test}.c
         LIBRARIES rippl_np_faces_fixtures

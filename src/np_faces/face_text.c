@@ -153,6 +153,21 @@ RIPPL_NP_FACES_CODE int face_progress_width(uint32_t position_ms, uint32_t durat
     return (int)((uint64_t)position_ms * (uint64_t)width / duration_ms);
 }
 
+RIPPL_NP_FACES_CODE int face_queue_progress(const NowPlayingFrame *frame, int whole)
+{
+    const PlayerStatus *status = frame->status;
+    if (status->shuffle == SHUFFLE_SONGS) {
+        return 0;
+    }
+    int song = face_progress_width(frame->shown_ms, status->duration_ms, whole);
+    uint32_t number = status->place.number;
+    uint32_t total = status->place.total;
+    if (number == 0 || total == 0 || number > total) {
+        return song;
+    }
+    return (int)(((uint64_t)(number - 1) * (uint64_t)whole + (uint64_t)song) / total);
+}
+
 RIPPL_NP_FACES_CODE int face_volume_width(uint8_t volume, int width)
 {
     int level = volume < SETTINGS_VOLUME_MAX ? volume : SETTINGS_VOLUME_MAX;

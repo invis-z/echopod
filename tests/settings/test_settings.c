@@ -382,12 +382,12 @@ static void the_checksum_covers_the_now_playing_face_byte(void)
     Settings settings = custom_settings();
     uint8_t bytes[SETTINGS_FILE_SIZE];
     settings_encode(&settings, bytes);
-    bytes[NOW_PLAYING_FACE_FIELD] = NP_FACE_LCD;
+    bytes[NOW_PLAYING_FACE_FIELD] = NP_FACE_CASSETTE;
     Settings decoded;
     CHECK(!settings_decode(bytes, sizeof bytes, &decoded));
     rewrite_checksum(bytes);
     CHECK(settings_decode(bytes, sizeof bytes, &decoded));
-    CHECK_EQUAL(NP_FACE_LCD, decoded.options[OPTION_NOW_PLAYING_FACE]);
+    CHECK_EQUAL(NP_FACE_CASSETTE, decoded.options[OPTION_NOW_PLAYING_FACE]);
 }
 
 static void an_unknown_dre_setting_is_rejected(void)

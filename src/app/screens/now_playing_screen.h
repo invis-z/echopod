@@ -112,5 +112,4 @@ bool now_playing_feedback_visible(NowPlayingFeedback feedback, uint32_t started_
                                   uint32_t now_ms);
 int now_playing_volume_width(uint8_t volume, int width);
 const char *now_playing_lyric(const NowPlayingScreen *now_playing);
-const ThemeColors *now_playing_face_colors(const NowPlayingScreen *now_playing);
 Screen *now_playing_screen_init(NowPlayingScreen *now_playing, NowPlayingConfig config);

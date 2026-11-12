@@ -4,25 +4,30 @@
 #include "np_faces_test.h"
 
 enum {
-    CENTRE_X = 77,
-    CENTRE_DROP = 73,
+    LANDSCAPE_X = 82,
+    LANDSCAPE_DROP = 85,
+    PORTRAIT_X = 85,
+    PORTRAIT_DROP = 103,
+    DECK_SCALE = 298,
+    QUARTER_TURN = 64,
     ARM_DX = 75,
     ARM_DY = -47,
     ARM_REST = 140,
     ARM_STEPS = 12,
-    TUBE_RADIUS = 60,
-    TURN_STEPS = 18,
-    LABEL_RADIUS = 28,
-    LOGO_HALF = 24,
+    TUBE_RADIUS = 20,
+    TUBE_FAR_RADIUS = 60,
+    TURN_MS = 3600,
+    FRAME_MS = 50,
+    LABEL_RADIUS = 33,
+    LOGO_HALF = 28,
     QUADRANT_SIDE = 64,
-    TICK_BASE = 1396,
     POSITION_MS = 139600,
     FALLBACK_LEVEL = 8,
     FULL_LEVEL = 15,
     COVER_RED = 0xF800,
     FAR_STEP = 6,
     BAR_PROBE = 5,
-    BAR_BETWEEN = 105,
+    BAR_BETWEEN = 90,
     BAR_TRACK = 3
 };
 
@@ -45,9 +50,22 @@ static NpTestScene scene_of(int layout, NpTestState state)
     return np_test_scene(NP_FACE_TURNTABLE, NP_TEST_LAYOUTS[layout], state);
 }
 
+static bool is_portrait(const NpTestScene *scene)
+{
+    return scene->layout.height > scene->layout.width;
+}
+
+static int sized(int value)
+{
+    return (value * DECK_SCALE + 128) >> 8;
+}
+
 static Point centre_of(const NpTestScene *scene)
 {
-    return (Point){CENTRE_X, scene->layout.area.y + CENTRE_DROP};
+    if (is_portrait(scene)) {
+        return (Point){PORTRAIT_X, scene->layout.area.y + PORTRAIT_DROP};
+    }
+    return (Point){LANDSCAPE_X, scene->layout.area.y + LANDSCAPE_DROP};
 }
 
 static Color probe(const NpTestScene *scene, int dx, int dy)
@@ -57,13 +75,26 @@ static Color probe(const NpTestScene *scene, int dx, int dy)
     return np_test_pixel(pixels, scene->layout, centre.x + dx, centre.y + dy);
 }
 
-static bool tube_at(const NpTestScene *scene, int steps)
+static bool tube_reaches(const NpTestScene *scene, int steps, int radius)
 {
     Point centre = centre_of(scene);
-    Point pivot = {centre.x + ARM_DX, centre.y + ARM_DY};
-    Point point = shape_polar(pivot, (uint8_t)(ARM_REST + steps), TUBE_RADIUS);
+    bool turned = is_portrait(scene);
+    Point pivot = turned ? (Point){centre.x + sized(ARM_DY), centre.y - sized(ARM_DX)}
+                         : (Point){centre.x + sized(ARM_DX), centre.y + sized(ARM_DY)};
+    uint8_t angle = (uint8_t)(ARM_REST + steps + (turned ? 3 * QUARTER_TURN : 0));
+    Point point = shape_polar(pivot, angle, sized(radius));
     np_test_draw(scene, pixels);
     return np_test_pixel(pixels, scene->layout, point.x, point.y) == ALU;
+}
+
+static bool tube_at(const NpTestScene *scene, int steps)
+{
+    return tube_reaches(scene, steps, TUBE_RADIUS);
+}
+
+static bool tube_far_at(const NpTestScene *scene, int steps)
+{
+    return tube_reaches(scene, steps, TUBE_FAR_RADIUS);
 }
 
 static int count_in(const NpTestScene *scene, Rect box, Color color)
@@ -78,23 +109,18 @@ static int count_in(const NpTestScene *scene, Rect box, Color color)
     return count;
 }
 
-static bool is_portrait(const NpTestScene *scene)
-{
-    return scene->layout.height > scene->layout.width;
-}
-
 static Rect text_row(const NpTestScene *scene, int top_row, int bottom_row, int height)
 {
     Rect area = scene->layout.area;
-    int x = is_portrait(scene) ? 10 : 170;
-    int width = is_portrait(scene) ? 150 : 140;
+    int x = is_portrait(scene) ? 10 : 192;
+    int width = is_portrait(scene) ? 150 : 120;
     int y = bottom_row != 0 ? area.y + area.height + bottom_row : area.y + top_row;
     return (Rect){x, y, width, height};
 }
 
 static Rect title_row(const NpTestScene *scene)
 {
-    return text_row(scene, is_portrait(scene) ? 144 : 4, 0, 22);
+    return text_row(scene, is_portrait(scene) ? 184 : 6, 0, 22);
 }
 
 static Rect modes_row(const NpTestScene *scene)
@@ -212,8 +238,8 @@ static void a_cover_is_a_round_label_with_a_vinyl_mask(void)
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
         CHECK_EQUAL(COVER_RED, probe(&scene, 10, 10));
-        CHECK_EQUAL(VINYL, probe(&scene, 27, 27));
-        CHECK_EQUAL(VINYL, probe(&scene, -27, -27));
+        CHECK_EQUAL(VINYL, probe(&scene, 35, 35));
+        CHECK_EQUAL(VINYL, probe(&scene, -35, -35));
     }
 }
 
@@ -233,7 +259,7 @@ static void without_a_cover_the_label_is_red_with_the_cream_logo(void)
         CHECK(label_count(&scene, LABEL_RED) > 200);
         CHECK(label_count(&scene, CREAM) > 200);
         CHECK_EQUAL(LABEL_RED, probe(&scene, 0, -LABEL_RADIUS + 2));
-        CHECK_EQUAL(VINYL, probe(&scene, 27, 27));
+        CHECK_EQUAL(VINYL, probe(&scene, 35, 35));
     }
 }
 
@@ -252,30 +278,31 @@ static Image quadrant_cover(void)
     return (Image){quadrant_pixels, QUADRANT_SIDE, QUADRANT_SIDE};
 }
 
-static void the_rim_and_three_grooves_ring_the_record(void)
+static void the_rim_and_four_grooves_ring_the_record(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
-        CHECK_EQUAL(ALU, probe(&scene, 0, -65));
-        CHECK(probe(&scene, 32, 32) != VINYL);
-        CHECK(probe(&scene, 37, 37) != VINYL);
-        CHECK(probe(&scene, 42, 42) != VINYL);
-        CHECK_EQUAL(VINYL, probe(&scene, 34, 34));
+        CHECK_EQUAL(ALU, probe(&scene, 0, -sized(65)));
+        CHECK(probe(&scene, 32, 31) != VINYL);
+        CHECK(probe(&scene, 37, 38) != VINYL);
+        CHECK(probe(&scene, 43, 43) != VINYL);
+        CHECK(probe(&scene, 49, 49) != VINYL);
+        CHECK_EQUAL(VINYL, probe(&scene, 40, 40));
     }
 }
 
-static void the_label_makes_one_turn_in_eighteen_ticks(void)
+static void the_label_turns_once_every_3600_ms(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         for (int covered = 0; covered < 2; covered++) {
             NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
             scene.frame.cover = covered ? quadrant_cover() : (Image){0};
-            scene.frame.tick = 0;
+            scene.status.position_ms = 0;
             np_test_draw(&scene, other);
-            scene.frame.tick = TURN_STEPS / 2;
+            scene.status.position_ms = TURN_MS / 2;
             np_test_draw(&scene, pixels);
             CHECK(!np_test_same(pixels, other, scene.layout));
-            scene.frame.tick = TURN_STEPS;
+            scene.status.position_ms = TURN_MS;
             np_test_draw(&scene, pixels);
             CHECK(np_test_same(pixels, other, scene.layout));
         }
@@ -287,31 +314,31 @@ static void a_cover_turns_clockwise_from_the_top(void)
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
         scene.frame.cover = quadrant_cover();
-        scene.frame.tick = 0;
+        scene.status.position_ms = 0;
         CHECK_EQUAL(COLOR_RGB(40, 120, 216), probe(&scene, -10, -10));
         CHECK_EQUAL(COLOR_RGB(240, 240, 240), probe(&scene, 10, -10));
-        scene.frame.tick = 3;
+        scene.status.position_ms = TURN_MS / 6;
         CHECK_EQUAL(COLOR_RGB(40, 120, 216), probe(&scene, 0, -15));
-        scene.frame.tick = TURN_STEPS / 2;
+        scene.status.position_ms = TURN_MS / 2;
         CHECK_EQUAL(COLOR_RGB(32, 160, 88), probe(&scene, -10, -10));
     }
 }
 
-static void one_tick_repaints_only_the_label(void)
+static void one_frame_repaints_only_the_label(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
-        for (uint32_t tick = TICK_BASE; tick < TICK_BASE + TURN_STEPS; tick++) {
+        for (uint32_t at = POSITION_MS; at < POSITION_MS + TURN_MS; at += FRAME_MS) {
             NpTestScene scene = scene_of(layout, NP_TEST_NO_COVER);
-            scene.frame.tick = tick;
+            scene.status.position_ms = at;
             np_test_draw(&scene, other);
-            scene.frame.tick = tick + 1;
+            scene.status.position_ms = at + FRAME_MS;
             np_test_draw(&scene, pixels);
             int rows = 0;
             for (int y = 0; y < scene.layout.height; y++) {
                 bool differs = rows_differ(pixels, other, scene.layout, y);
                 rows += differs ? 1 : 0;
-                CHECK(!differs || (y >= centre_of(&scene).y - LABEL_RADIUS &&
-                                   y < centre_of(&scene).y + LABEL_RADIUS));
+                CHECK(!differs || (y > centre_of(&scene).y - LABEL_RADIUS &&
+                                   y <= centre_of(&scene).y + LABEL_RADIUS));
             }
             CHECK(rows > 0);
         }
@@ -323,8 +350,9 @@ static void the_lamp_is_amber_when_playing_and_dark_when_paused(void)
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestScene playing = scene_of(layout, NP_TEST_PLAYING);
         NpTestScene paused = scene_of(layout, NP_TEST_PAUSED);
-        CHECK_EQUAL(AMBER, probe(&playing, 80, 59));
-        CHECK_EQUAL(ALU_DARK, probe(&paused, 80, 59));
+        Point lamp = layout == 0 ? (Point){sized(80), sized(59)} : (Point){sized(61), sized(61)};
+        CHECK_EQUAL(AMBER, probe(&playing, lamp.x, lamp.y));
+        CHECK_EQUAL(ALU_DARK, probe(&paused, lamp.x, lamp.y));
     }
 }
 
@@ -377,14 +405,58 @@ static void the_arm_advances_monotonically_with_progress(void)
     }
 }
 
-static void scrubbing_swings_the_arm_to_the_target_but_the_label_keeps_the_tick(void)
+static void the_arm_travels_across_the_whole_queue_with_each_track_an_equal_share(void)
+{
+    for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
+        NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
+        scene.status.place = (PlayQueuePlace){1, 4};
+        scene.frame.shown_ms = 0;
+        CHECK(tube_at(&scene, 0));
+        scene.status.place = (PlayQueuePlace){3, 4};
+        CHECK(tube_at(&scene, ARM_STEPS / 2));
+        CHECK(!tube_at(&scene, 0));
+        scene.frame.shown_ms = scene.status.duration_ms;
+        scene.status.place = (PlayQueuePlace){4, 4};
+        CHECK(tube_at(&scene, ARM_STEPS));
+        scene.status.duration_ms = 0;
+        scene.frame.shown_ms = 0;
+        scene.status.place = (PlayQueuePlace){3, 4};
+        CHECK(tube_at(&scene, ARM_STEPS / 2));
+    }
+}
+
+static void shuffled_songs_pin_the_arm_at_the_start(void)
+{
+    for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
+        NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
+        scene.status.shuffle = SHUFFLE_SONGS;
+        scene.status.place = (PlayQueuePlace){4, 4};
+        scene.frame.shown_ms = scene.status.duration_ms;
+        CHECK(tube_at(&scene, 0));
+        CHECK(!tube_at(&scene, ARM_STEPS));
+    }
+}
+
+static void shuffled_albums_move_the_arm_across_the_album(void)
+{
+    for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
+        NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
+        scene.status.shuffle = SHUFFLE_ALBUMS;
+        scene.status.place = (PlayQueuePlace){4, 4};
+        scene.frame.shown_ms = scene.status.duration_ms;
+        CHECK(tube_at(&scene, ARM_STEPS));
+        CHECK(!tube_at(&scene, 0));
+    }
+}
+
+static void scrubbing_swings_the_arm_to_the_target_but_the_label_keeps_turning_with_playback(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestScene scene = scene_of(layout, NP_TEST_SCRUBBING);
-        CHECK(tube_at(&scene, 9));
-        CHECK(!tube_at(&scene, 6));
+        CHECK(tube_far_at(&scene, 9));
+        CHECK(!tube_far_at(&scene, 6));
         scene.frame.cover = quadrant_cover();
-        scene.frame.tick = 3;
+        scene.status.position_ms = TURN_MS / 6;
         CHECK_EQUAL(COLOR_RGB(40, 120, 216), probe(&scene, 0, -15));
     }
 }
@@ -393,8 +465,8 @@ static void volume_feedback_leaves_the_arm_where_playback_is(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestScene scene = scene_of(layout, NP_TEST_VOLUME);
-        CHECK(tube_at(&scene, 6));
-        CHECK(!tube_at(&scene, 9));
+        CHECK(tube_far_at(&scene, 6));
+        CHECK(!tube_far_at(&scene, 9));
     }
 }
 
@@ -469,7 +541,7 @@ static void the_hint_and_the_volume_replace_the_modes_with_different_text(void)
 static void the_landscape_detail_row_shows_the_detail_text(void)
 {
     NpTestScene landscape = plain(scene_of(0, NP_TEST_PLAYING));
-    Rect row = text_row(&landscape, 92, 0, 14);
+    Rect row = text_row(&landscape, 116, 0, 14);
     CHECK(ink_is(&landscape, row, TAN_DIM, FALLBACK_LEVEL));
     landscape.frame.detail = NULL;
     CHECK(ink_free(&landscape, row));
@@ -529,16 +601,19 @@ int main(void)
         TEST_CASE(the_backdrop_runs_from_walnut_top_to_walnut_bottom),
         TEST_CASE(a_cover_is_a_round_label_with_a_vinyl_mask),
         TEST_CASE(without_a_cover_the_label_is_red_with_the_cream_logo),
-        TEST_CASE(the_rim_and_three_grooves_ring_the_record),
-        TEST_CASE(the_label_makes_one_turn_in_eighteen_ticks),
+        TEST_CASE(the_rim_and_four_grooves_ring_the_record),
+        TEST_CASE(the_label_turns_once_every_3600_ms),
         TEST_CASE(a_cover_turns_clockwise_from_the_top),
-        TEST_CASE(one_tick_repaints_only_the_label),
+        TEST_CASE(one_frame_repaints_only_the_label),
         TEST_CASE(the_lamp_is_amber_when_playing_and_dark_when_paused),
         TEST_CASE(a_playing_face_with_fitting_text_ignores_the_clock),
         TEST_CASE(the_stylus_sits_at_the_start_with_nothing_played_and_unknown_duration),
         TEST_CASE(the_stylus_reaches_the_last_groove_at_the_end),
         TEST_CASE(the_arm_advances_monotonically_with_progress),
-        TEST_CASE(scrubbing_swings_the_arm_to_the_target_but_the_label_keeps_the_tick),
+        TEST_CASE(the_arm_travels_across_the_whole_queue_with_each_track_an_equal_share),
+        TEST_CASE(shuffled_songs_pin_the_arm_at_the_start),
+        TEST_CASE(shuffled_albums_move_the_arm_across_the_album),
+        TEST_CASE(scrubbing_swings_the_arm_to_the_target_but_the_label_keeps_turning_with_playback),
         TEST_CASE(volume_feedback_leaves_the_arm_where_playback_is),
         TEST_CASE(the_bar_is_cream_when_playing_amber_when_scrubbing_and_track_past_the_fill),
         TEST_CASE(the_volume_fills_the_bar_in_amber),

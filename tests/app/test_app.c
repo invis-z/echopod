@@ -3200,10 +3200,10 @@ static const uint8_t SHOT_FACES[2] = {NP_FACE_CASSETTE, NP_FACE_TURNTABLE};
 static const ShotLayout SHOT_LAYOUTS[2] = {SHOT_LANDSCAPE, SHOT_PORTRAIT};
 
 static const uint32_t FACE_SHOT_HASHES[2][2][SHOT_STATE_COUNT] = {
-    {{0x396A393BU, 0x597D1834U, 0x43849A9FU, 0xA371FF18U, 0x597D1834U, 0x3A32007FU, 0x8012DFC1U},
-     {0xA645C254U, 0x3F3621E0U, 0xE0A0EB67U, 0xFAAB936CU, 0x3F3621E0U, 0x78B20E5EU, 0x5F7ED099U}},
-    {{0xB6D2A166U, 0x0E1892D1U, 0x11D485EFU, 0xE20F0AD6U, 0xCC992E3CU, 0x7158D5C1U, 0x78F2DE35U},
-     {0xD0701AABU, 0x73EEBD28U, 0xADCABC6EU, 0x14BE16DBU, 0x511529E1U, 0x6F491A7DU, 0xAAA3CCF0U}},
+    {{0x92E7F3EDU, 0x6306874DU, 0x85164715U, 0xE6EEA25EU, 0x6306874DU, 0x7D9F3F96U, 0x7C0EE49FU},
+     {0x211CC35FU, 0x144CD2FFU, 0xCC1E3E7CU, 0x3D15EE3BU, 0x144CD2FFU, 0xF4224224U, 0x2BEAF4E6U}},
+    {{0xF2558C4DU, 0xF07B7DC6U, 0xB5C8FB9AU, 0x5EAEF6AFU, 0xD44DDA4FU, 0xE2CC2289U, 0x29CE3915U},
+     {0xC040ACEDU, 0xFAFC5B1AU, 0x1C758E70U, 0x00E2F7C1U, 0x57492D4BU, 0x7797ADD3U, 0x9DCF43B8U}},
 };
 
 static void the_cassette_and_turntable_frames_keep_their_pixels_in_every_state(void)
@@ -3226,6 +3226,19 @@ static void a_playing_face_changes_pixels_a_tick_later_and_a_paused_one_does_not
     fake_hal_audio_set_position(SHOT_POSITION_MS + NP_FACE_TICK_MS);
     wait_ms(NP_FACE_TICK_MS);
     CHECK(fake_hal_pixels_written() > pixels);
+}
+
+static void the_turntable_redraws_twenty_times_a_second_and_the_cassette_ten(void)
+{
+    static const uint8_t FACES[2] = {NP_FACE_TURNTABLE, NP_FACE_CASSETTE};
+    static const bool MOVES[2] = {true, false};
+    for (int face = 0; face < 2; face++) {
+        reach_shot((ShotSetup){SHOT_LANDSCAPE, SHOT_NO_COVER, FACES[face], true});
+        long pixels = fake_hal_pixels_written();
+        fake_hal_audio_set_position(SHOT_POSITION_MS + NP_FACE_SMOOTH_TICK_MS);
+        wait_ms(NP_FACE_SMOOTH_TICK_MS);
+        CHECK_EQUAL(MOVES[face], fake_hal_pixels_written() > pixels);
+    }
 }
 
 static const uint8_t TIMED_LYRICS[] = "[00:00.00]first line\n[00:30.00]second line\n";
@@ -3260,11 +3273,6 @@ static void the_standard_face_is_drawn_when_the_face_code_is_missing_or_unknown(
     }
 }
 
-static const NowPlayingFaces *face_code_in_use(void)
-{
-    return hal_system_load_faces();
-}
-
 static bool header_shows(Color color)
 {
     for (int y = 0; y < DEFAULT_THEME.metrics.header_height; y++) {
@@ -3283,67 +3291,50 @@ static void charge_the_battery(void)
         .known = true, .percent = 60, .charging = true, .usb_power = true, .millivolts = 3900});
 }
 
-static void the_header_and_status_bar_take_the_face_colours_until_home(void)
+static bool shows_the_bars(void)
+{
+    return fake_hal_pixel(2, 0) == DEFAULT_THEME.colors.header_top &&
+           header_shows(DEFAULT_THEME.colors.success);
+}
+
+static void a_face_fills_the_screen_without_the_header_and_status_bar_until_home(void)
 {
     ShotSetup setup = {SHOT_LANDSCAPE, SHOT_PLAYING, NP_FACE_CASSETTE, true};
     reach_shot(setup);
     charge_the_battery();
     wait_ms(IDLE_MS);
-    const ThemeColors *face = face_code_in_use()->chrome[NP_FACE_CASSETTE];
-    CHECK_EQUAL(face->header_top, fake_hal_pixel(2, 0));
-    CHECK(header_shows(face->success));
+    CHECK(fake_hal_pixel(2, 0) != DEFAULT_THEME.colors.header_top);
     CHECK(!header_shows(DEFAULT_THEME.colors.success));
     hold_back();
     wait_ms(SLIDE_DURATION_MS);
     CHECK(title_is("Rippl"));
-    CHECK_EQUAL(DEFAULT_THEME.colors.header_top, fake_hal_pixel(2, 0));
-    CHECK(header_shows(DEFAULT_THEME.colors.success));
-    CHECK(!header_shows(face->success));
+    CHECK(shows_the_bars());
 }
 
-static bool shows_chrome_of(const ThemeColors *chrome)
-{
-    return fake_hal_pixel(2, 0) == chrome->header_top && header_shows(chrome->success);
-}
-
-static void leaving_a_face_flips_the_header_and_status_bar_at_the_midpoint(void)
-{
-    ShotSetup setup = {SHOT_LANDSCAPE, SHOT_PLAYING, NP_FACE_CASSETTE, true};
-    reach_shot(setup);
-    charge_the_battery();
-    wait_ms(KEY_HOLD_MS);
-    const ThemeColors *face = face_code_in_use()->chrome[NP_FACE_CASSETTE];
-    hold_back();
-    CHECK(title_is("Rippl"));
-    CHECK(shows_chrome_of(face));
-    wait_ms(SLIDE_DURATION_MS * 3 / 4);
-    CHECK(shows_chrome_of(&DEFAULT_THEME.colors));
-    CHECK(!header_shows(face->success));
-}
-
-static void entering_a_face_flips_the_header_and_status_bar_at_the_midpoint(void)
+static void coming_back_to_a_face_takes_the_bars_away_again(void)
 {
     ShotSetup setup = {SHOT_LANDSCAPE, SHOT_PLAYING, NP_FACE_CASSETTE, true};
     reach_shot(setup);
     charge_the_battery();
     hold_back();
     wait_ms(SLIDE_DURATION_MS);
-    const ThemeColors *face = face_code_in_use()->chrome[NP_FACE_CASSETTE];
+    CHECK(shows_the_bars());
     tap(KEY_MENU);
-    CHECK(title_is("Now Playing"));
-    CHECK(shows_chrome_of(&DEFAULT_THEME.colors));
-    CHECK(!header_shows(face->success));
-    wait_ms(SLIDE_DURATION_MS * 3 / 4);
-    CHECK(shows_chrome_of(face));
+    wait_ms(SLIDE_DURATION_MS);
+    wait_ms(IDLE_MS);
+    CHECK(fake_hal_pixel(2, 0) != DEFAULT_THEME.colors.header_top);
+    CHECK(!header_shows(DEFAULT_THEME.colors.success));
 }
 
-static void each_face_chrome_background_matches_the_backdrop_that_face_draws(void)
+static void every_face_paints_the_top_of_the_screen(void)
 {
     for (int face = NP_FACE_CASSETTE; face < NP_FACE_COUNT; face++) {
         ShotSetup setup = {SHOT_LANDSCAPE, SHOT_PLAYING, (uint8_t)face, true};
         reach_shot(setup);
-        const ThemeColors *chrome = face_code_in_use()->chrome[face];
-        CHECK_EQUAL(chrome->background, fake_hal_pixel(0, DEFAULT_THEME.metrics.header_height));
+        charge_the_battery();
+        wait_ms(IDLE_MS);
+        CHECK(fake_hal_pixel(0, 0) != DEFAULT_THEME.colors.header_top);
+        CHECK(!header_shows(DEFAULT_THEME.colors.success));
     }
 }
 
@@ -3362,16 +3353,14 @@ static void a_face_chosen_in_settings_applies_without_a_restart(void)
     wait_ms(SLIDE_DURATION_MS);
     CHECK_EQUAL(DEFAULT_THEME.colors.header_top, fake_hal_pixel(2, 0));
     hold_back();
-    choose_now_playing_face(NP_FACE_LCD);
+    choose_now_playing_face(NP_FACE_TURNTABLE);
     Settings settings;
     CHECK(saved_settings(&settings));
-    CHECK_EQUAL(NP_FACE_LCD, settings.options[OPTION_NOW_PLAYING_FACE]);
+    CHECK_EQUAL(NP_FACE_TURNTABLE, settings.options[OPTION_NOW_PLAYING_FACE]);
     hold_back();
     tap(KEY_MENU);
     wait_ms(SLIDE_DURATION_MS);
-    const ThemeColors *face = face_code_in_use()->chrome[NP_FACE_LCD];
-    CHECK_EQUAL(face->header_top, fake_hal_pixel(2, 0));
-    CHECK_EQUAL(face->background, fake_hal_pixel(2, HAL_DISPLAY_HEIGHT / 2));
+    CHECK(fake_hal_pixel(2, 0) != DEFAULT_THEME.colors.header_top);
 }
 
 static void a_paused_face_frame_followed_by_an_idle_frame_sends_nothing(void)
@@ -3385,33 +3374,6 @@ static void a_paused_face_frame_followed_by_an_idle_frame_sends_nothing(void)
     wait_ms(IDLE_MS);
     CHECK_EQUAL(presents + 1, fake_hal_present_count());
     CHECK_EQUAL(pixels, fake_hal_pixels_written());
-}
-
-static bool role_is_chrome(size_t offset)
-{
-    return offset == ROLE(background) || offset == ROLE(text_tertiary) ||
-           offset == ROLE(header_background) || offset == ROLE(header_top) ||
-           offset == ROLE(header_text) || offset == ROLE(divider) || offset == ROLE(danger) ||
-           offset == ROLE(success);
-}
-
-static void every_face_chrome_meets_the_floors_of_the_roles_it_draws(void)
-{
-    for (int face = NP_FACE_CASSETTE; face < NP_FACE_COUNT; face++) {
-        const ThemeColors *colors = face_code_in_use()->chrome[face];
-        for (size_t check = 0; check < sizeof ROLE_FLOORS / sizeof ROLE_FLOORS[0]; check++) {
-            ContrastCheck floor = ROLE_FLOORS[check];
-            if (!role_is_chrome(floor.foreground) || !role_is_chrome(floor.background)) {
-                continue;
-            }
-            double ratio = contrast(role_color(colors, floor.foreground),
-                                    role_color(colors, floor.background));
-            if (ratio < floor.floor) {
-                CHECK_EQUAL(1000 * face + (int)check, (int)(ratio * 100.0));
-            }
-        }
-        check_gradient_steps(colors->header_top, colors->header_background);
-    }
 }
 
 static void start_app_with_clock(bool clock_on)
@@ -3762,15 +3724,14 @@ int main(void)
         TEST_CASE(the_standard_now_playing_keeps_its_pixels),
         TEST_CASE(the_cassette_and_turntable_frames_keep_their_pixels_in_every_state),
         TEST_CASE(a_playing_face_changes_pixels_a_tick_later_and_a_paused_one_does_not),
+        TEST_CASE(the_turntable_redraws_twenty_times_a_second_and_the_cassette_ten),
         TEST_CASE(lyrics_never_show_on_a_face),
         TEST_CASE(the_standard_face_is_drawn_when_the_face_code_is_missing_or_unknown),
-        TEST_CASE(the_header_and_status_bar_take_the_face_colours_until_home),
-        TEST_CASE(leaving_a_face_flips_the_header_and_status_bar_at_the_midpoint),
-        TEST_CASE(entering_a_face_flips_the_header_and_status_bar_at_the_midpoint),
-        TEST_CASE(each_face_chrome_background_matches_the_backdrop_that_face_draws),
+        TEST_CASE(a_face_fills_the_screen_without_the_header_and_status_bar_until_home),
+        TEST_CASE(coming_back_to_a_face_takes_the_bars_away_again),
+        TEST_CASE(every_face_paints_the_top_of_the_screen),
         TEST_CASE(a_face_chosen_in_settings_applies_without_a_restart),
         TEST_CASE(a_paused_face_frame_followed_by_an_idle_frame_sends_nothing),
-        TEST_CASE(every_face_chrome_meets_the_floors_of_the_roles_it_draws),
         TEST_CASE(the_header_shows_the_time_only_while_the_clock_setting_is_on),
         TEST_CASE(a_clock_record_written_over_usb_sets_the_clock),
         TEST_CASE(dac_keys_follow_the_swap_setting),
