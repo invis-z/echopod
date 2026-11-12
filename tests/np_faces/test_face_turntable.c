@@ -11,9 +11,10 @@ enum {
     ARM_REST = 140,
     ARM_STEPS = 12,
     TUBE_RADIUS = 60,
-    GLINT_STEPS = 18,
-    GLINT_REACH = 59,
-    GLINT_ROWS = 24,
+    TURN_STEPS = 18,
+    LABEL_RADIUS = 28,
+    LOGO_HALF = 24,
+    QUADRANT_SIDE = 64,
     TICK_BASE = 1396,
     POSITION_MS = 139600,
     FALLBACK_LEVEL = 8,
@@ -222,14 +223,39 @@ static void a_cover_is_a_round_label_with_a_vinyl_mask(void)
     }
 }
 
-static void without_a_cover_the_label_is_red_with_a_cream_ring(void)
+static int label_count(const NpTestScene *scene, Color color)
+{
+    Point centre = centre_of(scene);
+    return count_in(
+        scene, (Rect){centre.x - LOGO_HALF, centre.y - LOGO_HALF, 2 * LOGO_HALF, 2 * LOGO_HALF},
+        color);
+}
+
+static void without_a_cover_the_label_is_red_with_the_cream_logo(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestScene scene = scene_of(layout, NP_TEST_NO_COVER);
-        CHECK_EQUAL(LABEL_RED, probe(&scene, 10, 10));
-        CHECK_EQUAL(CREAM, probe(&scene, 16, 16));
+        np_test_draw(&scene, pixels);
+        CHECK(label_count(&scene, LABEL_RED) > 200);
+        CHECK(label_count(&scene, CREAM) > 200);
+        CHECK_EQUAL(LABEL_RED, probe(&scene, 0, -LABEL_RADIUS + 2));
         CHECK_EQUAL(VINYL, probe(&scene, 27, 27));
     }
+}
+
+static Color quadrant_pixels[QUADRANT_SIDE * QUADRANT_SIDE];
+
+static Image quadrant_cover(void)
+{
+    static const Color QUADRANTS[2][2] = {{COLOR_RGB(40, 120, 216), COLOR_RGB(240, 240, 240)},
+                                          {COLOR_RGB(248, 200, 40), COLOR_RGB(32, 160, 88)}};
+    for (int y = 0; y < QUADRANT_SIDE; y++) {
+        for (int x = 0; x < QUADRANT_SIDE; x++) {
+            quadrant_pixels[y * QUADRANT_SIDE + x] =
+                QUADRANTS[y >= QUADRANT_SIDE / 2][x >= QUADRANT_SIDE / 2];
+        }
+    }
+    return (Image){quadrant_pixels, QUADRANT_SIDE, QUADRANT_SIDE};
 }
 
 static void the_rim_and_three_grooves_ring_the_record(void)
@@ -244,38 +270,44 @@ static void the_rim_and_three_grooves_ring_the_record(void)
     }
 }
 
-static void the_glint_makes_one_turn_in_eighteen_ticks(void)
+static void the_label_makes_one_turn_in_eighteen_ticks(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
-        NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
-        scene.frame.tick = 0;
-        CHECK_EQUAL(ALU, probe(&scene, 0, -50));
-        np_test_draw(&scene, other);
-        scene.frame.tick = GLINT_STEPS / 2;
-        CHECK_EQUAL(ALU, probe(&scene, 0, 50));
-        CHECK_EQUAL(VINYL, probe(&scene, 0, -50));
-        scene.frame.tick = GLINT_STEPS;
-        np_test_draw(&scene, pixels);
-        CHECK(np_test_same(pixels, other, scene.layout));
-    }
-}
-
-static void the_glint_turns_clockwise_from_the_top(void)
-{
-    for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
-        NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
-        scene.frame.tick = 5;
-        CHECK_EQUAL(VINYL, probe(&scene, -49, 9));
-        scene.frame.tick = GLINT_STEPS - 5;
-        CHECK_EQUAL(ALU, probe(&scene, -49, 9));
-    }
-}
-
-static void one_tick_repaints_only_the_glint_band(void)
-{
-    for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
-        for (uint32_t tick = TICK_BASE; tick < TICK_BASE + GLINT_STEPS; tick++) {
+        for (int covered = 0; covered < 2; covered++) {
             NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
+            scene.frame.cover = covered ? quadrant_cover() : (Image){0};
+            scene.frame.tick = 0;
+            np_test_draw(&scene, other);
+            scene.frame.tick = TURN_STEPS / 2;
+            np_test_draw(&scene, pixels);
+            CHECK(!np_test_same(pixels, other, scene.layout));
+            scene.frame.tick = TURN_STEPS;
+            np_test_draw(&scene, pixels);
+            CHECK(np_test_same(pixels, other, scene.layout));
+        }
+    }
+}
+
+static void a_cover_turns_clockwise_from_the_top(void)
+{
+    for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
+        NpTestScene scene = scene_of(layout, NP_TEST_PLAYING);
+        scene.frame.cover = quadrant_cover();
+        scene.frame.tick = 0;
+        CHECK_EQUAL(COLOR_RGB(40, 120, 216), probe(&scene, -10, -10));
+        CHECK_EQUAL(COLOR_RGB(240, 240, 240), probe(&scene, 10, -10));
+        scene.frame.tick = 3;
+        CHECK_EQUAL(COLOR_RGB(40, 120, 216), probe(&scene, 0, -15));
+        scene.frame.tick = TURN_STEPS / 2;
+        CHECK_EQUAL(COLOR_RGB(32, 160, 88), probe(&scene, -10, -10));
+    }
+}
+
+static void one_tick_repaints_only_the_label(void)
+{
+    for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
+        for (uint32_t tick = TICK_BASE; tick < TICK_BASE + TURN_STEPS; tick++) {
+            NpTestScene scene = scene_of(layout, NP_TEST_NO_COVER);
             scene.frame.tick = tick;
             np_test_draw(&scene, other);
             scene.frame.tick = tick + 1;
@@ -284,10 +316,10 @@ static void one_tick_repaints_only_the_glint_band(void)
             for (int y = 0; y < scene.layout.height; y++) {
                 bool differs = rows_differ(pixels, other, scene.layout, y);
                 rows += differs ? 1 : 0;
-                CHECK(!differs || (y >= centre_of(&scene).y - GLINT_REACH &&
-                                   y <= centre_of(&scene).y + GLINT_REACH));
+                CHECK(!differs || (y >= centre_of(&scene).y - LABEL_RADIUS &&
+                                   y < centre_of(&scene).y + LABEL_RADIUS));
             }
-            CHECK(rows > 0 && rows <= GLINT_ROWS);
+            CHECK(rows > 0);
         }
     }
 }
@@ -351,14 +383,15 @@ static void the_arm_advances_monotonically_with_progress(void)
     }
 }
 
-static void scrubbing_swings_the_arm_to_the_target_but_the_glint_keeps_the_tick(void)
+static void scrubbing_swings_the_arm_to_the_target_but_the_label_keeps_the_tick(void)
 {
     for (int layout = 0; layout < NP_TEST_LAYOUT_COUNT; layout++) {
         NpTestScene scene = scene_of(layout, NP_TEST_SCRUBBING);
         CHECK(tube_at(&scene, 9));
         CHECK(!tube_at(&scene, 6));
-        scene.frame.tick = 0;
-        CHECK_EQUAL(ALU, probe(&scene, 0, -50));
+        scene.frame.cover = quadrant_cover();
+        scene.frame.tick = 3;
+        CHECK_EQUAL(COLOR_RGB(40, 120, 216), probe(&scene, 0, -15));
     }
 }
 
@@ -513,17 +546,17 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(the_backdrop_runs_from_walnut_top_to_walnut_bottom),
         TEST_CASE(a_cover_is_a_round_label_with_a_vinyl_mask),
-        TEST_CASE(without_a_cover_the_label_is_red_with_a_cream_ring),
+        TEST_CASE(without_a_cover_the_label_is_red_with_the_cream_logo),
         TEST_CASE(the_rim_and_three_grooves_ring_the_record),
-        TEST_CASE(the_glint_makes_one_turn_in_eighteen_ticks),
-        TEST_CASE(the_glint_turns_clockwise_from_the_top),
-        TEST_CASE(one_tick_repaints_only_the_glint_band),
+        TEST_CASE(the_label_makes_one_turn_in_eighteen_ticks),
+        TEST_CASE(a_cover_turns_clockwise_from_the_top),
+        TEST_CASE(one_tick_repaints_only_the_label),
         TEST_CASE(the_lamp_is_amber_when_playing_and_dark_when_paused),
         TEST_CASE(a_playing_face_with_fitting_text_ignores_the_clock),
         TEST_CASE(the_stylus_sits_at_the_start_with_nothing_played_and_unknown_duration),
         TEST_CASE(the_stylus_reaches_the_last_groove_at_the_end),
         TEST_CASE(the_arm_advances_monotonically_with_progress),
-        TEST_CASE(scrubbing_swings_the_arm_to_the_target_but_the_glint_keeps_the_tick),
+        TEST_CASE(scrubbing_swings_the_arm_to_the_target_but_the_label_keeps_the_tick),
         TEST_CASE(volume_feedback_leaves_the_arm_where_playback_is),
         TEST_CASE(the_bar_is_cream_when_playing_amber_when_scrubbing_and_track_past_the_fill),
         TEST_CASE(the_volume_fills_the_bar_in_amber),

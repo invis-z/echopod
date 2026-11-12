@@ -13,6 +13,7 @@ typedef struct RipplLogo {
 } RipplLogo;
 
 extern const RipplLogo RIPPL_LOGO_SPLASH;
+extern const RipplLogo RIPPL_LOGO_LABEL;
 
 uint8_t rippl_logo_alpha(const RipplLogo *logo, int x, int y);
 void rippl_logo_draw(Canvas *canvas, const RipplLogo *logo, Point origin, Color color,

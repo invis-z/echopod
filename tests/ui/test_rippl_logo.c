@@ -28,6 +28,15 @@ static void outside_the_mask_there_is_nothing(void)
     CHECK_EQUAL(SIDE, RIPPL_LOGO_SPLASH.side);
 }
 
+static void the_label_size_has_its_head_and_ring_where_the_splash_does(void)
+{
+    CHECK_EQUAL(48, RIPPL_LOGO_LABEL.side);
+    CHECK_EQUAL(COLOR_ALPHA_OPAQUE, rippl_logo_alpha(&RIPPL_LOGO_LABEL, 24, 40));
+    CHECK_EQUAL(COLOR_ALPHA_OPAQUE, rippl_logo_alpha(&RIPPL_LOGO_LABEL, 24, 2));
+    CHECK_EQUAL(0, rippl_logo_alpha(&RIPPL_LOGO_LABEL, 24, 8));
+    CHECK_EQUAL(0, rippl_logo_alpha(&RIPPL_LOGO_LABEL, 0, 0));
+}
+
 static int count(Color color)
 {
     int found = 0;
@@ -74,6 +83,7 @@ int main(void)
         TEST_CASE(the_note_head_is_solid_and_the_corners_are_empty),
         TEST_CASE(the_ring_is_solid_and_the_gap_inside_it_is_empty),
         TEST_CASE(outside_the_mask_there_is_nothing),
+        TEST_CASE(the_label_size_has_its_head_and_ring_where_the_splash_does),
         TEST_CASE(drawing_at_full_alpha_paints_the_shape_in_the_colour),
         TEST_CASE(drawing_at_zero_alpha_paints_nothing),
         TEST_CASE(drawing_is_clipped_to_the_canvas),

@@ -3,6 +3,7 @@
 #include "faces.h"
 #include "np_faces/face_shapes.h"
 #include "ui/label.h"
+#include "ui/rippl_logo.h"
 
 #define WALNUT_TOP COLOR_RGB(72, 44, 24)
 #define WALNUT_BOTTOM COLOR_RGB(40, 24, 16)
@@ -27,15 +28,13 @@ enum {
     RIM_INNER = 64,
     LABEL_RADIUS = 28,
     LABEL_MASK = 40,
-    PLAIN_RING = 23,
-    PLAIN_RING_INNER = 22,
+    FRACTION_BITS = 8,
+    FRACTION_ONE = 1 << FRACTION_BITS,
+    FRACTION_MASK = FRACTION_ONE - 1,
     GROOVE_FIRST = 45,
     GROOVE_STEP = 7,
     GROOVE_COUNT = 3,
-    GLINT_STEPS = 18,
-    GLINT_WIDTH = 32,
-    GLINT_FROM = 44,
-    GLINT_TO = 58,
+    TURN_STEPS = 18,
     SPINDLE = 48,
     BADGE_DISC = 320,
     BADGE_SIDE = 18,
@@ -112,19 +111,99 @@ RIPPL_NP_FACES_CODE static void plate(const Deck *deck)
     ring(deck, RIM_INNER * Q4, 0, VINYL);
 }
 
+RIPPL_NP_FACES_CODE static uint8_t label_angle(const Deck *deck)
+{
+    return (uint8_t)(deck->frame->tick % TURN_STEPS * SHAPE_TURN / TURN_STEPS);
+}
+
+RIPPL_NP_FACES_CODE static int clamped(int value, int limit)
+{
+    return value < 0 ? 0 : value >= limit ? limit - 1 : value;
+}
+
+RIPPL_NP_FACES_CODE static void cover_pixel(Canvas *canvas, Point at, Image cover, Point from)
+{
+    Rect clip = canvas->clip;
+    if (at.x >= clip.x && at.x < clip.x + clip.width && at.y >= clip.y &&
+        at.y < clip.y + clip.height) {
+        int offset = (at.y - canvas->bounds.y) * canvas->bounds.width + at.x - canvas->bounds.x;
+        canvas->pixels[offset] =
+            cover
+                .pixels[clamped(from.y, cover.height) * cover.width + clamped(from.x, cover.width)];
+    }
+}
+
+RIPPL_NP_FACES_CODE static void turned_cover(const Deck *deck, Image cover, uint8_t angle)
+{
+    int sine = shape_sine(angle);
+    int cosine = shape_cosine(angle);
+    int span = 2 * LABEL_RADIUS;
+    int reach = span * SHAPE_UNIT;
+    for (int row = 0; row < span; row++) {
+        int dy = 2 * row + 1 - span;
+        for (int column = 0; column < span; column++) {
+            int dx = 2 * column + 1 - span;
+            if (dx * dx + dy * dy <= span * span) {
+                int u = dx * cosine + dy * sine + reach;
+                int v = dy * cosine - dx * sine + reach;
+                Point at = {deck->centre.x - LABEL_RADIUS + column,
+                            deck->centre.y - LABEL_RADIUS + row};
+                cover_pixel(deck->canvas, at, cover,
+                            (Point){u * cover.width / (2 * reach), v * cover.height / (2 * reach)});
+            }
+        }
+    }
+    ring(deck, LABEL_MASK * Q4, LABEL_RADIUS * Q4, VINYL);
+}
+
+RIPPL_NP_FACES_CODE static int logo_level(int x, int y)
+{
+    return rippl_logo_alpha(&RIPPL_LOGO_LABEL, x, y);
+}
+
+RIPPL_NP_FACES_CODE static uint8_t logo_alpha(int u, int v)
+{
+    int x = u >> FRACTION_BITS;
+    int y = v >> FRACTION_BITS;
+    int across = u & FRACTION_MASK;
+    int down = v & FRACTION_MASK;
+    int top = logo_level(x, y) * (FRACTION_ONE - across) + logo_level(x + 1, y) * across;
+    int bottom = logo_level(x, y + 1) * (FRACTION_ONE - across) + logo_level(x + 1, y + 1) * across;
+    int rounding = 1 << (2 * FRACTION_BITS - 1);
+    return (uint8_t)((top * (FRACTION_ONE - down) + bottom * down + rounding) >>
+                     (2 * FRACTION_BITS));
+}
+
+RIPPL_NP_FACES_CODE static void turned_logo(const Deck *deck, uint8_t angle)
+{
+    int sine = shape_sine(angle);
+    int cosine = shape_cosine(angle);
+    int side = RIPPL_LOGO_LABEL.side;
+    int middle = side * FRACTION_ONE / 2 - FRACTION_ONE / 2;
+    for (int row = 0; row < side; row++) {
+        int dy = 2 * row + 1 - side;
+        for (int column = 0; column < side; column++) {
+            int dx = 2 * column + 1 - side;
+            uint8_t alpha = logo_alpha(middle + (dx * cosine + dy * sine) / 2,
+                                       middle + (dy * cosine - dx * sine) / 2);
+            if (alpha != 0) {
+                Point at = {deck->centre.x - side / 2 + column, deck->centre.y - side / 2 + row};
+                canvas_blend_pixel(deck->canvas, at, CREAM, alpha);
+            }
+        }
+    }
+}
+
 RIPPL_NP_FACES_CODE static void label_art(const Deck *deck)
 {
     Image cover = deck->frame->cover;
-    int corner = deck->centre.y - LABEL_RADIUS;
+    uint8_t angle = label_angle(deck);
     if (cover.pixels == NULL) {
         ring(deck, LABEL_RADIUS * Q4, 0, LABEL_RED);
-        ring(deck, PLAIN_RING * Q4, PLAIN_RING_INNER * Q4, CREAM);
-        return;
+        turned_logo(deck, angle);
+    } else {
+        turned_cover(deck, cover, angle);
     }
-    int side = 2 * LABEL_RADIUS;
-    image_draw_quad(deck->canvas, cover,
-                    (Quad){deck->centre.x - LABEL_RADIUS, side, corner, side, corner, side});
-    ring(deck, LABEL_MASK * Q4, LABEL_RADIUS * Q4, VINYL);
 }
 
 RIPPL_NP_FACES_CODE static void grooves(const Deck *deck)
@@ -133,8 +212,6 @@ RIPPL_NP_FACES_CODE static void grooves(const Deck *deck)
         int radius = GROOVE_FIRST + GROOVE_STEP * index;
         ring(deck, (radius + 1) * Q4, radius * Q4, ALU_DARK);
     }
-    uint8_t angle = (uint8_t)(deck->frame->tick % GLINT_STEPS * SHAPE_TURN / GLINT_STEPS);
-    spoke(deck->canvas, (ShapeSpoke){deck->centre, angle, GLINT_WIDTH, GLINT_FROM, GLINT_TO}, ALU);
     ring(deck, SPINDLE, 0, ALU);
 }
 

@@ -33,6 +33,7 @@ The first Rippl release, forked from EchoPod 0.12.0.
 ### Look
 
 - The start-up screen shows the Rippl logo fading in, instead of the word Rippl.
+- The Turntable face shows the album cover as the record's label again, as before EchoPod 0.12.0 printed it across the whole record, and the label turns with the record in place of the turning glint; without a cover the label is red with the Rippl logo on it.
 
 ### Buttons
 

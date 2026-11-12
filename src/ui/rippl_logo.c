@@ -5,6 +5,7 @@
 _Static_assert((int)RIPPL_LOGO_LEVELS == (int)COLOR_ALPHA_OPAQUE, "a logo level is a blend alpha");
 
 const RipplLogo RIPPL_LOGO_SPLASH = {RIPPL_LOGO_SPLASH_COVERAGE, RIPPL_LOGO_SPLASH_SIDE};
+const RipplLogo RIPPL_LOGO_LABEL = {RIPPL_LOGO_LABEL_COVERAGE, RIPPL_LOGO_LABEL_SIDE};
 
 uint8_t rippl_logo_alpha(const RipplLogo *logo, int x, int y)
 {

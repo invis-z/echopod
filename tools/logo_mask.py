@@ -10,7 +10,7 @@ VIEW_BOX = 160
 SUPERSAMPLE = 16
 CURVE_STEPS = 24
 LEVELS = 15
-SIZES = {"RIPPL_LOGO_SPLASH": 80}
+SIZES = {"RIPPL_LOGO_SPLASH": 80, "RIPPL_LOGO_LABEL": 48}
 TOKEN = re.compile(r"[A-Za-z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
 ARGUMENTS = {"M": 2, "L": 2, "H": 1, "V": 1, "C": 6, "S": 4, "Q": 4, "T": 2, "Z": 0}
 
