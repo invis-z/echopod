@@ -1,4 +1,4 @@
-# Rippl
+<h1 align="center"><img src="assets/rippl-title.svg" width="48" alt="" align="absmiddle"> Rippl</h1>
 
 Replacement firmware for the Snowsky (FiiO) Echo Mini 8 GB music player. It has an iPod-style Cover Flow browser, a music library built on the player, album favorites, M3U playlists and an Up Next queue. It isn't made or supported by FiiO.
 
