@@ -46,6 +46,7 @@ typedef struct NowPlayingFrame {
     bool playing;
     bool scrubbing;
     bool volume_shown;
+    bool flipped;
 } NowPlayingFrame;
 
 typedef struct NowPlayingFaces {

@@ -945,6 +945,8 @@ static void frame_state(const NowPlayingScreen *now_playing, NowPlayingFrame *fr
     frame->playing = now_playing->status.state == PLAYER_PLAYING;
     frame->scrubbing = now_playing->scrubbing;
     frame->volume_shown = showing(now_playing, NOW_PLAYING_FEEDBACK_VOLUME);
+    frame->flipped = now_playing->config.orientation != NULL &&
+                     *now_playing->config.orientation == ORIENTATION_PORTRAIT_FLIPPED;
 }
 
 static void frame_of(const NowPlayingScreen *now_playing, NowPlayingFrame *frame, char *texts)
@@ -967,8 +969,9 @@ static void request_tick(const NowPlayingScreen *now_playing)
 {
     const PlayerStatus *status = &now_playing->status;
     if (status->state == PLAYER_PLAYING) {
-        uint32_t period =
-            face_of(now_playing) == NP_FACE_TURNTABLE ? NP_FACE_SMOOTH_TICK_MS : NP_FACE_TICK_MS;
+        uint8_t face = face_of(now_playing);
+        bool smooth = face == NP_FACE_TURNTABLE || face == NP_FACE_TAPE_WINDOW;
+        uint32_t period = smooth ? NP_FACE_SMOOTH_TICK_MS : NP_FACE_TICK_MS;
         marquee_frame_request(period - status->position_ms % period);
     }
 }

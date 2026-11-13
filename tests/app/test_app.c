@@ -3218,6 +3218,21 @@ static void the_cassette_and_turntable_frames_keep_their_pixels_in_every_state(v
     }
 }
 
+static const uint32_t TAPE_WINDOW_SHOT_HASHES[2][SHOT_STATE_COUNT] = {
+    {0x187F9172U, 0x6F89313AU, 0xFB77FFB9U, 0xB4EC0F34U, 0x6F89313AU, 0x6B6F3118U, 0x137BFCA8U},
+    {0x08980246U, 0xE645F7D6U, 0x8EEDC36DU, 0x915B3B1DU, 0xE645F7D6U, 0x35355B52U, 0xAAAA65DCU},
+};
+
+static void the_tape_window_frames_keep_their_pixels_in_every_state(void)
+{
+    for (int layout = 0; layout < 2; layout++) {
+        for (int state = 0; state < SHOT_STATE_COUNT; state++) {
+            ShotSetup setup = {SHOT_LAYOUTS[layout], (ShotState)state, NP_FACE_TAPE_WINDOW, true};
+            CHECK_EQUAL(TAPE_WINDOW_SHOT_HASHES[layout][state], shot_hash(setup));
+        }
+    }
+}
+
 static void a_playing_face_changes_pixels_a_tick_later_and_a_paused_one_does_not(void)
 {
     ShotSetup playing = {SHOT_LANDSCAPE, SHOT_PLAYING, NP_FACE_CASSETTE, true};
@@ -3228,11 +3243,11 @@ static void a_playing_face_changes_pixels_a_tick_later_and_a_paused_one_does_not
     CHECK(fake_hal_pixels_written() > pixels);
 }
 
-static void the_turntable_redraws_twenty_times_a_second_and_the_cassette_ten(void)
+static void the_turntable_and_tape_window_redraw_twenty_times_a_second_and_the_cassette_ten(void)
 {
-    static const uint8_t FACES[2] = {NP_FACE_TURNTABLE, NP_FACE_CASSETTE};
-    static const bool MOVES[2] = {true, false};
-    for (int face = 0; face < 2; face++) {
+    static const uint8_t FACES[3] = {NP_FACE_TURNTABLE, NP_FACE_TAPE_WINDOW, NP_FACE_CASSETTE};
+    static const bool MOVES[3] = {true, true, false};
+    for (int face = 0; face < 3; face++) {
         reach_shot((ShotSetup){SHOT_LANDSCAPE, SHOT_NO_COVER, FACES[face], true});
         long pixels = fake_hal_pixels_written();
         fake_hal_audio_set_position(SHOT_POSITION_MS + NP_FACE_SMOOTH_TICK_MS);
@@ -3723,8 +3738,9 @@ int main(void)
         TEST_CASE(a_track_without_lyrics_shows_none),
         TEST_CASE(the_standard_now_playing_keeps_its_pixels),
         TEST_CASE(the_cassette_and_turntable_frames_keep_their_pixels_in_every_state),
+        TEST_CASE(the_tape_window_frames_keep_their_pixels_in_every_state),
         TEST_CASE(a_playing_face_changes_pixels_a_tick_later_and_a_paused_one_does_not),
-        TEST_CASE(the_turntable_redraws_twenty_times_a_second_and_the_cassette_ten),
+        TEST_CASE(the_turntable_and_tape_window_redraw_twenty_times_a_second_and_the_cassette_ten),
         TEST_CASE(lyrics_never_show_on_a_face),
         TEST_CASE(the_standard_face_is_drawn_when_the_face_code_is_missing_or_unknown),
         TEST_CASE(a_face_fills_the_screen_without_the_header_and_status_bar_until_home),

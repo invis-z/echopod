@@ -33,7 +33,7 @@ Version 0.12.0 adds seven colour themes, four retro Now Playing faces, `.m4b` au
 | USB DAC mode | device | Settings → USB mode → DAC: a USB Audio Class 1.0 sound card, 16 or 24-bit at 44.1 or 48 kHz, with its own remembered volume; played on the player from Windows 11 (all four formats) and an Android phone |
 | Updates and the way back to FiiO | device | Rippl installs its own updates and FiiO's 8 GB firmware from a file copy |
 | Themes | device | Settings → Display → Theme: Dark, Light, Fjord, Dusk, Neon, Phosphor, Paper, Olive and High contrast |
-| Now Playing faces | device | Settings → Display → Now Playing: Standard, Cassette and Turntable (a picture disc of the cover), in landscape and portrait |
+| Now Playing faces | device | Settings → Display → Now Playing: Standard, Cassette, Turntable (a picture disc of the cover) and Tape Window (the player's window onto a cassette), in landscape and portrait |
 | `.m4b` audiobooks with chapters | device | "Chapter N of M" on Now Playing, a chapter list on ≡, the chapter kept in a one-file book's bookmark; no chapter titles yet |
 | QOA playback | device | Mono and stereo, exact seeking, gapless; names from the path, since QOA has no tags |
 | Configurable start screen | sim | Works in the simulator; not yet checked on the player |

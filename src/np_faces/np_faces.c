@@ -10,6 +10,9 @@ RIPPL_NP_FACES_CODE static void draw(const NowPlayingFrame *frame, Canvas *canva
     case NP_FACE_TURNTABLE:
         face_turntable_draw(frame, canvas);
         break;
+    case NP_FACE_TAPE_WINDOW:
+        face_tape_window_draw(frame, canvas);
+        break;
     default:
         break;
     }
