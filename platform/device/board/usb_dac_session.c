@@ -11,19 +11,18 @@
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/power.h"
+#include "irq.h"
 #include "settings/settings.h"
 #include "usb.h"
 
 enum {
     HOST_TIMEOUT_MS = 3000,
     STREAM_IDLE_MS = 100,
+    STREAM_QUIET_MS = 10,
     POLLS_PER_SERVICE = 4,
-    NOTICE_CAPACITY = 192,
-    NUMBER_CAPACITY = 12,
-    FORMAT_CAPACITY = 16,
-    HZ_PER_KHZ = 1000,
     BITS_PER_BYTE = 8,
-    NOTICE_REFRESH_MS = 1000,
+    STATS_REFRESH_MS = 1000,
+    STATE_REFRESH_MS = 5000,
     REPORT_QUEUE_CAPACITY = 8
 };
 
@@ -34,21 +33,66 @@ static UsbPort port;
 static UsbAudio audio;
 static UsbAudioSink sink;
 static uint32_t open_rate;
-static uint32_t last_packet_ms;
-static bool receiving;
+static volatile uint32_t last_packet_ms;
+static volatile bool receiving;
+static volatile bool finished;
+static uint32_t stream_consumed;
+static uint32_t stream_last_position;
 static bool playing;
-static uint32_t notice_refreshed_ms;
-static char shown_text[NOTICE_CAPACITY];
+static uint32_t shown_ms;
+static bool stats_shown;
+static uint32_t output_starts;
+static uint32_t output_stops;
+static uint32_t format_changes;
+static uint32_t loss_last;
+static uint32_t loss_longest;
+static uint32_t loss_gap_us;
 static uint8_t reports[REPORT_QUEUE_CAPACITY];
 static uint8_t report_start;
 static uint8_t report_count;
 
+static uint32_t consumed_frames(void)
+{
+    uint32_t position = board_audio_stream_position();
+    if (position == BOARD_AUDIO_STREAM_STOPPED) {
+        stream_consumed = 0;
+        stream_last_position = 0;
+        return 0;
+    }
+    stream_consumed += (position + sink.ring_frames - stream_last_position) % sink.ring_frames;
+    stream_last_position = position;
+    return stream_consumed;
+}
+
+static void restart_position(void)
+{
+    uint32_t primask = irq_save();
+    stream_consumed = 0;
+    stream_last_position = 0;
+    irq_restore(primask);
+}
+
+static void note_loss(void)
+{
+    uint32_t run = ((uint32_t)port.packet_frame - sink.last_frame) & USB_AUDIO_SINK_FRAME_MASK;
+    if (!sink.frame_known || !sink.playing || run <= 1) {
+        return;
+    }
+    loss_last = run - 1;
+    loss_gap_us = port.interrupt_gap_us;
+    if (loss_last > loss_longest) {
+        loss_longest = loss_last;
+    }
+}
+
 static void receive_stream(const uint8_t *bytes, uint32_t length)
 {
     if (receiving) {
+        note_loss();
         last_packet_ms = hal_clock_milliseconds();
+        finished = false;
         usb_audio_sink_count_frame(&sink, port.packet_frame);
-        usb_audio_sink_write(&sink, bytes, length, board_audio_stream_consumed());
+        usb_audio_sink_write(&sink, bytes, length, consumed_frames());
     }
 }
 
@@ -59,104 +103,49 @@ static void serve_usb(void)
     }
 }
 
-static void number_text(char *text, size_t capacity, uint32_t value)
+static void fill_stats(AppDacStats *stats)
 {
-    StringBuilder number = string_builder_make(text, capacity);
-    string_builder_append_unsigned(&number, value);
-}
-
-static void append_format(StringBuilder *line)
-{
-    char rate[FORMAT_CAPACITY];
-    char bits[NUMBER_CAPACITY];
-    char volume[NUMBER_CAPACITY];
-    StringBuilder rate_builder = string_builder_make(rate, sizeof rate);
-    string_builder_append_unsigned(&rate_builder, audio.rate / HZ_PER_KHZ);
-    if (audio.rate % HZ_PER_KHZ != 0) {
-        string_builder_append_char(&rate_builder, '.');
-        string_builder_append_unsigned(&rate_builder, audio.rate % HZ_PER_KHZ / 100);
-    }
-    number_text(bits, sizeof bits, BITS_PER_BYTE * usb_audio_sample_bytes(&audio));
-    number_text(volume, sizeof volume, shared->dac_volume);
-    const char *arguments[] = {rate, bits, volume};
-    i18n_format(line, STR_USB_FORMAT_VOLUME, arguments, 3);
-}
-
-static void append_counters(StringBuilder *line)
-{
-    char missed[NUMBER_CAPACITY];
-    char dropped[NUMBER_CAPACITY];
-    char repeated[NUMBER_CAPACITY];
-    char restarts[NUMBER_CAPACITY];
-    number_text(missed, sizeof missed, sink.stats.missed);
-    number_text(dropped, sizeof dropped, sink.stats.dropped);
-    number_text(repeated, sizeof repeated, sink.stats.repeated);
-    number_text(restarts, sizeof restarts, sink.stats.realigned);
-    const char *arguments[] = {missed, dropped, repeated, restarts};
-    string_builder_append(line, " \xC2\xB7 ");
-    i18n_format(line, STR_USB_COUNTERS, arguments, 4);
-}
-
-static void append_battery(StringBuilder *line)
-{
-    HalBattery battery = hal_power_battery();
-    char percent[NUMBER_CAPACITY];
-    number_text(percent, sizeof percent, battery.percent);
-    const char *arguments[] = {percent};
-    string_builder_append(line, " · ");
-    if (!battery.known) {
-        string_builder_append(line, i18n_text(STR_USB_BATTERY_UNKNOWN));
-        return;
-    }
-    i18n_format(line, battery.charging ? STR_USB_BATTERY_CHARGING : STR_USB_BATTERY, arguments, 1);
-}
-
-static void state_text(char *text, size_t capacity)
-{
-    StringBuilder line = string_builder_make(text, capacity);
-    if (usb_audio_sample_bytes(&audio) == 0) {
-        char volume[NUMBER_CAPACITY];
-        number_text(volume, sizeof volume, shared->dac_volume);
-        const char *arguments[] = {volume};
-        i18n_format(&line, STR_USB_CHOOSE_OUTPUT, arguments, 1);
-    } else if (open_rate == 0) {
-        string_builder_append(&line, i18n_text(STR_USB_OUTPUT_FAILED));
-    } else {
-        append_format(&line);
-        append_counters(&line);
-    }
-    append_battery(&line);
-}
-
-static bool text_differs(const char *text)
-{
-    for (size_t index = 0;; index++) {
-        if (text[index] != shown_text[index]) {
-            return true;
-        }
-        if (text[index] == '\0') {
-            return false;
-        }
-    }
+    *stats = (AppDacStats){
+        .missed = sink.stats.missed,
+        .dropped = sink.stats.dropped,
+        .repeated = sink.stats.repeated,
+        .restarts = sink.stats.realigned,
+        .starts = output_starts,
+        .stops = output_stops,
+        .formats = format_changes,
+        .control = port.control_entries,
+        .wrong_slot = port.wrong_slots,
+        .late = port.late_interrupts,
+        .loss_last = loss_last,
+        .loss_longest = loss_longest,
+        .loss_gap_us = loss_gap_us,
+    };
 }
 
 static void show_state(void)
 {
-    state_text(shown_text, sizeof shown_text);
-    notice_refreshed_ms = hal_clock_milliseconds();
-    app_show_notice(TITLE, shown_text);
+    AppDacStats stats;
+    AppDacView view = {.title = TITLE,
+                       .rate = audio.rate,
+                       .bits = (uint8_t)(BITS_PER_BYTE * usb_audio_sample_bytes(&audio)),
+                       .volume = shared->dac_volume};
+    if (usb_audio_sample_bytes(&audio) == 0) {
+        view.message = i18n_text(STR_USB_CHOOSE_OUTPUT);
+    } else if (open_rate == 0) {
+        view.message = i18n_text(STR_USB_OUTPUT_FAILED);
+    }
+    if (stats_shown) {
+        fill_stats(&stats);
+        view.stats = &stats;
+    }
+    shown_ms = hal_clock_milliseconds();
+    app_show_dac(&view);
 }
 
 static void refresh_state(void)
 {
-    uint32_t now_ms = hal_clock_milliseconds();
-    if (playing || now_ms - notice_refreshed_ms < NOTICE_REFRESH_MS) {
-        return;
-    }
-    notice_refreshed_ms = now_ms;
-    char text[NOTICE_CAPACITY];
-    state_text(text, sizeof text);
-    if (text_differs(text)) {
+    uint32_t every = stats_shown ? STATS_REFRESH_MS : STATE_REFRESH_MS;
+    if (hal_clock_milliseconds() - shown_ms >= every) {
         show_state();
     }
 }
@@ -173,15 +162,21 @@ static void apply_attenuation(void)
 
 static void stop_output(void)
 {
+    output_stops++;
+    bool was_receiving = receiving;
+    receiving = false;
     if (playing) {
         board_audio_stream_pause();
         playing = false;
     }
+    restart_position();
     usb_audio_sink_start(&sink, audio.rate, usb_audio_sample_bytes(&audio));
+    receiving = was_receiving;
 }
 
 static void follow_format(void)
 {
+    format_changes++;
     receiving = false;
     stop_output();
     if (usb_audio_sample_bytes(&audio) != 0 && audio.rate != open_rate) {
@@ -203,14 +198,33 @@ static void follow_host(void)
     }
 }
 
+static void finish_quietly(void)
+{
+    uint32_t primask = irq_save();
+    usb_audio_sink_finish(&sink, consumed_frames());
+    finished = true;
+    irq_restore(primask);
+}
+
 static void keep_output(void)
 {
-    if (playing && hal_clock_milliseconds() - last_packet_ms > STREAM_IDLE_MS) {
+    int32_t quiet_ms = (int32_t)(hal_clock_milliseconds() - last_packet_ms);
+    if (playing && quiet_ms > STREAM_IDLE_MS) {
         stop_output();
+    } else if (playing && !finished && quiet_ms > STREAM_QUIET_MS) {
+        finish_quietly();
     } else if (!playing && receiving && usb_audio_sink_primed(&sink)) {
+        output_starts++;
         playing = board_audio_stream_play();
         usb_audio_sink_set_playing(&sink, playing);
     }
+}
+
+static void track_output(void)
+{
+    uint32_t primask = irq_save();
+    (void)consumed_frames();
+    irq_restore(primask);
 }
 
 static void step_volume(int step)
@@ -263,6 +277,10 @@ static bool user_left(void)
         case APP_DAC_KEY_PREVIOUS:
             queue_report(USB_HID_PREVIOUS);
             break;
+        case APP_DAC_KEY_STATS:
+            stats_shown = !stats_shown;
+            show_state();
+            break;
         case APP_DAC_KEY_LEAVE:
             return true;
         }
@@ -277,6 +295,7 @@ static void serve(void)
         hal_audio_service();
         board_display_service();
         follow_host();
+        track_output();
         keep_output();
         send_reports();
         refresh_state();
@@ -293,6 +312,13 @@ static void start_session(void)
     receiving = false;
     playing = false;
     report_count = 0;
+    stats_shown = false;
+    output_starts = 0;
+    output_stops = 0;
+    format_changes = 0;
+    loss_last = 0;
+    loss_longest = 0;
+    loss_gap_us = 0;
     port = (UsbPort){.link = shared->link,
                      .bulk_packet = USB_PACKET_SIZE,
                      .audio = &audio,
@@ -312,8 +338,10 @@ void usb_dac_session(UsbShared *state)
     start_session();
     uint8_t starting_volume = shared->dac_volume;
     if (usb_wait_for_host(&port, HOST_TIMEOUT_MS)) {
+        usb_receive_interrupts_start(&port);
         show_state();
         serve();
+        usb_receive_interrupts_stop(&port);
     }
     receiving = false;
     stop_output();

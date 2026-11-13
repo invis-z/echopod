@@ -1167,10 +1167,12 @@ void board_audio_stream_pause(void)
     stop_transfer();
 }
 
-uint32_t board_audio_stream_consumed(void)
+uint32_t board_audio_stream_position(void)
 {
-    update_consumed();
-    return transferring ? consumed : 0;
+    if (!transferring) {
+        return BOARD_AUDIO_STREAM_STOPPED;
+    }
+    return dma_loop_position(dmac_source(), ring_address(), ring_words) / WORDS_PER_FRAME;
 }
 
 void board_audio_stream_close(void)

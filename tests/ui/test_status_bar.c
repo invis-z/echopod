@@ -70,6 +70,17 @@ static void a_paused_player_shows_two_bars(void)
     CHECK(ui_test_area_has_only(&canvas, last, theme.colors.header_text));
 }
 
+static void a_usb_session_shows_the_usb_mark_in_the_playback_place(void)
+{
+    Theme theme = status_theme();
+    Canvas canvas = draw_status(&theme, (StatusBarState){.playback = STATUS_PLAYBACK_USB});
+    Rect icon = status_bar_playback_area(&theme);
+    Rect stem = {icon.x + icon.width / 2 - 1, icon.y, 3, icon.height};
+    CHECK(ui_test_area_has_color(&canvas, stem, theme.colors.header_text));
+    Rect paused_gap = {icon.x + 2, icon.y, 3, icon.height};
+    CHECK(ui_test_area_has_color(&canvas, paused_gap, theme.colors.header_text));
+}
+
 static void the_battery_sits_inside_the_right_inset(void)
 {
     Theme theme = status_theme();
@@ -269,6 +280,7 @@ static void the_percentage_gives_way_to_a_clock_that_does_not_fit_beside_it(void
 int main(void)
 {
     static const TestCase cases[] = {
+        TEST_CASE(a_usb_session_shows_the_usb_mark_in_the_playback_place),
         TEST_CASE(the_clock_sits_after_the_left_icons_inside_the_inset),
         TEST_CASE(a_clock_that_does_not_fit_the_inset_is_left_out),
         TEST_CASE(with_a_status_band_the_clock_is_centered_between_the_icons_and_the_battery),

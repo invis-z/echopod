@@ -7,6 +7,8 @@
 #include "dsp/equalizer.h"
 #include "hal/system.h"
 
+#define BOARD_AUDIO_STREAM_STOPPED 0xFFFFFFFFu
+
 void board_clock_start(void);
 void board_clock_record_boot(void);
 uint32_t board_boot_ticks_per_microsecond(void);
@@ -36,6 +38,7 @@ BatteryGauge board_battery_gauge(void);
 void board_battery_restart(void);
 void board_systick_handler(const uint32_t *frame);
 void device_systick_entry(void);
+void board_usb_interrupt_attach(void (*handler)(void));
 void board_stall_beat(void);
 void board_stall_pause(bool paused);
 void board_stall_report(const uint32_t *frame);
@@ -71,7 +74,7 @@ bool board_audio_stream_open(uint32_t rate, void (*service)(void));
 uint32_t *board_audio_stream_ring(uint32_t *frames);
 bool board_audio_stream_play(void);
 void board_audio_stream_pause(void);
-uint32_t board_audio_stream_consumed(void);
+uint32_t board_audio_stream_position(void);
 void board_audio_stream_close(void);
 void board_wait_for_key(void);
 void board_main(void);

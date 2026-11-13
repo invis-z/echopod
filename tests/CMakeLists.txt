@@ -176,6 +176,11 @@ rippl_add_unit_test(NAME test_face_text
     LIBRARIES rippl_np_faces_fixtures
     PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/np_faces
 )
+rippl_add_unit_test(NAME test_dac_screen
+    SOURCES app/test_dac_screen.c
+    LIBRARIES rippl_app
+    PRIVATE_INCLUDES ${PROJECT_SOURCE_DIR}/src/app
+)
 rippl_add_unit_test(NAME test_app
     SOURCES app/test_app.c app/fake_hal.c
     LIBRARIES rippl_app rippl_library_fixtures m

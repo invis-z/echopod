@@ -1,5 +1,6 @@
 #include "gfx/text.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "core/utf8.h"
@@ -17,13 +18,15 @@ static void draw_glyph(Canvas *canvas, TextStyle style, const Glyph *glyph, Poin
         return;
     }
     const uint8_t *bitmap = font_glyph_bitmap(style.font, glyph);
+    bool two_bit = style.font->level_bits == FONT_TWO_BIT_LEVELS;
     int stride = canvas->bounds.width;
     Color *row =
         &canvas->pixels[(visible.y - canvas->bounds.y) * stride + (visible.x - canvas->bounds.x)];
     for (int y = visible.y; y < visible.y + visible.height; y++) {
         Color *pixel = row;
         for (int x = visible.x; x < visible.x + visible.width; x++) {
-            uint8_t level = font_bitmap_level(bitmap, glyph, x - area.x, y - area.y);
+            uint8_t level = two_bit ? font_glyph_level(style.font, glyph, x - area.x, y - area.y)
+                                    : font_bitmap_level(bitmap, glyph, x - area.x, y - area.y);
             if (level > 0) {
                 *pixel = color_blend(*pixel, style.color, level);
             }

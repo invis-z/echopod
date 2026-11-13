@@ -205,6 +205,8 @@ void status_bar_draw(Canvas *canvas, const Theme *theme, StatusBarState state)
         icon_draw_play(canvas, icon, color);
     } else if (state.playback == STATUS_PLAYBACK_PAUSED) {
         icon_draw_pause(canvas, icon, color);
+    } else if (state.playback == STATUS_PLAYBACK_USB) {
+        icon_draw_usb(canvas, icon, color);
     }
     if (state.bluetooth != STATUS_BLUETOOTH_OFF) {
         Color tint =

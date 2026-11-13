@@ -14,6 +14,7 @@
 #include "core/power_policy.h"
 #include "core/string_builder.h"
 #include "cover_cache.h"
+#include "dac_screen.h"
 #include "default_theme.h"
 #include "draw_profile.h"
 #include "equalizer_store.h"
@@ -1041,9 +1042,13 @@ void app_dac_keys_start(void)
     app.dac_volume_until_ms = hal_clock_milliseconds();
 }
 
-static AppDacKey dac_key_of(NowPlayingCommand command)
+static AppDacKey dac_key_of(NowPlayingCommand command, bool menu_skips)
 {
     switch (command) {
+    case NOW_PLAYING_EQUALIZER:
+        return APP_DAC_KEY_STATS;
+    case NOW_PLAYING_UP_NEXT:
+        return menu_skips ? APP_DAC_KEY_STATS : APP_DAC_KEY_NONE;
     case NOW_PLAYING_VOLUME_UP:
         return APP_DAC_KEY_VOLUME_UP;
     case NOW_PLAYING_VOLUME_DOWN:
@@ -1066,7 +1071,8 @@ static AppDacKey dac_key_for(KeyEvent event, uint32_t now_ms)
     NowPlayingControls controls =
         now_playing_controls_of(app.settings.settings.options, app.settings.settings.orientation);
     controls.volume_shown = !deadline_reached(now_ms, app.dac_volume_until_ms);
-    AppDacKey key = dac_key_of(now_playing_command_with(event, false, controls));
+    AppDacKey key =
+        dac_key_of(now_playing_command_with(event, false, controls), controls.menu_skips);
     if (key == APP_DAC_KEY_VOLUME_UP || key == APP_DAC_KEY_VOLUME_DOWN) {
         app.dac_volume_until_ms = now_ms + NOW_PLAYING_VOLUME_HOLD_MS;
     }
@@ -1377,14 +1383,54 @@ bool app_charging(void)
     return app.charging;
 }
 
-void app_show_notice(const char *title, const char *message)
+static void show_notice(const char *title, const char *message, void (*draw)(void *, Canvas *))
 {
     MessageConfig config = {.title = title, .message = message, .theme = current_theme()};
     Screen *screen = message_screen_init(&app.notice, config);
     if (!app.display_on) {
         set_display(true);
     }
-    render((FrameDrawer){.draw = draw_notice, .context = screen}, false, NOTICE_STRIP_HEIGHT);
+    render((FrameDrawer){.draw = draw, .context = screen}, false, NOTICE_STRIP_HEIGHT);
+    light_after_first_frame();
+}
+
+void app_show_notice(const char *title, const char *message)
+{
+    show_notice(title, message, draw_notice);
+}
+
+static void draw_usb_status(Canvas *canvas)
+{
+    StatusBarState status = current_status_bar();
+    status.playback = STATUS_PLAYBACK_USB;
+    status_bar_draw(canvas, current_theme(), status);
+}
+
+static void draw_usb_notice(void *context, Canvas *canvas)
+{
+    draw_notice(context, canvas);
+    draw_usb_status(canvas);
+}
+
+void app_show_usb_notice(const char *title, const char *message)
+{
+    show_notice(title, message, draw_usb_notice);
+}
+
+static void draw_dac(void *context, Canvas *canvas)
+{
+    dac_screen_draw(canvas, current_theme(), context);
+    draw_usb_status(canvas);
+}
+
+void app_show_dac(const AppDacView *view)
+{
+    static AppDacView shown;
+    shown = *view;
+    if (!app.display_on) {
+        set_display(true);
+    }
+    render((FrameDrawer){.draw = draw_dac, .context = &shown}, true, STRIP_HEIGHT);
     light_after_first_frame();
 }
 

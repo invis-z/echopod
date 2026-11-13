@@ -10,7 +10,8 @@
 typedef enum StatusPlayback {
     STATUS_PLAYBACK_NONE,
     STATUS_PLAYBACK_PLAYING,
-    STATUS_PLAYBACK_PAUSED
+    STATUS_PLAYBACK_PAUSED,
+    STATUS_PLAYBACK_USB
 } StatusPlayback;
 
 typedef enum StatusBluetooth {

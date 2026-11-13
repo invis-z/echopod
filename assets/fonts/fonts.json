@@ -71,6 +71,14 @@
       "ranges": [],
       "pack_faces": ["big_letters", "big_letters"],
       "level_bits": 2
+    },
+    {
+      "name": "inter_semibold_48",
+      "file": "inter/Inter-SemiBold.ttf",
+      "size": 48,
+      "ranges": [],
+      "pack_faces": ["big_digits", "big_digits"],
+      "level_bits": 2
     }
   ]
 }

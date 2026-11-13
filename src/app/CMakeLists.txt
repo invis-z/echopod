@@ -8,6 +8,7 @@ add_library(rippl_app STATIC
     bluetooth_store.c
     browse_screen.c
     cover_cache.c
+    dac_screen.c
     default_theme.c
     favorites_store.c
     diagnostics_values.c

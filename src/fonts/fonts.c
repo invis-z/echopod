@@ -947,3 +947,10 @@ const Font FONT_INTER_SEMIBOLD_64 = {
     .pack_faces = {8, 8},
     .level_bits = 2,
 };
+
+const Font FONT_INTER_SEMIBOLD_48 = {
+    .ascent = 47,
+    .descent = 12,
+    .pack_faces = {9, 9},
+    .level_bits = 2,
+};

@@ -109,3 +109,24 @@ void icon_draw_bluetooth(Canvas *canvas, Rect area, Color color)
         }
     }
 }
+
+enum {
+    TRIDENT_ROWS = 10,
+    TRIDENT_COLUMNS = 9
+};
+
+static const uint16_t TRIDENT[TRIDENT_ROWS] = {0x010, 0x038, 0x010, 0x191, 0x191,
+                                               0x092, 0x054, 0x038, 0x010, 0x038};
+
+void icon_draw_usb(Canvas *canvas, Rect area, Color color)
+{
+    int left = area.x + (area.width - TRIDENT_COLUMNS) / 2;
+    int top = area.y + (area.height - TRIDENT_ROWS) / 2;
+    for (int row = 0; row < TRIDENT_ROWS; row++) {
+        for (int column = 0; column < TRIDENT_COLUMNS; column++) {
+            if ((TRIDENT[row] >> column & 1) != 0) {
+                canvas_fill_rect(canvas, (Rect){left + column, top + row, 1, 1}, color);
+            }
+        }
+    }
+}

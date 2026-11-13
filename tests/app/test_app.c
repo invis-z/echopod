@@ -841,6 +841,44 @@ static void dac_keys_skip_on_a_held_rocker_and_play_pause_on_play(void)
     app_dac_keys_stop();
 }
 
+static uint32_t screen_hash(void);
+
+static void a_usb_notice_adds_the_status_bar_to_a_notice(void)
+{
+    start_app_with_library();
+    fake_hal_set_battery((HalBattery){.known = true, .percent = 50});
+    app_show_notice("USB Storage", "Connected.");
+    uint32_t plain = screen_hash();
+    app_show_usb_notice("USB Storage", "Connected.");
+    CHECK(screen_hash() != plain);
+}
+
+static void start_app_with_settings(const Settings *settings);
+
+static void holding_menu_opens_the_dac_stats(void)
+{
+    start_app_with_library();
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_NONE, dac_tap(KEY_MENU));
+    dac_press(KEY_MENU, 1000);
+    dac_release(KEY_MENU);
+    CHECK_EQUAL(APP_DAC_KEY_STATS, app_dac_next_key());
+    app_dac_keys_stop();
+}
+
+static void holding_menu_opens_the_dac_stats_when_menu_skips(void)
+{
+    Settings settings = settings_defaults();
+    settings.options[OPTION_MENU_KEY] = MENU_KEY_NEXT;
+    start_app_with_settings(&settings);
+    app_dac_keys_start();
+    CHECK_EQUAL(APP_DAC_KEY_NEXT, dac_tap(KEY_MENU));
+    dac_press(KEY_MENU, 1000);
+    dac_release(KEY_MENU);
+    CHECK_EQUAL(APP_DAC_KEY_STATS, app_dac_next_key());
+    app_dac_keys_stop();
+}
+
 static void dac_keys_keep_changing_the_volume_when_held_right_after_a_tap(void)
 {
     start_app_with_library();
@@ -3754,6 +3792,9 @@ int main(void)
         TEST_CASE(dac_keys_turn_around_in_a_swapping_portrait),
         TEST_CASE(swapped_volume_buttons_leave_lists_and_skips_alone),
         TEST_CASE(dac_keys_skip_on_a_held_rocker_and_play_pause_on_play),
+        TEST_CASE(a_usb_notice_adds_the_status_bar_to_a_notice),
+        TEST_CASE(holding_menu_opens_the_dac_stats),
+        TEST_CASE(holding_menu_opens_the_dac_stats_when_menu_skips),
         TEST_CASE(dac_keys_keep_changing_the_volume_when_held_right_after_a_tap),
         TEST_CASE(dac_keys_leave_on_a_long_back_press_and_then_serve_the_screens_again),
         TEST_CASE(a_usb_choice_is_picked_with_play),

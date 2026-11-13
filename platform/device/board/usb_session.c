@@ -23,6 +23,8 @@ enum {
     LAST_REPLY_TIMEOUT_MS = 200,
     COUNTER_REFRESH_MS = 1000,
     COUNTER_TEXT_CAPACITY = 48,
+    MESSAGE_CAPACITY = 192,
+    STATUS_REFRESH_MS = 5000,
     SERIAL_DIGITS = 8,
     INTERNAL_LUN = 0,
     CARD_LUN = 1,
@@ -40,6 +42,9 @@ static UsbFallback fallback;
 static VbusDebounce vbus;
 static SdHealth card_at_start;
 static bool screen_dark;
+static uint32_t shown_ms;
+static char shown_title[COUNTER_TEXT_CAPACITY];
+static char shown_message[MESSAGE_CAPACITY];
 static uint32_t screen_used_ms;
 static uint32_t write_buffer[WRITE_BUFFER_SECTORS * MSC_SECTOR_SIZE / 4];
 
@@ -131,6 +136,33 @@ static void dim_when_idle(void)
     }
 }
 
+static void show(const char *title, const char *message)
+{
+    StringBuilder top = string_builder_make(shown_title, sizeof shown_title);
+    string_builder_append(&top, title);
+    StringBuilder line = string_builder_make(shown_message, sizeof shown_message);
+    string_builder_append(&line, message);
+    shown_ms = hal_clock_milliseconds();
+    app_show_usb_notice(shown_title, shown_message);
+}
+
+static void refresh_status(void)
+{
+    if (!screen_dark && hal_clock_milliseconds() - shown_ms >= STATUS_REFRESH_MS) {
+        shown_ms = hal_clock_milliseconds();
+        app_show_usb_notice(shown_title, shown_message);
+    }
+}
+
+static void show_storage(const char *message)
+{
+    char title[COUNTER_TEXT_CAPACITY];
+    StringBuilder top = string_builder_make(title, sizeof title);
+    string_builder_append(&top, "USB ");
+    string_builder_append(&top, i18n_text(STR_SETTINGS_STORAGE));
+    show(title, message);
+}
+
 static void show_counters(MscStats stats)
 {
     light_screen();
@@ -143,7 +175,7 @@ static void show_counters(MscStats stats)
     append_count(&top, 'E', stats.read_failures + stats.write_failures);
     StringBuilder line = string_builder_make(message, sizeof message);
     append_history(&line);
-    app_show_notice(title, message);
+    show(title, message);
 }
 
 static bool stats_changed(MscStats now, MscStats shown)
@@ -182,6 +214,7 @@ static UsbSessionEnd serve(void)
         usb_poll(&port);
         board_display_service();
         dim_when_idle();
+        refresh_status();
         if (usb_fallback_due(&fallback, session_works(), hal_clock_milliseconds())) {
             fall_back_to_full_speed();
         }
@@ -226,7 +259,7 @@ static void remember_session(UsbSessionEnd end)
 
 static UsbSessionEnd run(void)
 {
-    app_show_notice("USB", i18n_text(STR_USB_COMPUTER_FOUND));
+    show_storage(i18n_text(STR_USB_COMPUTER_FOUND));
     vbus_debounce_start(&vbus);
     fallback = (UsbFallback){.watching = false};
     prepare_port();
@@ -235,8 +268,8 @@ static UsbSessionEnd run(void)
     UsbSessionEnd end = USB_SESSION_NO_HOST;
     if (usb_wait_for_host(&port, HOST_TIMEOUT_MS)) {
         usb_fallback_start(&fallback, port.link.high_speed_allowed, hal_clock_milliseconds());
-        app_show_notice("USB", i18n_text(card_present ? STR_USB_CONNECTED_EJECT_BOTH
-                                                      : STR_USB_CONNECTED_EJECT_ONE));
+        show_storage(
+            i18n_text(card_present ? STR_USB_CONNECTED_EJECT_BOTH : STR_USB_CONNECTED_EJECT_ONE));
         end = serve();
         light_screen();
     }

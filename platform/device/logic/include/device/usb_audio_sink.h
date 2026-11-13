@@ -45,3 +45,4 @@ void usb_audio_sink_write(UsbAudioSink *sink, const uint8_t *bytes, uint32_t len
                           uint32_t consumed);
 void usb_audio_sink_count_frame(UsbAudioSink *sink, uint16_t frame);
 bool usb_audio_sink_primed(const UsbAudioSink *sink);
+void usb_audio_sink_finish(UsbAudioSink *sink, uint32_t consumed);

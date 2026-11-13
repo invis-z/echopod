@@ -147,18 +147,21 @@ set(RIPPL_OVERLAY_IMPORTS
     app_dac_next_key
     app_prepare_notice
     app_remember_dac_volume
+    app_show_dac
     app_show_notice
+    app_show_usb_notice
     board_audio_stream_attenuation
     board_audio_stream_close
-    board_audio_stream_consumed
     board_audio_stream_open
     board_audio_stream_pause
     board_audio_stream_play
+    board_audio_stream_position
     board_audio_stream_ring
     board_audio_volume_level
     board_display_service
     board_restart
     board_start_record_update
+    board_usb_interrupt_attach
     board_wait_for_key
     covers_open
     emmc_read
@@ -172,6 +175,7 @@ set(RIPPL_OVERLAY_IMPORTS
     fat_read
     hal_audio_service
     hal_audio_set_volume
+    hal_clock_microseconds
     hal_clock_milliseconds
     hal_display_set_power
     hal_input_next_transition

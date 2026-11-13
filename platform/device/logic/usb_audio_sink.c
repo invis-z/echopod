@@ -10,7 +10,8 @@ enum {
     WORD_BYTES = 4,
     GAIN_BITS = 24,
     HALF_DECIBELS_PER_DECADE = 40,
-    RAMP_DIVISOR = 128
+    RAMP_DIVISOR = 128,
+    FINISH_FADE_SHARE = 8
 };
 
 static const uint32_t HALF_DECIBEL_GAINS[HALF_DECIBELS_PER_DECADE] = {
@@ -163,6 +164,25 @@ static void write_frames(UsbAudioSink *sink, const uint8_t *bytes, uint32_t fram
         put_frame(sink, sink->written++, scaled(sample_word(frame, sink->sample_bytes), sink->gain),
                   scaled(sample_word(frame + sink->sample_bytes, sink->sample_bytes), sink->gain));
     }
+}
+
+void usb_audio_sink_finish(UsbAudioSink *sink, uint32_t consumed)
+{
+    int32_t pending = (int32_t)(sink->written - consumed);
+    pending = pending < 0 ? 0 : pending;
+    uint32_t fade = sink->guard / FINISH_FADE_SHARE;
+    fade = (uint32_t)pending < fade ? (uint32_t)pending : fade;
+    for (uint32_t step = 0; step < fade; step++) {
+        uint32_t frame = sink->written - fade + step;
+        uint32_t *words = sink->ring + (frame % sink->ring_frames) * WORDS_PER_FRAME;
+        int32_t gain = (int32_t)(((int64_t)(fade - step - 1) << GAIN_BITS) / (int64_t)fade);
+        words[0] = scaled(words[0], gain);
+        words[1] = scaled(words[1], gain);
+    }
+    uint32_t end = consumed + sink->ring_frames;
+    clear_range(sink, (uint32_t)pending > 0 ? sink->written : consumed, end);
+    sink->cleared = end;
+    sink->gain = 0;
 }
 
 void usb_audio_sink_write(UsbAudioSink *sink, const uint8_t *bytes, uint32_t length,

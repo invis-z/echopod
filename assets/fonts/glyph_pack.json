@@ -50,6 +50,13 @@
       "size": 64,
       "ranges": [[35, 35], [65, 90]],
       "level_bits": 2
+    },
+    {
+      "name": "big_digits",
+      "file": "inter/Inter-SemiBold.ttf",
+      "size": 48,
+      "ranges": [[46, 46], [48, 57]],
+      "level_bits": 2
     }
   ],
   "character_sets": {
