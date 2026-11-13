@@ -110,6 +110,7 @@ STR_SETTINGS_OUTPUT_USING_44 = Níveis de volume de 4.4 mm
 STR_SETTINGS_MAIN_MENU = Menu principal
 STR_SETTINGS_STORAGE = Armazenamento
 STR_SETTINGS_DAC = DAC
+STR_SETTINGS_HIRES_DAC = Hi-Res DAC
 STR_SETTINGS_USB_DRIVES = USB mostra as unidades do leitor
 STR_SETTINGS_USB_SOUND = USB toca o som do computador
 STR_SETTINGS_SAVE_FAILED = Erro ao guardar definições

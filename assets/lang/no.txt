@@ -109,6 +109,7 @@ STR_SETTINGS_OUTPUT_USING_44 = Bruker 4.4 mm-volum
 STR_SETTINGS_MAIN_MENU = Hovedmeny
 STR_SETTINGS_STORAGE = Lagring
 STR_SETTINGS_DAC = DAC
+STR_SETTINGS_HIRES_DAC = Hi-Res DAC
 STR_SETTINGS_USB_DRIVES = USB viser spillerens stasjoner
 STR_SETTINGS_USB_SOUND = USB spiller datamaskinens lyd
 STR_SETTINGS_SAVE_FAILED = Kunne ikke lagre innstillinger

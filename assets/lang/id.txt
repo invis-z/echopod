@@ -114,6 +114,7 @@ STR_SETTINGS_OUTPUT_USING_44 = Memakai level volume 4,4 mm
 STR_SETTINGS_MAIN_MENU = Menu utama
 STR_SETTINGS_STORAGE = Penyimpanan
 STR_SETTINGS_DAC = DAC
+STR_SETTINGS_HIRES_DAC = Hi-Res DAC
 STR_SETTINGS_USB_DRIVES = USB menampilkan drive pemutar
 STR_SETTINGS_USB_SOUND = USB memutar suara komputer
 STR_SETTINGS_SAVE_FAILED = Pengaturan tidak dapat disimpan

@@ -110,6 +110,7 @@ STR_SETTINGS_OUTPUT_USING_44 = Volumeniveaus van 4.4 mm
 STR_SETTINGS_MAIN_MENU = Hoofdmenu
 STR_SETTINGS_STORAGE = Opslag
 STR_SETTINGS_DAC = DAC
+STR_SETTINGS_HIRES_DAC = Hi-Res DAC
 STR_SETTINGS_USB_DRIVES = USB toont de schijven van de speler
 STR_SETTINGS_USB_SOUND = USB speelt geluid van de computer
 STR_SETTINGS_SAVE_FAILED = Instellingen opslaan mislukt

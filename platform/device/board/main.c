@@ -21,8 +21,9 @@ enum {
     EMPTY_NOTICE_MS = 2000,
     USB_CHOICE_STORAGE = 0,
     USB_CHOICE_DAC = 1,
-    USB_CHOICE_CHARGE_ONLY = 2,
-    USB_CHOICE_COUNT = 3
+    USB_CHOICE_HIRES_DAC = 2,
+    USB_CHOICE_CHARGE_ONLY = 3,
+    USB_CHOICE_COUNT = 4
 };
 
 typedef enum UsbState {
@@ -33,7 +34,7 @@ typedef enum UsbState {
 } UsbState;
 
 static const StringId USB_CHOICES[USB_CHOICE_COUNT] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC,
-                                                       STR_USB_CHARGE_ONLY};
+                                                       STR_SETTINGS_HIRES_DAC, STR_USB_CHARGE_ONLY};
 
 static UsbState usb_state;
 static uint32_t listen_started_ms;
@@ -56,7 +57,14 @@ void hal_system_set_usb_prompt(bool ask)
 
 static int saved_choice(void)
 {
-    return usb_mode == HAL_USB_MODE_DAC ? USB_CHOICE_DAC : USB_CHOICE_STORAGE;
+    switch (usb_mode) {
+    case HAL_USB_MODE_DAC:
+        return USB_CHOICE_DAC;
+    case HAL_USB_MODE_HIRES_DAC:
+        return USB_CHOICE_HIRES_DAC;
+    default:
+        return USB_CHOICE_STORAGE;
+    }
 }
 
 bool board_usb_listening(void)
@@ -152,8 +160,10 @@ static void report_failed_start(void)
 static bool listen(int choice)
 {
     raise_clock_for_usb();
-    dac_session = choice == USB_CHOICE_DAC;
-    if (dac_session ? usb_dac_session_listen() : usb_session_listen()) {
+    dac_session = choice == USB_CHOICE_DAC || choice == USB_CHOICE_HIRES_DAC;
+    bool listening =
+        dac_session ? usb_dac_session_listen(choice == USB_CHOICE_HIRES_DAC) : usb_session_listen();
+    if (listening) {
         return true;
     }
     report_failed_start();

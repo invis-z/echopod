@@ -109,6 +109,7 @@ STR_SETTINGS_OUTPUT_USING_44 = Volúmenes del jack de 4,4 mm
 STR_SETTINGS_MAIN_MENU = Menú principal
 STR_SETTINGS_STORAGE = Almacenam.
 STR_SETTINGS_DAC = DAC
+STR_SETTINGS_HIRES_DAC = Hi-Res DAC
 STR_SETTINGS_USB_DRIVES = USB muestra las unidades del reproductor
 STR_SETTINGS_USB_SOUND = USB reproduce el sonido del equipo
 STR_SETTINGS_SAVE_FAILED = No se guardaron los ajustes

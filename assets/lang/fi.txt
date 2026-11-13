@@ -109,6 +109,7 @@ STR_SETTINGS_OUTPUT_USING_44 = 4.4 mm:n volyymitasot
 STR_SETTINGS_MAIN_MENU = Päävalikko
 STR_SETTINGS_STORAGE = Tallennus
 STR_SETTINGS_DAC = DAC
+STR_SETTINGS_HIRES_DAC = Hi-Res DAC
 STR_SETTINGS_USB_DRIVES = USB näyttää soittimen asemat
 STR_SETTINGS_USB_SOUND = USB toistaa tietokoneen äänen
 STR_SETTINGS_SAVE_FAILED = Asetusten tallennus epäonnistui

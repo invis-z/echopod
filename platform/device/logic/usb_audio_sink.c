@@ -6,6 +6,7 @@ enum {
     SETTLE_DIVISOR = 1000,
     CORRECTION_SPACING = 7,
     GUARD_DIVISOR = 50,
+    RING_SHARE = 4,
     WORDS_PER_FRAME = 2,
     WORD_BYTES = 4,
     GAIN_BITS = 24,
@@ -31,8 +32,9 @@ void usb_audio_sink_start(UsbAudioSink *sink, uint32_t rate, uint8_t sample_byte
 {
     sink->written = 0;
     sink->cleared = 0;
-    sink->target = rate / TARGET_DIVISOR;
-    sink->guard = rate / GUARD_DIVISOR;
+    uint32_t most = sink->ring_frames / RING_SHARE;
+    sink->target = rate / TARGET_DIVISOR < most ? rate / TARGET_DIVISOR : most;
+    sink->guard = rate / GUARD_DIVISOR < most ? rate / GUARD_DIVISOR : most;
     sink->sample_bytes = sample_bytes;
     sink->playing = false;
     sink->frame_known = false;

@@ -109,6 +109,7 @@ STR_SETTINGS_OUTPUT_USING_44 = Lautstärke für 4,4 mm
 STR_SETTINGS_MAIN_MENU = Hauptmenü
 STR_SETTINGS_STORAGE = Speicher
 STR_SETTINGS_DAC = DAC
+STR_SETTINGS_HIRES_DAC = Hi-Res DAC
 STR_SETTINGS_USB_DRIVES = USB zeigt die Laufwerke des Players
 STR_SETTINGS_USB_SOUND = USB spielt den Ton des Computers
 STR_SETTINGS_SAVE_FAILED = Einstellungen nicht gespeichert

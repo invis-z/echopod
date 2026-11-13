@@ -109,6 +109,7 @@ STR_SETTINGS_OUTPUT_USING_44 = Volumes de la prise 4,4 mm
 STR_SETTINGS_MAIN_MENU = Menu principal
 STR_SETTINGS_STORAGE = Stockage
 STR_SETTINGS_DAC = DAC
+STR_SETTINGS_HIRES_DAC = Hi-Res DAC
 STR_SETTINGS_USB_DRIVES = USB montre les disques du lecteur
 STR_SETTINGS_USB_SOUND = USB lit le son de l'ordinateur
 STR_SETTINGS_SAVE_FAILED = Réglages non enregistrés

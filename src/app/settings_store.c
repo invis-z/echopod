@@ -13,7 +13,8 @@ static const HalAudioDre HAL_DRES[DRE_MODE_COUNT] = {HAL_AUDIO_DRE_OFF, HAL_AUDI
                                                      HAL_AUDIO_DRE_ON_FIX};
 static const HalAudioOutput HAL_OUTPUTS[OUTPUT_JACK_COUNT] = {
     HAL_AUDIO_OUTPUT_AUTO, HAL_AUDIO_OUTPUT_SINGLE_ENDED, HAL_AUDIO_OUTPUT_BALANCED};
-static const HalUsbMode HAL_USB_MODES[USB_MODE_COUNT] = {HAL_USB_MODE_STORAGE, HAL_USB_MODE_DAC};
+static const HalUsbMode HAL_USB_MODES[USB_MODE_COUNT] = {HAL_USB_MODE_STORAGE, HAL_USB_MODE_DAC,
+                                                         HAL_USB_MODE_HIRES_DAC};
 
 static uint32_t read_settings(uint8_t *bytes)
 {

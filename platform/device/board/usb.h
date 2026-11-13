@@ -56,12 +56,16 @@ typedef struct UsbPort {
     volatile bool control_data_ready;
     uint16_t control_data_length;
     uint32_t control_data[USB_PACKET_SIZE / 4];
+    bool interrupts;
+    bool feedback_armed;
+    bool feedback_odd;
+    uint32_t feedback_armed_ms;
+    uint32_t feedback_retries;
     uint32_t control_entries;
     uint32_t wrong_slots;
     uint32_t late_interrupts;
     uint32_t interrupt_last_us;
     uint32_t interrupt_gap_us;
-    bool interrupts;
     void (*receive_stream)(const uint8_t *bytes, uint32_t length);
 } UsbPort;
 
@@ -77,6 +81,8 @@ bool usb_wait_for_host(UsbPort *port, uint32_t timeout_ms);
 void usb_poll(UsbPort *port);
 void usb_receive_interrupts_start(UsbPort *port);
 void usb_receive_interrupts_stop(UsbPort *port);
+bool usb_feedback_wanted(UsbPort *port);
+void usb_feedback_send(UsbPort *port, uint32_t value);
 UsbProbe usb_probe(void);
 bool usb_reply_pending(const UsbPort *port);
 bool usb_send_report(UsbPort *port, uint8_t report);

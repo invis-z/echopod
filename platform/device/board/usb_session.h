@@ -29,6 +29,7 @@ typedef struct UsbShared {
     bool high_speed_failed;
     bool flash_rewritten;
     bool dac_volume_known;
+    bool high_resolution;
     uint8_t dac_volume;
 } UsbShared;
 
@@ -44,7 +45,7 @@ typedef struct UsbOverlayEntry {
 } UsbOverlayEntry;
 
 bool usb_session_listen(void);
-bool usb_dac_session_listen(void);
+bool usb_dac_session_listen(bool high_resolution);
 bool usb_session_host_seen(void);
 void usb_session_stop_listening(void);
 const UsbReport *usb_session_report(void);

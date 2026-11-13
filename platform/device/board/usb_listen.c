@@ -27,9 +27,10 @@ bool usb_session_listen(void)
     return connected;
 }
 
-bool usb_dac_session_listen(void)
+bool usb_dac_session_listen(bool high_resolution)
 {
-    shared.link = (UsbLink){.high_speed_allowed = false};
+    shared.high_resolution = high_resolution;
+    shared.link = (UsbLink){.high_speed_allowed = high_resolution};
     usb_power_up();
     if (usb_connect(&shared.link)) {
         return true;

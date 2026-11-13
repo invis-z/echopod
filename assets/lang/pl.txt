@@ -111,6 +111,7 @@ STR_SETTINGS_OUTPUT_USING_44 = Poziomy głośności dla 4,4 mm
 STR_SETTINGS_MAIN_MENU = Menu główne
 STR_SETTINGS_STORAGE = Pamięć
 STR_SETTINGS_DAC = DAC
+STR_SETTINGS_HIRES_DAC = Hi-Res DAC
 STR_SETTINGS_USB_DRIVES = USB pokazuje dyski odtwarzacza
 STR_SETTINGS_USB_SOUND = USB odtwarza dźwięk komputera
 STR_SETTINGS_SAVE_FAILED = Nie można zapisać ustawień

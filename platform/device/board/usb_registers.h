@@ -14,6 +14,7 @@
 #define GRSTCTL 0x010u
 #define GINTSTS 0x014u
 #define GINTMSK 0x018u
+#define GRXSTSR 0x01Cu
 #define GRXSTSP 0x020u
 #define GRXFSIZ 0x024u
 #define GNPTXFSIZ 0x028u
@@ -23,6 +24,7 @@
 #define GHWCFG3 0x04Cu
 #define GHWCFG4 0x050u
 #define DIEPTXF1 0x104u
+#define DIEPTXF2 0x108u
 #define DCFG 0x800u
 #define DCTL 0x804u
 #define DSTS 0x808u
@@ -35,6 +37,7 @@
 #define GRSTCTL_SOFT_RESET (1u << 0)
 #define GRSTCTL_RX_FLUSH (1u << 4)
 #define GRSTCTL_TX_FLUSH (1u << 5)
+#define GRSTCTL_TX_FIFO_SHIFT 6
 #define GRSTCTL_FLUSH_ALL_TX 0x420u
 #define GRSTCTL_AHB_IDLE (1u << 31)
 #define GRSTCTL_AFTER_FLUSH 0x8u
@@ -81,9 +84,11 @@
 #define EP_INT_TRANSFER_DONE (1u << 0)
 #define EP_INT_SETUP (1u << 3)
 #define EP_INT_DISABLED (1u << 1)
+#define EP_INT_NAK_EFFECTIVE (1u << 6)
 #define EP_INT_ALL 0xFFFFu
 #define EP0_OUT_SETUP_SIZE 0x60080040u
 #define ONE_PACKET (1u << 19)
+#define ONE_ISO_IN_TRANSACTION (1u << 29)
 #define PACKET_COUNT_SHIFT 19
 #define DIEPMSK_VALUE 0x2Fu
 #define DOEPMSK_VALUE 0x0Fu
@@ -124,6 +129,9 @@ enum {
     PACKET_WORDS = USB_PACKET_SIZE / 4,
     BULK_CHUNK_BYTES = 512,
     RX_ENTRIES_PER_INTERRUPT = 8,
+    AUDIO_TX_FIFO_WORDS = 16,
+    FEEDBACK_STUCK_MS = 250,
+    FEEDBACK_WITHDRAW_MS = 2,
     ISO_OUT_STOP_MS = 2,
     TRANSFER_DONE_SPINS = 32,
     LATE_INTERRUPT_US = 500,

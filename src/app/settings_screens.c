@@ -90,9 +90,10 @@ static const StringId THEME_OPTIONS[THEME_COUNT] = {
     STR_SETTINGS_PAPER, STR_SETTINGS_OLIVE, STR_SETTINGS_HIGH_CONTRAST};
 static const StringId STATUS_BAR_OPTIONS[2] = {STR_SETTINGS_STANDARD, STR_SETTINGS_LARGE};
 static const StringId POWER_ON_OPTIONS[2] = {STR_SETTINGS_PRESS, STR_SETTINGS_HOLD};
-static const StringId USB_MODE_OPTIONS[USB_MODE_COUNT] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC};
-static const StringId USB_MODE_MESSAGES[USB_MODE_COUNT] = {STR_SETTINGS_USB_DRIVES,
-                                                           STR_SETTINGS_USB_SOUND};
+static const StringId USB_MODE_OPTIONS[USB_MODE_COUNT] = {STR_SETTINGS_STORAGE, STR_SETTINGS_DAC,
+                                                          STR_SETTINGS_HIRES_DAC};
+static const StringId USB_MODE_MESSAGES[USB_MODE_COUNT] = {
+    STR_SETTINGS_USB_DRIVES, STR_SETTINGS_USB_SOUND, STR_SETTINGS_USB_SOUND};
 
 static const Settings *settings_of(const void *context)
 {

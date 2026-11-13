@@ -85,6 +85,25 @@ static void twenty_four_bit_samples_are_left_justified(void)
     CHECK_EQUAL(0xABCDEF00u, ring[1]);
 }
 
+static void thirty_two_bit_samples_pass_through_whole(void)
+{
+    UsbAudioSink sink = started_sink(4);
+    static const uint8_t bytes[] = {0x78, 0x56, 0x34, 0x12, 0x01, 0xEF, 0xCD, 0xAB};
+    usb_audio_sink_write(&sink, bytes, sizeof bytes, 0);
+    CHECK_EQUAL(0x12345678u, ring[0]);
+    CHECK_EQUAL(0xABCDEF01u, ring[1]);
+}
+
+static void high_rates_keep_the_target_inside_a_quarter_of_the_ring(void)
+{
+    UsbAudioSink sink = started_sink(4);
+    usb_audio_sink_start(&sink, 384000, 4);
+    CHECK_EQUAL(RING_FRAMES / 4, sink.target);
+    CHECK_EQUAL(RING_FRAMES / 4, sink.guard);
+    usb_audio_sink_start(&sink, RATE, 4);
+    CHECK_EQUAL(TARGET, sink.target);
+}
+
 static void finishing_fades_the_tail_and_silences_the_rest_of_the_ring(void)
 {
     UsbAudioSink sink = started_sink(3);
@@ -372,6 +391,8 @@ int main(void)
     static const TestCase cases[] = {
         TEST_CASE(sixteen_bit_samples_go_to_the_top_of_each_word),
         TEST_CASE(twenty_four_bit_samples_are_left_justified),
+        TEST_CASE(thirty_two_bit_samples_pass_through_whole),
+        TEST_CASE(high_rates_keep_the_target_inside_a_quarter_of_the_ring),
         TEST_CASE(finishing_fades_the_tail_and_silences_the_rest_of_the_ring),
         TEST_CASE(finishing_after_the_output_ran_past_the_audio_clears_everything),
         TEST_CASE(a_partial_frame_at_the_end_of_a_packet_is_ignored),

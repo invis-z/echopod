@@ -109,6 +109,7 @@ STR_SETTINGS_OUTPUT_USING_44 = Рівні гучності для 4,4 мм
 STR_SETTINGS_MAIN_MENU = Головне меню
 STR_SETTINGS_STORAGE = Накопичувач
 STR_SETTINGS_DAC = DAC
+STR_SETTINGS_HIRES_DAC = Hi-Res DAC
 STR_SETTINGS_USB_DRIVES = Комп'ютер бачить диски плеєра
 STR_SETTINGS_USB_SOUND = Плеєр грає звук комп'ютера
 STR_SETTINGS_SAVE_FAILED = Не вдалося зберегти налаштування

@@ -8,6 +8,7 @@
 #include "core/string_builder.h"
 #include "device/usb_audio.h"
 #include "device/usb_audio_sink.h"
+#include "device/usb_feedback.h"
 #include "hal/audio.h"
 #include "hal/clock.h"
 #include "hal/power.h"
@@ -20,13 +21,13 @@ enum {
     STREAM_IDLE_MS = 100,
     STREAM_QUIET_MS = 10,
     POLLS_PER_SERVICE = 4,
-    BITS_PER_BYTE = 8,
     STATS_REFRESH_MS = 1000,
     STATE_REFRESH_MS = 5000,
     REPORT_QUEUE_CAPACITY = 8
 };
 
 static const char TITLE[] = "USB DAC";
+static const char HIGH_RESOLUTION_TITLE[] = "Hi-Res DAC";
 
 static UsbShared *shared;
 static UsbPort port;
@@ -36,6 +37,8 @@ static uint32_t open_rate;
 static volatile uint32_t last_packet_ms;
 static volatile bool receiving;
 static volatile bool finished;
+static bool high_resolution;
+static UsbFeedback feedback;
 static uint32_t stream_consumed;
 static uint32_t stream_last_position;
 static bool playing;
@@ -113,6 +116,7 @@ static void fill_stats(AppDacStats *stats)
         .starts = output_starts,
         .stops = output_stops,
         .formats = format_changes,
+        .retries = port.feedback_retries,
         .control = port.control_entries,
         .wrong_slot = port.wrong_slots,
         .late = port.late_interrupts,
@@ -125,9 +129,9 @@ static void fill_stats(AppDacStats *stats)
 static void show_state(void)
 {
     AppDacStats stats;
-    AppDacView view = {.title = TITLE,
+    AppDacView view = {.title = high_resolution ? HIGH_RESOLUTION_TITLE : TITLE,
                        .rate = audio.rate,
-                       .bits = (uint8_t)(BITS_PER_BYTE * usb_audio_sample_bytes(&audio)),
+                       .bits = usb_audio_bits(&audio),
                        .volume = shared->dac_volume};
     if (usb_audio_sample_bytes(&audio) == 0) {
         view.message = i18n_text(STR_USB_CHOOSE_OUTPUT);
@@ -160,6 +164,11 @@ static void apply_attenuation(void)
         &sink, muted || total >= USB_AUDIO_SINK_MUTED ? USB_AUDIO_SINK_MUTED : (uint8_t)total);
 }
 
+static void start_feedback(void)
+{
+    usb_feedback_start(&feedback, audio.rate, port.device.speed == USB_SPEED_HIGH, sink.target);
+}
+
 static void stop_output(void)
 {
     output_stops++;
@@ -171,6 +180,7 @@ static void stop_output(void)
     }
     restart_position();
     usb_audio_sink_start(&sink, audio.rate, usb_audio_sample_bytes(&audio));
+    start_feedback();
     receiving = was_receiving;
 }
 
@@ -225,6 +235,17 @@ static void track_output(void)
     uint32_t primask = irq_save();
     (void)consumed_frames();
     irq_restore(primask);
+}
+
+static void send_feedback(void)
+{
+    if (!high_resolution || !usb_feedback_wanted(&port)) {
+        return;
+    }
+    uint32_t primask = irq_save();
+    int32_t fill = playing ? (int32_t)(sink.written - stream_consumed) : (int32_t)sink.target;
+    irq_restore(primask);
+    usb_feedback_send(&port, usb_feedback_value(&feedback, fill));
 }
 
 static void step_volume(int step)
@@ -297,6 +318,7 @@ static void serve(void)
         follow_host();
         track_output();
         keep_output();
+        send_feedback();
         send_reports();
         refresh_state();
     }
@@ -323,7 +345,13 @@ static void start_session(void)
                      .bulk_packet = USB_PACKET_SIZE,
                      .audio = &audio,
                      .receive_stream = receive_stream};
-    usb_audio_init(&audio, &port.device);
+    high_resolution = shared->high_resolution;
+    if (high_resolution) {
+        usb_audio_init_high_resolution(&audio, &port.device);
+    } else {
+        usb_audio_init(&audio, &port.device);
+    }
+    start_feedback();
     if (!shared->dac_volume_known) {
         shared->dac_volume = (uint8_t)SETTINGS_DEFAULT_DAC_VOLUME;
     }
@@ -333,7 +361,8 @@ static void start_session(void)
 void usb_dac_session(UsbShared *state)
 {
     shared = state;
-    app_show_notice(TITLE, i18n_text(STR_USB_COMPUTER_FOUND));
+    app_show_notice(state->high_resolution ? HIGH_RESOLUTION_TITLE : TITLE,
+                    i18n_text(STR_USB_COMPUTER_FOUND));
     uint8_t level = board_audio_volume_level();
     start_session();
     uint8_t starting_volume = shared->dac_volume;

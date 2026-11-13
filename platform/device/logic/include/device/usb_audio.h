@@ -20,7 +20,12 @@ enum {
     USB_HID_INTERVAL_MS = 10,
     USB_HID_PLAY_PAUSE = 1,
     USB_HID_NEXT = 2,
-    USB_HID_PREVIOUS = 4
+    USB_HID_PREVIOUS = 4,
+    USB_AUDIO2_MAX_PACKET = 776,
+    USB_AUDIO2_HIGH_SPEED_MAX_PACKET = 392,
+    USB_AUDIO2_CONFIGURATION_LENGTH = 283,
+    USB_AUDIO2_RANGE_CAPACITY = 2 + 8 * 12,
+    USB_AUDIO_FEEDBACK_ENDPOINT = 0x81
 };
 
 typedef struct UsbAudio {
@@ -32,13 +37,19 @@ typedef struct UsbAudio {
     uint8_t report;
     uint32_t rate;
     uint8_t reply[4];
+    bool high_resolution;
+    uint8_t range[USB_AUDIO2_RANGE_CAPACITY];
+    uint8_t configuration[USB_AUDIO2_CONFIGURATION_LENGTH];
 } UsbAudio;
 
 void usb_audio_init(UsbAudio *audio, UsbDevice *device);
+void usb_audio_init_high_resolution(UsbAudio *audio, UsbDevice *device);
 void usb_audio_reset(UsbAudio *audio);
 UsbReply usb_audio_setup(UsbAudio *audio, UsbSetup setup);
 UsbReply usb_audio_receive(UsbAudio *audio, UsbSetup setup, const uint8_t *data, uint16_t length);
 uint8_t usb_audio_take_changes(UsbAudio *audio);
 uint8_t usb_audio_sample_bytes(const UsbAudio *audio);
+uint8_t usb_audio_bits(const UsbAudio *audio);
+uint16_t usb_audio_stream_packet(const UsbAudio *audio);
 void usb_audio_set_report(UsbAudio *audio, uint8_t report);
 uint8_t usb_audio_attenuation(const UsbAudio *audio);

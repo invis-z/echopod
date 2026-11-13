@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#include "usb_audio2.h"
+
 enum {
     TYPE_STANDARD_DEVICE_IN = 0x80,
     TYPE_STANDARD_INTERFACE_IN = 0x81,
@@ -256,6 +258,13 @@ void usb_audio_init(UsbAudio *audio, UsbDevice *device)
     *audio = (UsbAudio){.device = device, .rate = USB_AUDIO_DEFAULT_RATE};
 }
 
+void usb_audio_init_high_resolution(UsbAudio *audio, UsbDevice *device)
+{
+    usb_device_init(device, "", 1);
+    usb_device_allow_high_speed(device, true);
+    *audio = (UsbAudio){.device = device, .rate = USB_AUDIO_DEFAULT_RATE, .high_resolution = true};
+}
+
 static void set_alt(UsbAudio *audio, uint8_t alt)
 {
     if (audio->alt != alt) {
@@ -361,7 +370,8 @@ static UsbReply class_out(UsbSetup setup)
 
 static UsbReply set_interface(UsbAudio *audio, UsbSetup setup)
 {
-    if (setup.index == STREAMING_INTERFACE && setup.value <= LAST_ALT) {
+    uint16_t last = audio->high_resolution ? USB_AUDIO2_LAST_ALT : LAST_ALT;
+    if (setup.index == STREAMING_INTERFACE && setup.value <= last) {
         set_alt(audio, (uint8_t)setup.value);
         return status(USB_ACTION_STREAM, setup.value);
     }
@@ -432,20 +442,9 @@ static UsbReply standard(UsbAudio *audio, UsbSetup setup)
     return reply;
 }
 
-UsbReply usb_audio_setup(UsbAudio *audio, UsbSetup setup)
+static UsbReply common_setup(UsbAudio *audio, UsbSetup setup)
 {
-    if (own_descriptor(setup)) {
-        return descriptor(setup);
-    }
     switch (setup.request_type) {
-    case TYPE_CLASS_INTERFACE_IN:
-        return for_hid(setup) ? hid_class_in(audio, setup) : class_in(audio, setup);
-    case TYPE_CLASS_ENDPOINT_IN:
-        return class_in(audio, setup);
-    case TYPE_CLASS_INTERFACE_OUT:
-        return for_hid(setup) ? hid_class_out(setup) : class_out(setup);
-    case TYPE_CLASS_ENDPOINT_OUT:
-        return class_out(setup);
     case TYPE_STANDARD_INTERFACE_IN:
         if (setup.request == REQUEST_GET_DESCRIPTOR && for_hid(setup)) {
             return hid_descriptor(setup);
@@ -462,6 +461,45 @@ UsbReply usb_audio_setup(UsbAudio *audio, UsbSetup setup)
     }
 }
 
+static UsbReply high_resolution_setup(UsbAudio *audio, UsbSetup setup)
+{
+    if (usb_audio2_owns_descriptor(setup)) {
+        return usb_audio2_descriptor(audio, setup);
+    }
+    switch (setup.request_type) {
+    case TYPE_CLASS_INTERFACE_IN:
+        return for_hid(setup) ? hid_class_in(audio, setup) : usb_audio2_class_in(audio, setup);
+    case TYPE_CLASS_INTERFACE_OUT:
+        return for_hid(setup) ? hid_class_out(setup) : usb_audio2_class_out(setup);
+    case TYPE_CLASS_ENDPOINT_IN:
+    case TYPE_CLASS_ENDPOINT_OUT:
+        return stall();
+    default:
+        return common_setup(audio, setup);
+    }
+}
+
+UsbReply usb_audio_setup(UsbAudio *audio, UsbSetup setup)
+{
+    if (audio->high_resolution) {
+        return high_resolution_setup(audio, setup);
+    }
+    if (own_descriptor(setup)) {
+        return descriptor(setup);
+    }
+    switch (setup.request_type) {
+    case TYPE_CLASS_INTERFACE_IN:
+        return for_hid(setup) ? hid_class_in(audio, setup) : class_in(audio, setup);
+    case TYPE_CLASS_ENDPOINT_IN:
+        return class_in(audio, setup);
+    case TYPE_CLASS_INTERFACE_OUT:
+        return for_hid(setup) ? hid_class_out(setup) : class_out(setup);
+    case TYPE_CLASS_ENDPOINT_OUT:
+        return class_out(setup);
+    default:
+        return common_setup(audio, setup);
+    }
+}
 static int16_t clamped_volume(int32_t volume)
 {
     return (int16_t)(volume < VOLUME_MIN ? VOLUME_MIN : volume > VOLUME_MAX ? VOLUME_MAX : volume);
@@ -490,6 +528,9 @@ static uint32_t read_little_endian(const uint8_t *data, uint16_t length)
 
 UsbReply usb_audio_receive(UsbAudio *audio, UsbSetup setup, const uint8_t *data, uint16_t length)
 {
+    if (audio->high_resolution) {
+        return usb_audio2_receive(audio, setup, data, length);
+    }
     AudioControl control = control_of(setup);
     uint16_t needed = (uint16_t)(control == CONTROL_RATE     ? RATE_BYTES
                                  : control == CONTROL_VOLUME ? 2
@@ -519,7 +560,26 @@ uint8_t usb_audio_take_changes(UsbAudio *audio)
 
 uint8_t usb_audio_sample_bytes(const UsbAudio *audio)
 {
+    if (audio->high_resolution) {
+        return usb_audio2_sample_bytes(audio->alt);
+    }
     return audio->alt == 0 ? 0 : (uint8_t)(audio->alt + 1);
+}
+
+uint8_t usb_audio_bits(const UsbAudio *audio)
+{
+    if (audio->high_resolution) {
+        return usb_audio2_bits(audio->alt);
+    }
+    return (uint8_t)(8 * usb_audio_sample_bytes(audio));
+}
+
+uint16_t usb_audio_stream_packet(const UsbAudio *audio)
+{
+    if (audio->high_resolution) {
+        return usb_audio2_packet(audio->device->speed, audio->alt);
+    }
+    return USB_AUDIO_MAX_PACKET;
 }
 
 void usb_audio_set_report(UsbAudio *audio, uint8_t report)

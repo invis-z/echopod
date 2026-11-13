@@ -121,9 +121,11 @@ set(RIPPL_DEVICE_LOGIC_SOURCES
     tick_clock.c
     updater.c
     usb_audio.c
+    usb_audio2.c
     usb_audio_sink.c
     usb_device.c
     usb_fallback.c
+    usb_feedback.c
     vbus_debounce.c
     wav_format.c
 )
@@ -157,6 +159,7 @@ if(CMAKE_CROSSCOMPILING)
         start_record.c
         updater.c
         usb_audio.c
+        usb_audio2.c
         usb_device.c
         PROPERTIES COMPILE_OPTIONS -Os
     )

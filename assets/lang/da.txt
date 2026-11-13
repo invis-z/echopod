@@ -109,6 +109,7 @@ STR_SETTINGS_OUTPUT_USING_44 = Bruger 4.4 mm-lydstyrke
 STR_SETTINGS_MAIN_MENU = Hovedmenu
 STR_SETTINGS_STORAGE = Lager
 STR_SETTINGS_DAC = DAC
+STR_SETTINGS_HIRES_DAC = Hi-Res DAC
 STR_SETTINGS_USB_DRIVES = USB viser afspillerens drev
 STR_SETTINGS_USB_SOUND = USB afspiller computerens lyd
 STR_SETTINGS_SAVE_FAILED = Kunne ikke gemme indstillinger
