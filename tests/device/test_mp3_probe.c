@@ -62,6 +62,26 @@ static void a_tagged_file_skips_both_tags_and_the_info_frame(void)
     CHECK(stream.has_toc);
 }
 
+static uint32_t tag_bytes_of(const uint8_t *bytes, uint32_t size)
+{
+    free(fixture.bytes);
+    fixture.bytes = malloc(size);
+    memcpy(fixture.bytes, bytes, size);
+    fixture.size = size;
+    return mp3_tag_bytes((FlacInput){.read = read_fixture, .context = NULL, .size = size});
+}
+
+static void an_id3_tag_is_measured_from_its_header_and_footer_flag(void)
+{
+    static const uint8_t TAGGED[16] = {'I', 'D', '3', 3, 0, 0, 0, 0, 2, 1, 'f', 'L', 'a', 'C'};
+    static const uint8_t FOOTED[16] = {'I', 'D', '3', 4, 0, 0x10, 0, 0, 0, 5};
+    static const uint8_t BARE[16] = {'f', 'L', 'a', 'C'};
+    CHECK_EQUAL(10u + 257u, tag_bytes_of(TAGGED, sizeof TAGGED));
+    CHECK_EQUAL(10u + 5u + 10u, tag_bytes_of(FOOTED, sizeof FOOTED));
+    CHECK_EQUAL(0u, tag_bytes_of(BARE, sizeof BARE));
+    CHECK_EQUAL(0u, tag_bytes_of(TAGGED, 4));
+}
+
 static void a_bare_constant_rate_file_is_timed_from_its_size(void)
 {
     Mp3Stream stream;
@@ -204,6 +224,7 @@ int main(void)
 {
     static const TestCase cases[] = {
         TEST_CASE(a_tagged_file_skips_both_tags_and_the_info_frame),
+        TEST_CASE(an_id3_tag_is_measured_from_its_header_and_footer_flag),
         TEST_CASE(a_bare_constant_rate_file_is_timed_from_its_size),
         TEST_CASE(a_variable_rate_file_takes_its_length_from_the_xing_header),
         TEST_CASE(mpeg_2_frames_hold_576_samples),

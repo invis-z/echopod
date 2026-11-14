@@ -26,5 +26,6 @@ typedef struct Mp3Stream {
 
 bool mp3_signature(const uint8_t bytes[MP3_SIGNATURE_BYTES]);
 bool mp3_probe(FlacInput input, Mp3Stream *stream);
+uint32_t mp3_tag_bytes(FlacInput input);
 uint32_t mp3_seek_offset(const Mp3Stream *stream, uint32_t sample);
 uint32_t mp3_playable_samples(const Mp3Stream *stream);

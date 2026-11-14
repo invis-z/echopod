@@ -127,7 +127,7 @@ static uint32_t syncsafe(const uint8_t *bytes)
            (uint32_t)(bytes[2] & 0x7F) << 7 | (uint32_t)(bytes[3] & 0x7F);
 }
 
-static uint32_t audio_start(FlacInput input)
+uint32_t mp3_tag_bytes(FlacInput input)
 {
     uint8_t bytes[TAG_HEADER_BYTES];
     if (input.size < TAG_HEADER_BYTES || !input.read(input.context, 0, bytes, sizeof bytes) ||
@@ -265,7 +265,7 @@ static bool read_info(FlacInput input, uint32_t frame, const Header *header, uin
 
 bool mp3_probe(FlacInput input, Mp3Stream *stream)
 {
-    uint32_t start = audio_start(input);
+    uint32_t start = mp3_tag_bytes(input);
     if (start + HEADER_BYTES > input.size) {
         return false;
     }

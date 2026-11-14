@@ -186,6 +186,11 @@ static bool tag_is(const uint8_t *bytes, const char *tag)
            bytes[2] == (uint8_t)tag[2] && bytes[3] == (uint8_t)tag[3];
 }
 
+static bool tag_is_id3(const uint8_t *bytes)
+{
+    return bytes[0] == 'I' && bytes[1] == 'D' && bytes[2] == '3';
+}
+
 static uint32_t le32_at(const uint8_t *bytes)
 {
     return (uint32_t)bytes[0] | (uint32_t)bytes[1] << 8 | (uint32_t)bytes[2] << 16 |
@@ -241,6 +246,14 @@ static TrackProbe probe_input(FlacInput input)
         return probe_ogg(input);
     }
     TrackProbe probe = probe_header(magic, read);
+    if (probe.kind == SOURCE_MP3 && tag_is_id3(magic)) {
+        uint8_t after[LIGHT_SNIFF_BYTES] = {0};
+        uint32_t start = mp3_tag_bytes(input);
+        if (start > 0 && start <= input.size && input.size - start >= LIGHT_SNIFF_BYTES &&
+            input.read(input.context, start, after, sizeof after) && tag_is(after, "fLaC")) {
+            return probe_header(after, true);
+        }
+    }
     if (input.size < LIGHT_SNIFF_BYTES) {
         probe.rate = 0;
     }
